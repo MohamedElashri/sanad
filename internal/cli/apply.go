@@ -204,7 +204,7 @@ func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []stri
 			} else if ignore.Ignored {
 				decision = ignoredDecision(parsed, logicalRef, ignore)
 			} else {
-				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef)
+				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef, policy.UnpinnedPolicy(cfg.Updates.Unpinned))
 				decision = policy.Evaluate(policy.Entry{
 					File:       use.File,
 					Action:     parsed,
@@ -305,6 +305,8 @@ func applyInteractiveDecision(
 	switch {
 	case decision.Kind == policy.DecisionErrorUnpinned:
 		return promptUnpinnedAction(ctx, session, cfg, resolver, now, use, parsed, candidate, resolveErr, decision)
+	case decision.Kind == policy.DecisionErrorUnresolved && parsed.Valid && parsed.Ref == "" && !hasMetadata:
+		return promptUnpinnedAction(ctx, session, cfg, resolver, now, use, parsed, candidate, resolveErr, decision)
 	case decision.Kind == policy.DecisionErrorBranchDenied && candidate != nil:
 		return promptBranchAction(session, use, parsed, candidate, resolveErr, decision)
 	case decision.Kind == policy.DecisionUnchanged && parsed.Pinned && !hasMetadata:
@@ -346,7 +348,7 @@ func promptUnpinnedAction(
 			return parsed, candidate, resolveErr, decision, nil
 		}
 		nextParsed := actions.Parse(actionSelectorString(parsed) + "@" + ref)
-		nextCandidate, nextResolveErr := resolvePlanCandidate(ctx, resolver, nextParsed, "")
+		nextCandidate, nextResolveErr := resolvePlanCandidate(ctx, resolver, nextParsed, "", policy.UnpinnedDeny)
 		nextDecision := policy.Evaluate(policy.Entry{
 			Action:     nextParsed,
 			Candidate:  nextCandidate,
@@ -399,7 +401,7 @@ func promptMissingLogicalRef(
 		return parsed, candidate, resolveErr, decision, nil
 	}
 
-	nextCandidate, nextResolveErr := resolvePlanCandidate(ctx, resolver, parsed, ref)
+	nextCandidate, nextResolveErr := resolvePlanCandidate(ctx, resolver, parsed, ref, policy.UnpinnedDeny)
 	nextDecision := policy.Evaluate(policy.Entry{
 		Action:     parsed,
 		Candidate:  nextCandidate,

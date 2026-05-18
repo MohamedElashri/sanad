@@ -202,6 +202,84 @@ func TestPlanJSONOutputAndOutFile(t *testing.T) {
 	}
 }
 
+func TestPlanDiscoversDefaultBranchForUnpinnedActions(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("7", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@default-branch": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "main",
+			SHA:        sha,
+			Kind:       githubresolver.KindBranch,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+
+	root := withTempWorkingDir(t)
+	workflows := filepath.Join(root, ".github", "workflows")
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"default-branch\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workflows, "ci.yml"), []byte("jobs:\n  test:\n    steps:\n      - uses: actions/checkout\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "update" {
+		t.Fatalf("Decision = %q, want update (%s)", action.Decision, action.Reason)
+	}
+	if action.LogicalRef != "main" {
+		t.Fatalf("LogicalRef = %q, want main", action.LogicalRef)
+	}
+	if action.CandidateSHA != sha || action.CandidateRefKind != string(githubresolver.KindBranch) {
+		t.Fatalf("unexpected candidate: sha=%q kind=%q", action.CandidateSHA, action.CandidateRefKind)
+	}
+}
+
+func TestPlanDiscoversLatestReleaseForUnpinnedActions(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("8", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@latest-release": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v5",
+			SHA:        sha,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+
+	root := withTempWorkingDir(t)
+	workflows := filepath.Join(root, ".github", "workflows")
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"latest-release\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workflows, "ci.yml"), []byte("jobs:\n  test:\n    steps:\n      - uses: actions/checkout\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "update" {
+		t.Fatalf("Decision = %q, want update (%s)", action.Decision, action.Reason)
+	}
+	if action.LogicalRef != "v5" {
+		t.Fatalf("LogicalRef = %q, want v5", action.LogicalRef)
+	}
+	if action.CandidateSHA != sha || action.CandidateRefKind != string(githubresolver.KindTag) {
+		t.Fatalf("unexpected candidate: sha=%q kind=%q", action.CandidateSHA, action.CandidateRefKind)
+	}
+}
+
 func TestPlanConfiguresDefaultResolverFromGitHubAPIURL(t *testing.T) {
 	withTempWorkingDir(t)
 	if err := os.WriteFile(".sanad.toml", []byte("[github]\napi_url = \"https://github.example.com/api/v3\"\n"), 0o600); err != nil {
@@ -502,6 +580,14 @@ func (r fakePlanResolver) Resolve(_ context.Context, selector githubresolver.Act
 		return githubresolver.ResolvedRef{}, fmt.Errorf("unexpected resolve %s", key)
 	}
 	return resolved, nil
+}
+
+func (r fakePlanResolver) ResolveDefaultBranch(ctx context.Context, owner, repo string) (githubresolver.ResolvedRef, error) {
+	return r.Resolve(ctx, githubresolver.ActionSelector{Owner: owner, Repo: repo, Ref: "default-branch"})
+}
+
+func (r fakePlanResolver) ResolveLatestRelease(ctx context.Context, owner, repo string) (githubresolver.ResolvedRef, error) {
+	return r.Resolve(ctx, githubresolver.ActionSelector{Owner: owner, Repo: repo, Ref: "latest-release"})
 }
 
 type failingResolver struct{}

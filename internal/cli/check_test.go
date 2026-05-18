@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +139,52 @@ func TestCheckJSONIncludesViolations(t *testing.T) {
 	}
 	if violation.Raw != "owner/unpinned" {
 		t.Fatalf("Raw = %q, want owner/unpinned", violation.Raw)
+	}
+}
+
+func TestCheckUsesDefaultBranchPolicyForUnpinnedActions(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("7", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@default-branch": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "main",
+			SHA:        sha,
+			Kind:       githubresolver.KindBranch,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"default-branch\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"check", "--format", "json"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute returned nil error, want unpinned update violation")
+	}
+	if ExitCode(err) != exitPolicy {
+		t.Fatalf("ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+	}
+
+	var report checkReport
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("check output is not valid JSON: %v\n%s", err, out.String())
+	}
+	if len(report.Violations) != 1 {
+		t.Fatalf("violations = %d, want 1: %#v", len(report.Violations), report)
+	}
+	violation := report.Violations[0]
+	if violation.Decision != "update" || violation.LogicalRef != "main" || violation.CandidateSHA != sha {
+		t.Fatalf("unexpected violation: %#v", violation)
 	}
 }
 

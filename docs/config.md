@@ -118,8 +118,8 @@ Controls refs without `@ref`, such as `owner/repo`.
 Allowed values:
 
 - `deny`: report unpinned refs as policy violations.
-- `default-branch`: reserved by policy, but not fully resolved by the current CLI.
-- `latest-release`: reserved by policy, but not fully resolved by the current CLI.
+- `default-branch`: resolve the repository default branch and pin its current commit.
+- `latest-release`: resolve the latest GitHub release tag and pin its current commit.
 
 Default:
 
@@ -127,7 +127,7 @@ Default:
 unpinned = "deny"
 ```
 
-In interactive apply mode, you can enter an explicit ref for an unpinned action.
+If `latest-release` is configured and the repository has no releases, the action is reported as `error-unresolved`. In interactive apply mode, you can enter an explicit ref for an unpinned action or for an unpinned action whose configured discovery failed.
 
 ### `reusable_workflows`
 

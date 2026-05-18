@@ -23,6 +23,14 @@ type planResolver interface {
 	Resolve(context.Context, githubresolver.ActionSelector) (githubresolver.ResolvedRef, error)
 }
 
+type defaultBranchResolver interface {
+	ResolveDefaultBranch(context.Context, string, string) (githubresolver.ResolvedRef, error)
+}
+
+type latestReleaseResolver interface {
+	ResolveLatestRelease(context.Context, string, string) (githubresolver.ResolvedRef, error)
+}
+
 var (
 	defaultPlanResolver        planResolver
 	defaultPlanResolverFactory = newDefaultPlanResolver
@@ -201,7 +209,7 @@ func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []str
 			} else if ignore.Ignored {
 				decision = ignoredDecision(parsed, logicalRef, ignore)
 			} else {
-				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef)
+				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef, policy.UnpinnedPolicy(cfg.Updates.Unpinned))
 				decision = policy.Evaluate(policy.Entry{
 					File:       use.File,
 					Action:     parsed,
@@ -249,13 +257,41 @@ func recoverUseMetadata(use workflow.UseNode, lockfileMetadata metadata.Lockfile
 	return metadata.Merge(comment, lockfileValue, hasLockfile)
 }
 
-func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, logicalRef string) (*githubresolver.ResolvedRef, error) {
+func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, logicalRef string, unpinned policy.UnpinnedPolicy) (*githubresolver.ResolvedRef, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf("resolver is required")
 	}
-	if !shouldResolvePlanCandidate(parsed, logicalRef) {
+	if !shouldResolvePlanCandidate(parsed, logicalRef, unpinned) {
 		return nil, nil
 	}
+
+	if parsed.Ref == "" && logicalRef == "" {
+		switch unpinned {
+		case policy.UnpinnedDefaultBranch:
+			defaultBranch, ok := resolver.(defaultBranchResolver)
+			if !ok {
+				return nil, fmt.Errorf("resolver does not support default branch discovery")
+			}
+			resolved, err := defaultBranch.ResolveDefaultBranch(ctx, parsed.Owner, parsed.Repo)
+			if err != nil {
+				return nil, err
+			}
+			return &resolved, nil
+		case policy.UnpinnedLatestRelease:
+			latestRelease, ok := resolver.(latestReleaseResolver)
+			if !ok {
+				return nil, fmt.Errorf("resolver does not support latest release discovery")
+			}
+			resolved, err := latestRelease.ResolveLatestRelease(ctx, parsed.Owner, parsed.Repo)
+			if err != nil {
+				return nil, err
+			}
+			return &resolved, nil
+		default:
+			return nil, nil
+		}
+	}
+
 	ref := parsed.Ref
 	if logicalRef != "" {
 		ref = logicalRef
@@ -272,7 +308,7 @@ func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed act
 	return &resolved, nil
 }
 
-func shouldResolvePlanCandidate(parsed actions.ParsedAction, logicalRef string) bool {
+func shouldResolvePlanCandidate(parsed actions.ParsedAction, logicalRef string, unpinned policy.UnpinnedPolicy) bool {
 	if !parsed.Valid {
 		return false
 	}
@@ -282,7 +318,7 @@ func shouldResolvePlanCandidate(parsed actions.ParsedAction, logicalRef string) 
 		return false
 	}
 	if parsed.Ref == "" {
-		return false
+		return logicalRef != "" || unpinned == policy.UnpinnedDefaultBranch || unpinned == policy.UnpinnedLatestRelease
 	}
 	if parsed.Pinned {
 		return logicalRef != ""

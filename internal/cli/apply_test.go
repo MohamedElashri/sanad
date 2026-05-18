@@ -115,6 +115,51 @@ func TestApplyYesWriteRewritesWorkflowAndUpdatesLockfile(t *testing.T) {
 	}
 }
 
+func TestApplyYesWritePinsUnpinnedLatestRelease(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("8", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@latest-release": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v5",
+			SHA:        sha,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"latest-release\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout\n")
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	got := readFileString(t, path)
+	if !strings.Contains(got, "actions/checkout@"+sha+" # sanad: ref=v5") {
+		t.Fatalf("workflow was not rewritten as expected:\n%s", got)
+	}
+	lockfile, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if !ok || len(lockfile.Entries) != 1 {
+		t.Fatalf("unexpected lockfile state ok=%v entries=%#v", ok, lockfile.Entries)
+	}
+	if lockfile.Entries[0].LogicalRef != "v5" || lockfile.Entries[0].PinnedSHA != sha {
+		t.Fatalf("unexpected lockfile entry: %#v", lockfile.Entries[0])
+	}
+}
+
 func TestApplyCommentsWriteFalseUsesLockfileWithoutInlineMetadata(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("9", 40)

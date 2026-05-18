@@ -111,4 +111,4 @@ GITHUB_TOKEN=$(gh auth token) sanad plan
 
 - `scan` is local-only and does not verify refs against GitHub.
 - The CLI uses the public GitHub API by default unless `[github].api_url` is configured.
-- `updates.unpinned = "default-branch"` and `updates.unpinned = "latest-release"` are policy values, but the current resolver does not implement default-branch or latest-release discovery.
+- Repository visibility and fork lineage are not resolved yet, so `[security].allow_private = false` and `[security].deny_forks = true` fail closed at config-load time.

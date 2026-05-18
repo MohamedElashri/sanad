@@ -174,6 +174,38 @@ func TestEvaluatePolicyOverrides(t *testing.T) {
 		}
 	})
 
+	t.Run("unpinned default branch policy accepts discovered branch", func(t *testing.T) {
+		opts := DefaultOptions()
+		opts.Unpinned = UnpinnedDefaultBranch
+		got := Evaluate(Entry{
+			Action: actions.Parse("owner/repo"),
+			Candidate: &githubresolver.ResolvedRef{
+				Owner:      "owner",
+				Repo:       "repo",
+				Ref:        "main",
+				SHA:        sha,
+				Kind:       githubresolver.KindBranch,
+				CommitTime: old,
+			},
+			Now: now,
+		}, opts)
+		if got.Kind != DecisionUpdate {
+			t.Fatalf("Kind = %q, want %q (%s)", got.Kind, DecisionUpdate, got.Reason)
+		}
+		if got.LogicalRef != "main" {
+			t.Fatalf("LogicalRef = %q, want main", got.LogicalRef)
+		}
+	})
+
+	t.Run("unsupported unpinned policy is reported", func(t *testing.T) {
+		opts := DefaultOptions()
+		opts.Unpinned = "surprise"
+		got := Evaluate(Entry{Action: actions.Parse("owner/repo"), Now: now}, opts)
+		if got.Kind != DecisionErrorUnsupported {
+			t.Fatalf("Kind = %q, want %q", got.Kind, DecisionErrorUnsupported)
+		}
+	})
+
 	t.Run("reusable workflows can be denied", func(t *testing.T) {
 		opts := DefaultOptions()
 		opts.ReusableWorkflows = false

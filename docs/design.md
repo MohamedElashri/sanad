@@ -77,6 +77,8 @@ The resolver checks refs in this order:
 5. Commit timestamp lookup.
 6. Release timestamp lookup for tags when available.
 
+For unpinned refs, configured policy can also ask the resolver to discover the repository default branch or latest release before the normal policy and cooldown decision is made.
+
 The resolver lives in `internal/githubresolver` rather than `internal/github` to avoid a name collision with `github.com/google/go-github/v72/github`.
 
 ## Reporting Strategy
@@ -89,7 +91,5 @@ Table output is for humans. JSON output is stable enough for CI consumers. `chec
 
 ## Current Tradeoffs
 
-- Config parsing is a small local parser, not a full TOML parser.
 - Interactive prompts are simple built-in text prompts, not a terminal UI framework.
-- Default-branch and latest-release discovery for unpinned refs are not implemented yet.
 - The lockfile path is fixed.

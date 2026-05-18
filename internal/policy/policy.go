@@ -111,13 +111,17 @@ func Evaluate(entry Entry, opts Options) Decision {
 	}
 
 	if action.Ref == "" && entry.LogicalRef == "" {
-		if opts.Unpinned == UnpinnedDeny {
+		switch opts.Unpinned {
+		case UnpinnedDeny:
 			return Decision{
 				Kind:   DecisionErrorUnpinned,
 				Reason: "unpinned GitHub action references are denied by policy",
 			}
+		case UnpinnedDefaultBranch, UnpinnedLatestRelease:
+			return candidateDecision(entry, opts, fmt.Sprintf("unpinned action policy %q requires a resolved candidate", opts.Unpinned))
+		default:
+			return unsupportedPolicy("updates.unpinned", string(opts.Unpinned))
 		}
-		return candidateDecision(entry, opts, fmt.Sprintf("unpinned action policy %q requires a resolved candidate", opts.Unpinned))
 	}
 
 	if action.Pinned && entry.LogicalRef == "" && entry.Candidate == nil && entry.ResolveErr == nil {
@@ -281,6 +285,9 @@ func pinnedSHA(action actions.ParsedAction) string {
 func logicalRef(entry Entry) string {
 	if entry.LogicalRef != "" {
 		return entry.LogicalRef
+	}
+	if entry.Action.Ref == "" && entry.Candidate != nil {
+		return entry.Candidate.Ref
 	}
 	if !entry.Action.Pinned {
 		return entry.Action.Ref

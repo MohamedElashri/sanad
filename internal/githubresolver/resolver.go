@@ -173,6 +173,22 @@ func ResolveBranch(ctx context.Context, owner, repo, branch string) (ResolvedRef
 	return client.ResolveBranch(ctx, owner, repo, branch)
 }
 
+func ResolveDefaultBranch(ctx context.Context, owner, repo string) (ResolvedRef, error) {
+	client, err := NewClientFromEnv()
+	if err != nil {
+		return ResolvedRef{}, err
+	}
+	return client.ResolveDefaultBranch(ctx, owner, repo)
+}
+
+func ResolveLatestRelease(ctx context.Context, owner, repo string) (ResolvedRef, error) {
+	client, err := NewClientFromEnv()
+	if err != nil {
+		return ResolvedRef{}, err
+	}
+	return client.ResolveLatestRelease(ctx, owner, repo)
+}
+
 func VerifyCommit(ctx context.Context, owner, repo, sha string) error {
 	client, err := NewClientFromEnv()
 	if err != nil {
@@ -312,6 +328,49 @@ func (c *Client) ResolveBranch(ctx context.Context, owner, repo, branch string) 
 	}, nil
 }
 
+func (c *Client) ResolveDefaultBranch(ctx context.Context, owner, repo string) (ResolvedRef, error) {
+	selector := ActionSelector{Owner: owner, Repo: repo, Ref: "default-branch"}
+	if err := validateRepository(selector); err != nil {
+		return ResolvedRef{}, err
+	}
+
+	repository, _, err := c.github.Repositories.Get(ctx, owner, repo)
+	if err != nil {
+		return ResolvedRef{}, wrapGitHubError("resolve default branch", selector, err)
+	}
+	if repository == nil || strings.TrimSpace(repository.GetDefaultBranch()) == "" {
+		return ResolvedRef{}, invalidRef("resolve default branch", selector, "GitHub repository response was missing default branch")
+	}
+
+	return c.ResolveBranch(ctx, owner, repo, repository.GetDefaultBranch())
+}
+
+func (c *Client) ResolveLatestRelease(ctx context.Context, owner, repo string) (ResolvedRef, error) {
+	selector := ActionSelector{Owner: owner, Repo: repo, Ref: "latest-release"}
+	if err := validateRepository(selector); err != nil {
+		return ResolvedRef{}, err
+	}
+
+	release, _, err := c.github.Repositories.GetLatestRelease(ctx, owner, repo)
+	if err != nil {
+		return ResolvedRef{}, wrapGitHubError("resolve latest release", selector, err)
+	}
+	if release == nil || strings.TrimSpace(release.GetTagName()) == "" {
+		return ResolvedRef{}, invalidRef("resolve latest release", selector, "GitHub latest release response was missing tag name")
+	}
+
+	resolved, err := c.ResolveTag(ctx, owner, repo, release.GetTagName())
+	if err != nil {
+		return ResolvedRef{}, err
+	}
+	if release.PublishedAt != nil {
+		resolved.ReleaseTime = release.PublishedAt.GetTime()
+	} else if release.CreatedAt != nil {
+		resolved.ReleaseTime = release.CreatedAt.GetTime()
+	}
+	return resolved, nil
+}
+
 func (c *Client) VerifyCommit(ctx context.Context, owner, repo, sha string) error {
 	if strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" {
 		return invalidRef("verify commit", ActionSelector{Owner: owner, Repo: repo, Ref: sha}, "owner and repo are required")
@@ -381,6 +440,13 @@ func normalizeBaseURL(raw string) (*url.URL, error) {
 func validateSelector(selector ActionSelector) error {
 	if strings.TrimSpace(selector.Owner) == "" || strings.TrimSpace(selector.Repo) == "" || strings.TrimSpace(selector.Ref) == "" {
 		return invalidRef("resolve ref", selector, "owner, repo, and ref are required")
+	}
+	return nil
+}
+
+func validateRepository(selector ActionSelector) error {
+	if strings.TrimSpace(selector.Owner) == "" || strings.TrimSpace(selector.Repo) == "" {
+		return invalidRef("resolve ref", selector, "owner and repo are required")
 	}
 	return nil
 }

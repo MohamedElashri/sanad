@@ -83,6 +83,38 @@ func TestResolveBranch(t *testing.T) {
 	assertTime(t, got.CommitTime, "2026-05-02T12:00:00Z")
 }
 
+func TestResolveDefaultBranch(t *testing.T) {
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/actions/checkout":
+			writeJSON(t, w, map[string]string{"default_branch": "main"})
+		case "/repos/actions/checkout/git/ref/heads/main":
+			writeJSON(t, w, gitRef("refs/heads/main", "commit", branchSHA))
+		case "/repos/actions/checkout/git/commits/" + branchSHA:
+			writeJSON(t, w, commit(branchSHA, "2026-05-02T12:00:00Z"))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	})
+
+	client := newTestClient(t, server)
+	got, err := client.ResolveDefaultBranch(context.Background(), "actions", "checkout")
+	if err != nil {
+		t.Fatalf("ResolveDefaultBranch returned error: %v", err)
+	}
+
+	if got.Kind != KindBranch {
+		t.Fatalf("Kind = %q, want %q", got.Kind, KindBranch)
+	}
+	if got.Ref != "main" {
+		t.Fatalf("Ref = %q, want main", got.Ref)
+	}
+	if got.SHA != branchSHA {
+		t.Fatalf("SHA = %q, want %q", got.SHA, branchSHA)
+	}
+	assertTime(t, got.CommitTime, "2026-05-02T12:00:00Z")
+}
+
 func TestResolveLightweightTagWithReleaseTimestamp(t *testing.T) {
 	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -157,6 +189,97 @@ func TestResolveAnnotatedTag(t *testing.T) {
 	assertTimePtr(t, got.TagTime, "2026-05-05T12:00:00Z")
 	if got.ReleaseTime != nil {
 		t.Fatalf("ReleaseTime = %v, want nil when no release exists", got.ReleaseTime)
+	}
+}
+
+func TestResolveLatestRelease(t *testing.T) {
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/actions/checkout/releases/latest":
+			writeJSON(t, w, map[string]any{
+				"tag_name":     "v5",
+				"published_at": "2026-05-08T12:00:00Z",
+			})
+		case "/repos/actions/checkout/git/ref/tags/v5":
+			writeJSON(t, w, gitRef("refs/tags/v5", "commit", commitSHA))
+		case "/repos/actions/checkout/git/commits/" + commitSHA:
+			writeJSON(t, w, commit(commitSHA, "2026-05-07T12:00:00Z"))
+		case "/repos/actions/checkout/releases/tags/v5":
+			writeJSON(t, w, map[string]any{
+				"tag_name":     "v5",
+				"published_at": "2026-05-08T12:00:00Z",
+			})
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	})
+
+	client := newTestClient(t, server)
+	got, err := client.ResolveLatestRelease(context.Background(), "actions", "checkout")
+	if err != nil {
+		t.Fatalf("ResolveLatestRelease returned error: %v", err)
+	}
+
+	if got.Kind != KindTag {
+		t.Fatalf("Kind = %q, want %q", got.Kind, KindTag)
+	}
+	if got.Ref != "v5" {
+		t.Fatalf("Ref = %q, want v5", got.Ref)
+	}
+	if got.SHA != commitSHA {
+		t.Fatalf("SHA = %q, want %q", got.SHA, commitSHA)
+	}
+	assertTime(t, got.CommitTime, "2026-05-07T12:00:00Z")
+	assertTimePtr(t, got.ReleaseTime, "2026-05-08T12:00:00Z")
+}
+
+func TestResolveLatestReleaseReportsNoReleases(t *testing.T) {
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/actions/checkout/releases/latest" {
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+		writeError(w, http.StatusNotFound, "Not Found")
+	})
+
+	client := newTestClient(t, server)
+	err := func() error {
+		_, err := client.ResolveLatestRelease(context.Background(), "actions", "checkout")
+		return err
+	}()
+	var resolverErr *ResolverError
+	if !errors.As(err, &resolverErr) {
+		t.Fatalf("error type = %T, want *ResolverError", err)
+	}
+	if resolverErr.Kind != ErrorNotFound {
+		t.Fatalf("error kind = %s, want %s; error: %v", resolverErr.Kind, ErrorNotFound, err)
+	}
+	if !strings.Contains(err.Error(), "actions/checkout@latest-release") {
+		t.Fatalf("error %q does not include latest-release selector", err)
+	}
+}
+
+func TestResolveDiscoveryReportsAPIFailure(t *testing.T) {
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/actions/checkout" {
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+		writeError(w, http.StatusInternalServerError, "Server Error")
+	})
+
+	client := newTestClient(t, server)
+	err := func() error {
+		_, err := client.ResolveDefaultBranch(context.Background(), "actions", "checkout")
+		return err
+	}()
+	var resolverErr *ResolverError
+	if !errors.As(err, &resolverErr) {
+		t.Fatalf("error type = %T, want *ResolverError", err)
+	}
+	if resolverErr.Kind != ErrorGitHubAPI {
+		t.Fatalf("error kind = %s, want %s; error: %v", resolverErr.Kind, ErrorGitHubAPI, err)
+	}
+	if !strings.Contains(err.Error(), "resolve default branch") {
+		t.Fatalf("error %q does not include operation", err)
 	}
 }
 
