@@ -211,4 +211,4 @@ Current behavior:
 
 ## Parser Limits
 
-The current config loader is intentionally small. It supports the documented string, boolean, duration, and string-array shapes. It is not a full TOML implementation.
+Configuration files are parsed with a TOML library. The CLI only applies the documented keys above, but ordinary TOML syntax such as comments, quoted strings, multi-line arrays, empty arrays, tables, and dotted keys is accepted for those keys.

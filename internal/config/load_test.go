@@ -110,6 +110,57 @@ func TestLoadWorkflowPathsMultiline(t *testing.T) {
 	}
 }
 
+func TestLoadExampleConfig(t *testing.T) {
+	path := filepath.Join("..", "..", ".sanad.toml.example")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error for example config: %v", err)
+	}
+
+	if cfg.Source != path {
+		t.Fatalf("Source = %q, want %q", cfg.Source, path)
+	}
+	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
+		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
+	}
+	if cfg.Cooldown != 14*24*time.Hour {
+		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
+	}
+	if cfg.GitHub.APIURL != "https://api.github.com" {
+		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
+	}
+	if len(cfg.Ignore.Files) != 0 {
+		t.Fatalf("Ignore.Files = %#v, want empty", cfg.Ignore.Files)
+	}
+}
+
+func TestLoadDottedNestedKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`updates.tags = "deny"
+updates.branches = "track"
+ignore.actions = []
+github.api_url = "https://github.example.com/api/v3"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Updates.Tags != "deny" || cfg.Updates.Branches != "track" {
+		t.Fatalf("Updates = %#v", cfg.Updates)
+	}
+	if len(cfg.Ignore.Actions) != 0 {
+		t.Fatalf("Ignore.Actions = %#v, want explicit empty override", cfg.Ignore.Actions)
+	}
+	if cfg.GitHub.APIURL != "https://github.example.com/api/v3" {
+		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
+	}
+}
+
 func TestParseDuration(t *testing.T) {
 	tests := []struct {
 		value string

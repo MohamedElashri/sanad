@@ -150,3 +150,23 @@ func TestScanReportsIgnoredReferences(t *testing.T) {
 		t.Fatalf("ignore metadata = (%q, %q), want action/actions/checkout@v4", got[0].IgnoreBy, got[0].IgnoreRule)
 	}
 }
+
+func TestInvalidConfigReturnsConfigExitCode(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), ".sanad.toml")
+	if err := os.WriteFile(configPath, []byte("cooldown = \"1w\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--config", configPath, "scan"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute returned nil error for invalid config")
+	}
+	if ExitCode(err) != exitConfig {
+		t.Fatalf("ExitCode = %d, want %d; error: %v", ExitCode(err), exitConfig, err)
+	}
+}
