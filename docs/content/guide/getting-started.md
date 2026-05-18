@@ -7,13 +7,44 @@ template = "page"
 
 Sanad is a normal CLI. It does not need a GitHub Action wrapper.
 
-## Install
+## Install with Homebrew
+
+On macOS or Linux with Homebrew:
+
+```bash
+brew tap MohamedElashri/sanad
+brew install sanad
+sanad version
+```
+
+Homebrew installs the formula from the `MohamedElashri/homebrew-sanad` tap. Release automation updates that formula from the published archives and checksums.
+
+## Install with Nix
+
+Run the packaged release directly:
+
+```bash
+nix run github:MohamedElashri/sanad -- version
+```
+
+Or install it into your profile:
+
+```bash
+nix profile install github:MohamedElashri/sanad
+sanad version
+```
+
+The flake uses the published release archives for Linux and macOS on `x86_64` and `aarch64`, with fixed hashes derived from the release checksums.
+
+## Install from source
 
 Install the latest tagged release with Go:
 
 ```bash
 go install github.com/MohamedElashri/sanad/cmd/sanad@latest
 ```
+
+## Manual prebuilt archive install
 
 Tagged releases also publish Linux, macOS, and Windows archives on [GitHub Releases](https://github.com/MohamedElashri/sanad/releases). Download the archive for your platform and verify it against the published checksums file.
 

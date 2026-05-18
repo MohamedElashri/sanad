@@ -1,10 +1,10 @@
 +++
 title = "Sanad Docs"
-description = "A focused CLI for pinning GitHub Actions workflow dependencies to immutable commit SHAs."
+description = "Pin and update GitHub Actions dependencies to immutable commit SHAs."
 sort_by = "weight"
 +++
 
-Sanad scans GitHub Actions workflow files, resolves action refs through GitHub, and rewrites mutable `uses:` entries to full commit SHAs. It keeps the logical ref as metadata so future runs can keep tracking the intended update channel.
+Sanad pins and updates GitHub Actions dependencies by resolving action refs through GitHub and rewriting mutable `uses:` entries to full commit SHAs. It keeps the logical ref as metadata so future runs can keep tracking the intended update channel.
 
 These docs are split by audience:
 

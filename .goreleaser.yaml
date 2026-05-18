@@ -27,7 +27,8 @@ builds:
         -X github.com/MohamedElashri/sanad/internal/cli.date={{ .Date }}
 
 archives:
-  - ids:
+  - id: sanad
+    ids:
       - sanad
     formats:
       - tar.gz
@@ -45,6 +46,27 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
   algorithm: sha256
+
+brews:
+  - name: sanad
+    ids:
+      - sanad
+    directory: Formula
+    homepage: https://github.com/MohamedElashri/sanad
+    description: Pin and update GitHub Actions dependencies to immutable commit SHAs
+    license: MIT
+    repository:
+      owner: MohamedElashri
+      name: homebrew-sanad
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaserbot@users.noreply.github.com
+    install: |
+      bin.install "sanad"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/sanad version")
 
 release:
   github:

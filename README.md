@@ -1,36 +1,49 @@
 # sanad
 
-`sanad` is a focused Go CLI for GitHub Actions workflow dependencies. It finds `uses:` references, resolves GitHub action refs to full 40-character commit SHAs, rewrites workflow files without reformatting the whole YAML document, and preserves the logical ref that should be tracked later.
+[![CI](https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml)
+[![Pages](https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml)
+[![Release](https://github.com/MohamedElashri/sanad/actions/workflows/release.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/release.yml)
 
-In Arabic scholarly culture, a sanad is a chain of transmission back to a source. This tool keeps that chain explicit for workflow dependencies: the workflow runs an immutable commit, while metadata records the tag or branch that commit came from.
-
-## What It Does
-
-- Scans workflow files under `.github/workflows` by default.
-- Classifies GitHub actions, reusable workflows, local actions, Docker actions, invalid refs, short SHAs, and full SHA pins.
-- Resolves GitHub tags, branches, and full SHAs through the GitHub API.
-- Rewrites mutable refs such as `actions/checkout@v4` to full commit SHA refs.
-- Adds inline metadata comments such as `# sanad: ref=v4` by default.
-- Maintains `.github/sanad.lock.json` for machine-readable tracking metadata.
-- Applies a cooldown window before adopting newly resolved upstream commits.
-- Produces table, JSON, SARIF, and Markdown helper output for local use and CI.
-
-## What It Does Not Do
-
-- It is not a general dependency updater.
-- It is not a vulnerability scanner.
-- It does not update Docker image tags.
-- It does not rewrite local actions.
-- It does not format or lint workflow YAML.
-- It does not maintain a dedicated GitHub Action wrapper.
+`sanad` pins and updates GitHub Actions dependencies to immutable commit SHAs while preserving the logical refs you want to track.
 
 ## Installation
+
+### Homebrew
+
+On macOS or Linux with Homebrew:
+
+```bash
+brew tap MohamedElashri/sanad
+brew install sanad
+sanad version
+```
+
+### Nix
+
+Run the packaged release directly:
+
+```bash
+nix run github:MohamedElashri/sanad -- version
+```
+
+Or install it into your profile:
+
+```bash
+nix profile install github:MohamedElashri/sanad
+sanad version
+```
+
+The flake installs the published release archive for your platform and verifies it with the release checksum.
+
+### Go
 
 Install the latest tagged release with Go:
 
 ```bash
 go install github.com/MohamedElashri/sanad/cmd/sanad@latest
 ```
+
+### Prebuilt archives
 
 Tagged releases also publish Linux, macOS, and Windows archives on GitHub Releases. Download the archive for your platform, place the `sanad` binary on your `PATH`, and verify it against the published `sanad_<version>_checksums.txt` file.
 
@@ -99,6 +112,14 @@ jobs:
 ```
 
 The workflow executes immutable SHAs. The comments and lockfile tell `sanad` which logical refs to resolve on future runs.
+
+## Scope
+
+Sanad scans workflow files under `.github/workflows` by default, classifies `uses:` references, resolves GitHub tags and branches through the GitHub API, rewrites mutable action refs to full SHAs, adds `# sanad: ref=...` metadata, maintains `.github/sanad.lock.json`, applies cooldown rules, and emits table, JSON, SARIF, and Markdown helper output.
+
+It is not a general dependency updater, vulnerability scanner, workflow formatter, YAML linter, Docker image updater, local action rewriter, or dedicated GitHub Action wrapper.
+
+In Arabic scholarly culture, a sanad is a chain of transmission back to a source. This tool keeps that chain explicit for workflow dependencies: the workflow runs an immutable commit, while metadata records the tag or branch that commit came from.
 
 ## Configuration
 

@@ -2,7 +2,7 @@
 
 All notable changes to Sanad are documented here.
 
-## Unreleased
+## 0.1.1 - 2026-05-18
 
 ### Added
 
@@ -14,6 +14,8 @@ All notable changes to Sanad are documented here.
 - Added optional interactive persistence for branch tracking choices.
 - Added a Nida-powered documentation site and generated release notes from this changelog.
 - Added Dependabot configuration and pinned the repository's own workflow actions with Sanad metadata.
+- Added Homebrew tap publishing through GoReleaser for the external `homebrew-sanad` tap.
+- Added a Nix flake that installs verified Sanad release archives on Linux and macOS.
 
 
 ## v0.1.0 - 2026-05-18

@@ -1,7 +1,7 @@
 config_version = "0.4"
 base_url = "https://melashri.net/sanad/"
 title = "Sanad Docs"
-description = "A focused CLI for pinning GitHub Actions workflow dependencies to immutable commit SHAs."
+description = "Pin and update GitHub Actions dependencies to immutable commit SHAs."
 language = "en"
 author = "Mohamed Elashri"
 
