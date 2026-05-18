@@ -93,6 +93,12 @@ GitHub tokens are read from:
 
 Tokens are used only for API authentication and are never printed by command output.
 
+For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad plan
+```
+
 ## Current Limits
 
 - `scan` is local-only and does not verify refs against GitHub.

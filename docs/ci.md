@@ -139,6 +139,12 @@ sanad plan --pr-body-out sanad-pr-body.md
 
 Use `GITHUB_TOKEN` for GitHub Actions. `sanad` also accepts `GH_TOKEN`, but `GITHUB_TOKEN` has priority.
 
+For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad plan
+```
+
 Authenticated requests are recommended even for public repositories because unauthenticated GitHub API limits are low. Private repositories require a token with access to the referenced action repositories.
 
 For GitHub Enterprise, configure the API endpoint in `.sanad.toml`:

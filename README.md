@@ -51,25 +51,25 @@ sanad scan
 Preview policy decisions and proposed pin updates:
 
 ```bash
-GITHUB_TOKEN=... sanad plan
+GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
 Show the rewrite diff without changing files:
 
 ```bash
-GITHUB_TOKEN=... sanad apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
 ```
 
-Apply in automation:
+Apply locally:
 
 ```bash
-GITHUB_TOKEN=... sanad apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
-Validate in CI:
+Validate locally:
 
 ```bash
-GITHUB_TOKEN=... sanad check
+GITHUB_TOKEN=$(gh auth token) sanad check
 ```
 
 `sanad plan`, `sanad check`, and `sanad apply` may contact GitHub when resolution is needed. `sanad scan` is local-only.
@@ -157,6 +157,12 @@ Command-specific usage is covered in [docs/usage.md](docs/usage.md).
 2. `GH_TOKEN`
 
 Tokens are used for GitHub API requests and are never printed by the CLI. Public repositories can work without a token, but authenticated requests are strongly recommended for CI and private repositories.
+
+For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad plan
+```
 
 Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enterprise.
 

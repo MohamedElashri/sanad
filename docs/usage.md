@@ -38,10 +38,10 @@ Use `scan` when you want a local inventory.
 Resolve actionable refs and show the decisions `sanad` would make.
 
 ```bash
-GITHUB_TOKEN=... sanad plan
-GITHUB_TOKEN=... sanad --format json plan
-GITHUB_TOKEN=... sanad plan --out sanad-plan.json
-GITHUB_TOKEN=... sanad plan --pr-body-out sanad-pr-body.md
+GITHUB_TOKEN=$(gh auth token) sanad plan
+GITHUB_TOKEN=$(gh auth token) sanad --format json plan
+GITHUB_TOKEN=$(gh auth token) sanad plan --out sanad-plan.json
+GITHUB_TOKEN=$(gh auth token) sanad plan --pr-body-out sanad-pr-body.md
 ```
 
 `plan` may contact GitHub for GitHub actions and reusable workflows. It reads inline `sanad: ref=...` comments and `.github/sanad.lock.json` when present.
@@ -82,12 +82,12 @@ Decisions include:
 Validate workflows against policy. This is the CI enforcement command.
 
 ```bash
-GITHUB_TOKEN=... sanad check
-GITHUB_TOKEN=... sanad --format json check
-GITHUB_TOKEN=... sanad check --format sarif
-GITHUB_TOKEN=... sanad check --strict
-GITHUB_TOKEN=... sanad check --fail-on-updates
-GITHUB_TOKEN=... sanad check --strict --allow-pending-cooldown
+GITHUB_TOKEN=$(gh auth token) sanad check
+GITHUB_TOKEN=$(gh auth token) sanad --format json check
+GITHUB_TOKEN=$(gh auth token) sanad check --format sarif
+GITHUB_TOKEN=$(gh auth token) sanad check --strict
+GITHUB_TOKEN=$(gh auth token) sanad check --fail-on-updates
+GITHUB_TOKEN=$(gh auth token) sanad check --strict --allow-pending-cooldown
 ```
 
 Default behavior:
@@ -111,9 +111,9 @@ SARIF output follows the same pass/fail behavior as table and JSON output. It ca
 Apply approved updates to workflow files and refresh `.github/sanad.lock.json`.
 
 ```bash
-GITHUB_TOKEN=... sanad apply --dry-run
-GITHUB_TOKEN=... sanad apply --interactive
-GITHUB_TOKEN=... sanad apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad apply --interactive
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
 Safe defaults:
@@ -151,6 +151,12 @@ Development builds show `dev`, `unknown`, and `unknown` unless linker metadata w
 2. `GH_TOKEN`
 
 Tokens are not printed.
+
+For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad plan
+```
 
 Set `[github].api_url` in `.sanad.toml` for GitHub Enterprise API endpoints.
 
