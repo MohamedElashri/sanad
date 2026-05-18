@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MohamedElashri/sanad/internal/config"
 	"github.com/MohamedElashri/sanad/internal/githubresolver"
 	"github.com/MohamedElashri/sanad/internal/metadata"
 )
@@ -461,7 +462,7 @@ func TestApplyInteractivePinsDeniedBranchHead(t *testing.T) {
 
 	var out bytes.Buffer
 	cmd := NewRootCommand()
-	cmd.SetIn(strings.NewReader("p\ny\n"))
+	cmd.SetIn(strings.NewReader("p\nn\ny\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"apply", "--interactive"})
@@ -475,6 +476,63 @@ func TestApplyInteractivePinsDeniedBranchHead(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Found branch ref") {
 		t.Fatalf("branch prompt missing from output:\n%s", out.String())
+	}
+}
+
+func TestApplyInteractivePersistsBranchTrackingWhenRequested(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("6", 40)
+	nextSHA := strings.Repeat("7", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"owner/repo@main": {
+			Owner:      "owner",
+			Repo:       "repo",
+			Ref:        "main",
+			SHA:        sha,
+			Kind:       githubresolver.KindBranch,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: owner/repo@main\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetIn(strings.NewReader("p\ny\ny\n"))
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--interactive"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	configText := readFileString(t, config.DefaultPath)
+	if !strings.Contains(configText, `branches = "track"`) {
+		t.Fatalf("config did not persist branch tracking:\n%s", configText)
+	}
+
+	installPlanTestResolver(t, fakePlanResolver{
+		"owner/repo@main": {
+			Owner:      "owner",
+			Repo:       "repo",
+			Ref:        "main",
+			SHA:        nextSHA,
+			Kind:       githubresolver.KindBranch,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	cmd = NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("non-interactive apply after persistence returned error: %v", err)
+	}
+	got := readFileString(t, path)
+	if !strings.Contains(got, "owner/repo@"+nextSHA+" # sanad: ref=main") {
+		t.Fatalf("workflow was not updated by persisted branch policy:\n%s", got)
 	}
 }
 

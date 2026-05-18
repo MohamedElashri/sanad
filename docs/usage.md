@@ -128,7 +128,7 @@ Interactive mode can:
 
 - ask for an explicit ref for unpinned actions,
 - track a logical ref for unmanaged full-SHA pins,
-- pin the current head of a branch ref for the current run,
+- pin the current head of a branch ref and optionally persist branch tracking in `.sanad.toml`,
 - skip an entry for the current run,
 - leave a policy violation in place.
 

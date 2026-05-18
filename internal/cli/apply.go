@@ -50,8 +50,10 @@ type categorizedError struct {
 }
 
 type interactiveApplySession struct {
-	reader *bufio.Reader
-	out    io.Writer
+	reader                         *bufio.Reader
+	out                            io.Writer
+	branchTrackingPersistenceAsked bool
+	persistBranchTracking          bool
 }
 
 func (e categorizedError) Error() string {
@@ -124,6 +126,9 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 			if err := saveApplyLockfile(plan.LockEntries); err != nil {
 				return err
 			}
+			if err := saveInteractiveConfigChoices(opts, interactive); err != nil {
+				return err
+			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile; no workflow updates to apply.")
 			return nil
 		}
@@ -139,6 +144,9 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		return err
 	}
 	if err := saveApplyLockfile(plan.LockEntries); err != nil {
+		return err
+	}
+	if err := saveInteractiveConfigChoices(opts, interactive); err != nil {
 		return err
 	}
 
@@ -440,6 +448,9 @@ func promptBranchAction(
 	}
 	switch choice {
 	case "p":
+		if err := promptPersistBranchTracking(session); err != nil {
+			return parsed, candidate, resolveErr, decision, err
+		}
 		logical := decision.LogicalRef
 		if logical == "" {
 			logical = parsed.Ref
@@ -610,6 +621,29 @@ func applyLockfileWouldWrite(entries []metadata.LockfileEntry) (bool, error) {
 		return false, categorizedError{code: exitConfig, err: err}
 	}
 	return ok, nil
+}
+
+func promptPersistBranchTracking(session *interactiveApplySession) error {
+	if session.branchTrackingPersistenceAsked {
+		return nil
+	}
+	session.branchTrackingPersistenceAsked = true
+	ok, err := session.confirm("Persist branch tracking in config for future non-interactive runs? [y/N] ")
+	if err != nil {
+		return categorizedError{code: exitInternal, err: err}
+	}
+	session.persistBranchTracking = ok
+	return nil
+}
+
+func saveInteractiveConfigChoices(opts *rootOptions, interactive *interactiveApplySession) error {
+	if interactive == nil || !interactive.persistBranchTracking {
+		return nil
+	}
+	if err := config.PersistBranchTracking(opts.configPath); err != nil {
+		return categorizedError{code: exitConfig, err: err}
+	}
+	return nil
 }
 
 type interactiveChoice struct {

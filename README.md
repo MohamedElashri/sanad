@@ -137,6 +137,8 @@ deny_forks = false
 
 Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See [docs/config.md](docs/config.md) for exact supported keys.
 
+Interactive apply can optionally persist branch tracking by writing `[updates].branches = "track"` after final confirmation.
+
 ## Commands
 
 ```bash

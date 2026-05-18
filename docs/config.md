@@ -114,6 +114,8 @@ branches = "deny"
 
 The resolver may contact GitHub before returning `error-branch-denied`, because the current implementation distinguishes tags from branches by resolving the ref.
 
+In `sanad apply --interactive`, choosing to pin a denied branch head also offers to persist branch tracking by writing `branches = "track"` to `.sanad.toml`. That persistence happens only after the final apply confirmation.
+
 ### `unpinned`
 
 Controls refs without `@ref`, such as `owner/repo`.

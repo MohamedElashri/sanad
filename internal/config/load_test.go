@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,6 +57,83 @@ func TestLoadExistingConfigMarksSource(t *testing.T) {
 	}
 	if cfg.Source != path {
 		t.Fatalf("Source = %q, want %q", cfg.Source, path)
+	}
+}
+
+func TestPersistBranchTrackingCreatesDefaultConfig(t *testing.T) {
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previousWorkingDir); err != nil {
+			t.Fatalf("restore working directory: %v", err)
+		}
+	})
+
+	if err := PersistBranchTracking(DefaultPath); err != nil {
+		t.Fatalf("PersistBranchTracking returned error: %v", err)
+	}
+	cfg, err := Load(DefaultPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Updates.Branches != "track" {
+		t.Fatalf("Updates.Branches = %q, want track", cfg.Updates.Branches)
+	}
+}
+
+func TestPersistBranchTrackingUpdatesExistingConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := "# keep\nworkflow_paths = [\".github/workflows\"]\n\n[updates]\ntags = \"track\"\nbranches = 'deny' # keep comment\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := PersistBranchTracking(path); err != nil {
+		t.Fatalf("PersistBranchTracking returned error: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantLine := `branches = "track" # keep comment`
+	if !strings.Contains(string(got), wantLine) {
+		t.Fatalf("config missing %q:\n%s", wantLine, string(got))
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Updates.Branches != "track" || cfg.WorkflowPaths[0] != ".github/workflows" {
+		t.Fatalf("unexpected config after persistence: %#v", cfg)
+	}
+}
+
+func TestPersistBranchTrackingAddsUpdatesWithoutChangingOtherBranches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := "[other]\nbranches = \"keep\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := PersistBranchTracking(path); err != nil {
+		t.Fatalf("PersistBranchTracking returned error: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "[other]\nbranches = \"keep\"") {
+		t.Fatalf("other table was changed:\n%s", text)
+	}
+	if !strings.Contains(text, "[updates]\nbranches = \"track\"") {
+		t.Fatalf("updates section was not appended:\n%s", text)
 	}
 }
 
