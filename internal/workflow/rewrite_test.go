@@ -94,6 +94,51 @@ func TestRewriteWorkflowBytesPreservesCRLF(t *testing.T) {
 	}
 }
 
+func TestRewriteWorkflowBytesOmitsMetadataCommentWhenDisabled(t *testing.T) {
+	input := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n"
+	want := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + rewriteNewSHA + "\n"
+
+	uses := extractUsesFromBytesForRewriteTest(t, input)
+	change := rewriteChangeForUse(uses[0], rewriteNewSHA, "v4")
+	got, err := RewriteWorkflowBytes([]byte(input), []RewriteChange{change}, RewriteOptions{WriteMetadataComment: false})
+	if err != nil {
+		t.Fatalf("RewriteWorkflowBytes returned error: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("rewritten workflow mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestRewriteWorkflowBytesRemovesExistingMetadataCommentWhenDisabled(t *testing.T) {
+	input := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + rewriteOldSHA + " # keep; sanad: ref=v3\n"
+	want := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + rewriteNewSHA + " # keep\n"
+
+	uses := extractUsesFromBytesForRewriteTest(t, input)
+	change := rewriteChangeForUse(uses[0], rewriteNewSHA, "v4")
+	got, err := RewriteWorkflowBytes([]byte(input), []RewriteChange{change}, RewriteOptions{WriteMetadataComment: false})
+	if err != nil {
+		t.Fatalf("RewriteWorkflowBytes returned error: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("rewritten workflow mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestRewriteWorkflowBytesRemovesOnlyMetadataCommentWhenDisabled(t *testing.T) {
+	input := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + rewriteOldSHA + " # sanad: ref=v3\n"
+	want := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + rewriteNewSHA + "\n"
+
+	uses := extractUsesFromBytesForRewriteTest(t, input)
+	change := rewriteChangeForUse(uses[0], rewriteNewSHA, "v4")
+	got, err := RewriteWorkflowBytes([]byte(input), []RewriteChange{change}, RewriteOptions{WriteMetadataComment: false})
+	if err != nil {
+		t.Fatalf("RewriteWorkflowBytes returned error: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("rewritten workflow mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
 func TestApplySourceEditsRefusesOverlaps(t *testing.T) {
 	_, err := ApplySourceEdits([]byte("abcdef"), []SourceEdit{
 		{Start: 1, End: 4, Replacement: []byte("x")},

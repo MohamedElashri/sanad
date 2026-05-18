@@ -3,6 +3,7 @@ package config
 import "time"
 
 const DefaultPath = ".sanad.toml"
+const DefaultCommentFormat = "sanad: ref={{ref}}"
 
 type Config struct {
 	Source        string
@@ -12,6 +13,8 @@ type Config struct {
 	Ignore        IgnoreConfig
 	GitHub        GitHubConfig
 	Organization  OrganizationConfig
+	Comments      CommentsConfig
+	Security      SecurityConfig
 }
 
 type UpdatesConfig struct {
@@ -34,6 +37,18 @@ type OrganizationConfig struct {
 	PolicyFiles []string
 }
 
+type CommentsConfig struct {
+	Write  bool
+	Format string
+}
+
+type SecurityConfig struct {
+	RequireFullSHA            bool
+	RequireCommitInSourceRepo bool
+	AllowPrivate              bool
+	DenyForks                 bool
+}
+
 func Default() Config {
 	return Config{
 		Source:        "defaults",
@@ -47,6 +62,16 @@ func Default() Config {
 		},
 		Ignore: IgnoreConfig{
 			Actions: []string{"./*", "docker://*"},
+		},
+		Comments: CommentsConfig{
+			Write:  true,
+			Format: DefaultCommentFormat,
+		},
+		Security: SecurityConfig{
+			RequireFullSHA:            true,
+			RequireCommitInSourceRepo: true,
+			AllowPrivate:              true,
+			DenyForks:                 false,
 		},
 	}
 }

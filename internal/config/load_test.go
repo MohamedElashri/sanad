@@ -133,6 +133,12 @@ func TestLoadExampleConfig(t *testing.T) {
 	if len(cfg.Ignore.Files) != 0 {
 		t.Fatalf("Ignore.Files = %#v, want empty", cfg.Ignore.Files)
 	}
+	if !cfg.Comments.Write || cfg.Comments.Format != DefaultCommentFormat {
+		t.Fatalf("Comments = %#v", cfg.Comments)
+	}
+	if !cfg.Security.RequireFullSHA || !cfg.Security.RequireCommitInSourceRepo || !cfg.Security.AllowPrivate || cfg.Security.DenyForks {
+		t.Fatalf("Security = %#v", cfg.Security)
+	}
 }
 
 func TestLoadDottedNestedKeys(t *testing.T) {
@@ -334,6 +340,96 @@ func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load returned nil error for relative GitHub API URL")
+	}
+}
+
+func TestLoadCommentsConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[comments]
+write = false
+format = "sanad: ref={{ref}}"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Comments.Write {
+		t.Fatal("Comments.Write = true, want false")
+	}
+	if cfg.Comments.Format != DefaultCommentFormat {
+		t.Fatalf("Comments.Format = %q, want %q", cfg.Comments.Format, DefaultCommentFormat)
+	}
+}
+
+func TestLoadRejectsUnsupportedCommentFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[comments]\nformat = \"ref={{ref}}\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for unsupported comment format")
+	}
+}
+
+func TestLoadSecurityConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[security]
+require_full_sha = true
+require_commit_in_source_repo = true
+allow_private = true
+deny_forks = false
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if !cfg.Security.RequireFullSHA || !cfg.Security.RequireCommitInSourceRepo || !cfg.Security.AllowPrivate || cfg.Security.DenyForks {
+		t.Fatalf("Security = %#v", cfg.Security)
+	}
+}
+
+func TestLoadSecurityConfigFailsClosedForUnsupportedCombinations(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "disable full sha",
+			content: "[security]\nrequire_full_sha = false\n",
+		},
+		{
+			name:    "disable source repo check",
+			content: "[security]\nrequire_commit_in_source_repo = false\n",
+		},
+		{
+			name:    "deny private",
+			content: "[security]\nallow_private = false\n",
+		},
+		{
+			name:    "deny forks",
+			content: "[security]\ndeny_forks = true\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), DefaultPath)
+			if err := os.WriteFile(path, []byte(tt.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load(path); err == nil {
+				t.Fatal("Load returned nil error")
+			}
+		})
 	}
 }
 

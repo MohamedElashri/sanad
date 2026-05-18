@@ -168,6 +168,8 @@ func buildSourceEdit(data []byte, lines []lineSpan, change RewriteChange, opts R
 	tail := append([]byte(nil), lineBytes[valueEnd:]...)
 	if opts.WriteMetadataComment {
 		tail = updateMetadataComment(tail, change.Decision.LogicalRef)
+	} else {
+		tail = removeMetadataComment(tail)
 	}
 
 	replacement := make([]byte, 0, len(newRaw)+len(tail))
@@ -236,6 +238,45 @@ func updateMetadataComment(tail []byte, logicalRef string) []byte {
 		separator = " "
 	}
 	return append(before, []byte(trimmedRight+separator+string(metadataText)+trailing)...)
+}
+
+func removeMetadataComment(tail []byte) []byte {
+	commentStart := findInlineCommentStart(tail)
+	if commentStart < 0 {
+		return append([]byte(nil), tail...)
+	}
+
+	before := append([]byte(nil), tail[:commentStart]...)
+	comment := string(tail[commentStart:])
+	trimmedRight := strings.TrimRight(comment, " \t")
+	trailing := comment[len(trimmedRight):]
+
+	loc := sanadCommentPattern.FindStringIndex(trimmedRight)
+	if loc == nil {
+		return append(before, []byte(comment)...)
+	}
+
+	left := strings.TrimRight(trimmedRight[:loc[0]], " \t")
+	right := strings.TrimLeft(trimmedRight[loc[1]:], " \t")
+	if strings.HasSuffix(left, ";") {
+		left = strings.TrimRight(strings.TrimSuffix(left, ";"), " \t")
+	}
+	if strings.HasPrefix(right, ";") {
+		right = strings.TrimLeft(strings.TrimPrefix(right, ";"), " \t")
+	}
+
+	leftTrimmed := strings.TrimSpace(left)
+	rightTrimmed := strings.TrimSpace(right)
+	if leftTrimmed == "#" && rightTrimmed == "" {
+		return bytes.TrimRight(before, " \t")
+	}
+	if leftTrimmed == "#" {
+		return append(before, []byte(left+" "+right+trailing)...)
+	}
+	if rightTrimmed == "" {
+		return append(before, []byte(left+trailing)...)
+	}
+	return append(before, []byte(left+"; "+right+trailing)...)
 }
 
 func findInlineCommentStart(tail []byte) int {

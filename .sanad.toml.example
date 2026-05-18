@@ -23,16 +23,17 @@ api_url = "https://api.github.com"
 # in this repository config override settings loaded from these files.
 policy_files = []
 
-# Reserved for future CLI config support. Current releases always write
-# inline metadata comments when workflow entries are rewritten.
 [comments]
+# Disable this when `.github/sanad.lock.json` is the preferred metadata source.
 write = true
+# Custom formats are intentionally unsupported because sanad must be able to
+# parse its own metadata safely.
 format = "sanad: ref={{ref}}"
 
-# Reserved for future CLI config support. Current releases enforce the core
-# SHA and source-repository checks through built-in policy/resolver behavior.
 [security]
+# These strict checks are enforced by built-in policy/resolver behavior.
 require_full_sha = true
 require_commit_in_source_repo = true
+# The current CLI does not inspect repository visibility or fork lineage.
 allow_private = true
 deny_forks = false

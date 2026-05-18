@@ -100,7 +100,7 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		return categorizedError{code: blockerExitCode(plan.Blockers), err: blockersError(plan.Blockers)}
 	}
 
-	rewrites, err := buildWorkflowRewrites(plan.ChangesByFile)
+	rewrites, err := buildWorkflowRewrites(plan.ChangesByFile, cfg.Comments)
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ type workflowRewrite struct {
 	Perm os.FileMode
 }
 
-func buildWorkflowRewrites(changesByFile map[string][]workflow.RewriteChange) ([]workflowRewrite, error) {
+func buildWorkflowRewrites(changesByFile map[string][]workflow.RewriteChange, comments config.CommentsConfig) ([]workflowRewrite, error) {
 	paths := make([]string, 0, len(changesByFile))
 	for path := range changesByFile {
 		paths = append(paths, path)
@@ -558,7 +558,7 @@ func buildWorkflowRewrites(changesByFile map[string][]workflow.RewriteChange) ([
 		if err != nil {
 			return nil, categorizedError{code: exitFileSystem, err: fmt.Errorf("stat workflow %q: %w", path, err)}
 		}
-		rewritten, err := workflow.RewriteWorkflowBytes(data, changesByFile[path], workflow.RewriteOptions{WriteMetadataComment: true})
+		rewritten, err := workflow.RewriteWorkflowBytes(data, changesByFile[path], workflow.RewriteOptions{WriteMetadataComment: comments.Write})
 		if err != nil {
 			return nil, categorizedError{code: exitUnsafeRewrite, err: err}
 		}

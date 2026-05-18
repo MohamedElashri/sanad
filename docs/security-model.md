@@ -18,6 +18,8 @@ When `sanad` manages a pin, it also records the logical ref:
 
 The full SHA is what GitHub Actions executes. The logical ref is only metadata used for future update decisions.
 
+Inline comments are enabled by default. Set `[comments].write = false` to keep logical-ref metadata only in `.github/sanad.lock.json`; rewrites then remove stale inline `sanad` metadata from changed lines.
+
 ## Resolution
 
 For GitHub action refs, `sanad` resolves:
@@ -63,6 +65,12 @@ Default policy:
 
 These defaults are meant to keep non-interactive behavior conservative.
 
+## Security Config
+
+`[security].require_full_sha = true` and `[security].require_commit_in_source_repo = true` reflect built-in behavior: pins must be full SHAs and resolved commits are verified in the referenced source repository.
+
+Settings the CLI cannot currently enforce fail closed. `security.allow_private = false` and `security.deny_forks = true` are rejected because repository visibility and fork lineage are not resolved yet.
+
 ## Metadata Trust
 
 `sanad` reads logical refs from two places:
@@ -102,6 +110,5 @@ GITHUB_TOKEN=$(gh auth token) sanad plan
 ## Current Limits
 
 - `scan` is local-only and does not verify refs against GitHub.
-- The CLI currently uses the public GitHub API base URL.
-- `[security]` config keys in the example file are reserved and not yet parsed.
+- The CLI uses the public GitHub API by default unless `[github].api_url` is configured.
 - `updates.unpinned = "default-branch"` and `updates.unpinned = "latest-release"` are policy values, but the current resolver does not implement default-branch or latest-release discovery.

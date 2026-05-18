@@ -113,6 +113,32 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 		cfg.Organization.PolicyFiles = raw.Organization.PolicyFiles
 	}
 
+	if meta.IsDefined("comments", "write") {
+		cfg.Comments.Write = raw.Comments.Write
+	}
+	if meta.IsDefined("comments", "format") {
+		if err := validateCommentFormat(raw.Comments.Format); err != nil {
+			return Config{}, fmt.Errorf("load config %q: %w", path, err)
+		}
+		cfg.Comments.Format = raw.Comments.Format
+	}
+
+	if meta.IsDefined("security", "require_full_sha") {
+		cfg.Security.RequireFullSHA = raw.Security.RequireFullSHA
+	}
+	if meta.IsDefined("security", "require_commit_in_source_repo") {
+		cfg.Security.RequireCommitInSourceRepo = raw.Security.RequireCommitInSourceRepo
+	}
+	if meta.IsDefined("security", "allow_private") {
+		cfg.Security.AllowPrivate = raw.Security.AllowPrivate
+	}
+	if meta.IsDefined("security", "deny_forks") {
+		cfg.Security.DenyForks = raw.Security.DenyForks
+	}
+	if err := validateSecurityConfig(cfg.Security); err != nil {
+		return Config{}, fmt.Errorf("load config %q: %w", path, err)
+	}
+
 	return cfg, nil
 }
 
@@ -123,6 +149,8 @@ type fileConfig struct {
 	Ignore        ignoreFileConfig       `toml:"ignore"`
 	GitHub        githubFileConfig       `toml:"github"`
 	Organization  organizationFileConfig `toml:"organization"`
+	Comments      commentsFileConfig     `toml:"comments"`
+	Security      securityFileConfig     `toml:"security"`
 }
 
 type updatesFileConfig struct {
@@ -143,6 +171,18 @@ type githubFileConfig struct {
 
 type organizationFileConfig struct {
 	PolicyFiles []string `toml:"policy_files"`
+}
+
+type commentsFileConfig struct {
+	Write  bool   `toml:"write"`
+	Format string `toml:"format"`
+}
+
+type securityFileConfig struct {
+	RequireFullSHA            bool `toml:"require_full_sha"`
+	RequireCommitInSourceRepo bool `toml:"require_commit_in_source_repo"`
+	AllowPrivate              bool `toml:"allow_private"`
+	DenyForks                 bool `toml:"deny_forks"`
 }
 
 func decodeConfigData(data []byte) (fileConfig, toml.MetaData, error) {
@@ -198,4 +238,31 @@ func validateAPIURL(value string) (string, error) {
 		return "", fmt.Errorf("github.api_url must be an absolute URL")
 	}
 	return value, nil
+}
+
+func validateCommentFormat(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("comments.format must not be empty")
+	}
+	if value != DefaultCommentFormat {
+		return fmt.Errorf("comments.format %q is not supported; expected %q because sanad must be able to parse its own metadata safely", value, DefaultCommentFormat)
+	}
+	return nil
+}
+
+func validateSecurityConfig(cfg SecurityConfig) error {
+	if !cfg.RequireFullSHA {
+		return fmt.Errorf("security.require_full_sha=false is not supported; sanad always requires full 40-character SHAs")
+	}
+	if !cfg.RequireCommitInSourceRepo {
+		return fmt.Errorf("security.require_commit_in_source_repo=false is not supported; sanad resolves and verifies commits in the referenced source repository")
+	}
+	if !cfg.AllowPrivate {
+		return fmt.Errorf("security.allow_private=false is not supported because repository visibility is not resolved by the current CLI")
+	}
+	if cfg.DenyForks {
+		return fmt.Errorf("security.deny_forks=true is not supported because fork lineage is not resolved by the current CLI")
+	}
+	return nil
 }

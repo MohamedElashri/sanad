@@ -10,6 +10,8 @@ Inline comments are useful for humans:
 
 The lockfile is useful for deterministic planning and non-interactive operation.
 
+Set `[comments].write = false` to rely on the lockfile without inline `sanad` comments. In that mode, changed workflow lines are rewritten with only the pinned SHA, while the lockfile keeps the logical ref.
+
 ## Path
 
 Default path:

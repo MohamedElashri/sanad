@@ -10,7 +10,7 @@ In Arabic scholarly culture, a sanad is a chain of transmission back to a source
 - Classifies GitHub actions, reusable workflows, local actions, Docker actions, invalid refs, short SHAs, and full SHA pins.
 - Resolves GitHub tags, branches, and full SHAs through the GitHub API.
 - Rewrites mutable refs such as `actions/checkout@v4` to full commit SHA refs.
-- Adds inline metadata comments such as `# sanad: ref=v4`.
+- Adds inline metadata comments such as `# sanad: ref=v4` by default.
 - Maintains `.github/sanad.lock.json` for machine-readable tracking metadata.
 - Applies a cooldown window before adopting newly resolved upstream commits.
 - Produces table, JSON, SARIF, and Markdown helper output for local use and CI.
@@ -123,9 +123,19 @@ files = []
 
 [github]
 api_url = "https://api.github.com"
+
+[comments]
+write = true
+format = "sanad: ref={{ref}}"
+
+[security]
+require_full_sha = true
+require_commit_in_source_repo = true
+allow_private = true
+deny_forks = false
 ```
 
-See [docs/config.md](docs/config.md) for exact supported keys. Some settings in `.sanad.toml.example` are reserved for future behavior and are documented as such.
+Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See [docs/config.md](docs/config.md) for exact supported keys.
 
 ## Commands
 
