@@ -4,6 +4,7 @@ import "time"
 
 const DefaultPath = ".sanad.toml"
 const DefaultCommentFormat = "sanad: ref={{ref}}"
+const DefaultUpgradeLatestRelease = "github-release"
 
 type Config struct {
 	Source        string
@@ -15,6 +16,7 @@ type Config struct {
 	Organization  OrganizationConfig
 	Comments      CommentsConfig
 	Security      SecurityConfig
+	Upgrade       UpgradeConfig
 }
 
 type UpdatesConfig struct {
@@ -49,6 +51,10 @@ type SecurityConfig struct {
 	DenyForks                 bool
 }
 
+type UpgradeConfig struct {
+	LatestRelease string
+}
+
 func Default() Config {
 	return Config{
 		Source:        "defaults",
@@ -72,6 +78,9 @@ func Default() Config {
 			RequireCommitInSourceRepo: true,
 			AllowPrivate:              true,
 			DenyForks:                 false,
+		},
+		Upgrade: UpgradeConfig{
+			LatestRelease: DefaultUpgradeLatestRelease,
 		},
 	}
 }

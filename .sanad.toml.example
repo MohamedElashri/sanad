@@ -30,6 +30,11 @@ write = true
 # parse its own metadata safely.
 format = "sanad: ref={{ref}}"
 
+[upgrade]
+# Controls what `sanad upgrade --latest-release` means. `release` is accepted
+# as an alias for the GitHub latest-release API mode.
+latest_release = "github-release"
+
 [security]
 # These strict checks are enforced by built-in policy/resolver behavior.
 require_full_sha = true

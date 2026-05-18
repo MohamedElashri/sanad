@@ -139,6 +139,14 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 		return Config{}, fmt.Errorf("load config %q: %w", path, err)
 	}
 
+	if meta.IsDefined("upgrade", "latest_release") {
+		latestRelease, err := normalizeUpgradeLatestRelease(raw.Upgrade.LatestRelease)
+		if err != nil {
+			return Config{}, fmt.Errorf("load config %q: %w", path, err)
+		}
+		cfg.Upgrade.LatestRelease = latestRelease
+	}
+
 	return cfg, nil
 }
 
@@ -151,6 +159,7 @@ type fileConfig struct {
 	Organization  organizationFileConfig `toml:"organization"`
 	Comments      commentsFileConfig     `toml:"comments"`
 	Security      securityFileConfig     `toml:"security"`
+	Upgrade       upgradeFileConfig      `toml:"upgrade"`
 }
 
 type updatesFileConfig struct {
@@ -183,6 +192,10 @@ type securityFileConfig struct {
 	RequireCommitInSourceRepo bool `toml:"require_commit_in_source_repo"`
 	AllowPrivate              bool `toml:"allow_private"`
 	DenyForks                 bool `toml:"deny_forks"`
+}
+
+type upgradeFileConfig struct {
+	LatestRelease string `toml:"latest_release"`
 }
 
 func decodeConfigData(data []byte) (fileConfig, toml.MetaData, error) {
@@ -265,4 +278,16 @@ func validateSecurityConfig(cfg SecurityConfig) error {
 		return fmt.Errorf("security.deny_forks=true is not supported because fork lineage is not resolved by the current CLI")
 	}
 	return nil
+}
+
+func normalizeUpgradeLatestRelease(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case DefaultUpgradeLatestRelease, "release":
+		return DefaultUpgradeLatestRelease, nil
+	case "":
+		return "", fmt.Errorf("upgrade.latest_release must not be empty")
+	default:
+		return "", fmt.Errorf("upgrade.latest_release %q is not supported; expected %q", value, DefaultUpgradeLatestRelease)
+	}
 }

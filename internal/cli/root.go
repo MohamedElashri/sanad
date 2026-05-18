@@ -54,6 +54,7 @@ func NewRootCommand() *cobra.Command {
 		newCheckCommand(opts),
 		newPlanCommand(opts),
 		newApplyCommand(opts),
+		newUpgradeCommand(opts),
 		newVersionCommand(),
 	)
 

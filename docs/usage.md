@@ -1,12 +1,13 @@
 # Usage
 
-`sanad` has four workflow commands and one metadata command:
+`sanad` has five workflow commands and one metadata command:
 
 ```bash
 sanad scan
 sanad plan
 sanad check
 sanad apply
+sanad upgrade
 sanad version
 ```
 
@@ -132,6 +133,25 @@ Interactive mode can:
 - leave a policy violation in place.
 
 Workflow rewrites preserve the original file bytes as much as possible and validate that the rewritten YAML parses before writing.
+
+## `sanad upgrade`
+
+Move managed full-SHA pins from one logical ref to another.
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/setup-go --to v6 --write
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --latest-release --dry-run
+```
+
+`upgrade` is dry-run by default. It upgrades only managed pins: workflow entries pinned to a full SHA with `sanad: ref=...` metadata or matching lockfile metadata. `--action` applies to every managed matching entry; `--all` applies to all managed entries.
+
+Use exactly one target selector:
+
+- `--to <ref>` resolves the explicit logical ref.
+- `--latest-release` resolves according to `[upgrade].latest_release`.
+
+The command still applies cooldown and policy before rewriting. Pending cooldown and blocked decisions are reported without changing files.
 
 ## `sanad version`
 

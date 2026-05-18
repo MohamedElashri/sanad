@@ -35,6 +35,9 @@ policy_files = []
 write = true
 format = "sanad: ref={{ref}}"
 
+[upgrade]
+latest_release = "github-release"
+
 [security]
 require_full_sha = true
 require_commit_in_source_repo = true
@@ -168,11 +171,28 @@ Action patterns are matched against:
 
 Patterns use standard path-style glob matching, with a prefix fallback for trailing `*` patterns.
 
+## `[upgrade]`
+
+### `latest_release`
+
+Controls what `sanad upgrade --latest-release` resolves.
+
+Allowed values:
+
+- `github-release`: use GitHub's latest release API and upgrade to that release tag.
+- `release`: accepted as an alias for `github-release`.
+
+Default:
+
+```toml
+latest_release = "github-release"
+```
+
 ## `[github]`
 
 ### `api_url`
 
-GitHub API base URL used by `plan`, `check`, and `apply`.
+GitHub API base URL used by `plan`, `check`, `apply`, and `upgrade`.
 
 Default behavior uses the public GitHub API. Set `api_url` for GitHub Enterprise:
 
@@ -202,7 +222,7 @@ Relative paths are resolved relative to the config file that declares them. Shar
 
 ### `write`
 
-Controls whether `sanad apply` writes inline metadata comments when it rewrites workflow entries.
+Controls whether `sanad apply` and `sanad upgrade` write inline metadata comments when they rewrite workflow entries.
 
 Default:
 
@@ -218,7 +238,7 @@ Set this to `false` when `.github/sanad.lock.json` is the preferred metadata sou
 write = false
 ```
 
-When disabled, rewrites do not add `# sanad: ref=...` comments and remove existing inline `sanad` metadata from changed lines to avoid stale metadata conflicts. `sanad apply --yes --write` still writes lockfile entries for managed pins.
+When disabled, rewrites do not add `# sanad: ref=...` comments and remove existing inline `sanad` metadata from changed lines to avoid stale metadata conflicts. Write commands still update lockfile entries for managed pins.
 
 ### `format`
 

@@ -11,10 +11,11 @@ sanad scan
 sanad plan
 sanad check
 sanad apply
+sanad upgrade
 sanad version
 ```
 
-`scan` is local-only. `plan`, `check`, and `apply` share the same planning pipeline so CI and writes are based on the same decisions.
+`scan` is local-only. `plan`, `check`, and `apply` share the same planning pipeline so CI and writes are based on the same decisions. `upgrade` is a separate workflow for intentionally changing a managed pin's logical ref.
 
 ## Pipeline
 
@@ -30,7 +31,7 @@ The main workflow is:
 8. Resolve GitHub refs when needed.
 9. Evaluate policy and cooldown.
 10. Report decisions.
-11. For `apply`, rewrite workflow bytes and update the lockfile.
+11. For `apply` and `upgrade --write`, rewrite workflow bytes and update the lockfile.
 
 ## Packages
 

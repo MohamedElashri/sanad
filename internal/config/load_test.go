@@ -139,6 +139,9 @@ func TestLoadExampleConfig(t *testing.T) {
 	if !cfg.Security.RequireFullSHA || !cfg.Security.RequireCommitInSourceRepo || !cfg.Security.AllowPrivate || cfg.Security.DenyForks {
 		t.Fatalf("Security = %#v", cfg.Security)
 	}
+	if cfg.Upgrade.LatestRelease != DefaultUpgradeLatestRelease {
+		t.Fatalf("Upgrade.LatestRelease = %q, want %q", cfg.Upgrade.LatestRelease, DefaultUpgradeLatestRelease)
+	}
 }
 
 func TestLoadDottedNestedKeys(t *testing.T) {
@@ -340,6 +343,35 @@ func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load returned nil error for relative GitHub API URL")
+	}
+}
+
+func TestLoadUpgradeLatestRelease(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[upgrade]
+latest_release = "release"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Upgrade.LatestRelease != DefaultUpgradeLatestRelease {
+		t.Fatalf("Upgrade.LatestRelease = %q, want %q", cfg.Upgrade.LatestRelease, DefaultUpgradeLatestRelease)
+	}
+}
+
+func TestLoadUpgradeLatestReleaseRejectsUnsupportedMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[upgrade]\nlatest_release = \"tag\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for unsupported upgrade latest_release mode")
 	}
 }
 

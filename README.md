@@ -72,7 +72,7 @@ Validate locally:
 GITHUB_TOKEN=$(gh auth token) sanad check
 ```
 
-`sanad plan`, `sanad check`, and `sanad apply` may contact GitHub when resolution is needed. `sanad scan` is local-only.
+`sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` may contact GitHub when resolution is needed. `sanad scan` is local-only.
 
 ## Example
 
@@ -144,6 +144,7 @@ sanad scan
 sanad check
 sanad plan
 sanad apply
+sanad upgrade
 sanad version
 ```
 
@@ -156,6 +157,8 @@ All commands accept:
 ```
 
 `sanad check --format sarif` emits SARIF for code scanning, and `sanad plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
+
+`sanad upgrade --action actions/checkout --to v5` intentionally moves managed pins to a new logical ref while keeping workflow execution pinned to a full SHA.
 
 Command-specific usage is covered in [docs/usage.md](docs/usage.md).
 
