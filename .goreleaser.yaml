@@ -1,0 +1,63 @@
+version: 2
+
+project_name: sanad
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: sanad
+    main: ./cmd/sanad
+    binary: sanad
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/MohamedElashri/sanad/internal/cli.version={{ .Version }}
+        -X github.com/MohamedElashri/sanad/internal/cli.commit={{ .Commit }}
+        -X github.com/MohamedElashri/sanad/internal/cli.date={{ .Date }}
+
+archives:
+  - ids:
+      - sanad
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ title .Os }}_{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE
+      - .sanad.toml.example
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: MohamedElashri
+    name: sanad
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

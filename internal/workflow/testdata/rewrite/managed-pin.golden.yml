@@ -1,0 +1,7 @@
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: "actions/checkout@2222222222222222222222222222222222222222" # keep; sanad: ref=v4
+      - uses: docker://alpine:3.20
+      - run: echo ok

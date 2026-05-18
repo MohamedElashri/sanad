@@ -1,0 +1,209 @@
+# sanad
+
+`sanad` is a focused Go CLI for GitHub Actions workflow dependencies. It finds `uses:` references, resolves GitHub action refs to full 40-character commit SHAs, rewrites workflow files without reformatting the whole YAML document, and preserves the logical ref that should be tracked later.
+
+In Arabic scholarly culture, a sanad is a chain of transmission back to a source. This tool keeps that chain explicit for workflow dependencies: the workflow runs an immutable commit, while metadata records the tag or branch that commit came from.
+
+## What It Does
+
+- Scans workflow files under `.github/workflows` by default.
+- Classifies GitHub actions, reusable workflows, local actions, Docker actions, invalid refs, short SHAs, and full SHA pins.
+- Resolves GitHub tags, branches, and full SHAs through the GitHub API.
+- Rewrites mutable refs such as `actions/checkout@v4` to full commit SHA refs.
+- Adds inline metadata comments such as `# sanad: ref=v4`.
+- Maintains `.github/sanad.lock.json` for machine-readable tracking metadata.
+- Applies a cooldown window before adopting newly resolved upstream commits.
+- Produces table, JSON, SARIF, and Markdown helper output for local use and CI.
+
+## What It Does Not Do
+
+- It is not a general dependency updater.
+- It is not a vulnerability scanner.
+- It does not update Docker image tags.
+- It does not rewrite local actions.
+- It does not format or lint workflow YAML.
+- It does not maintain a dedicated GitHub Action wrapper.
+
+## Installation
+
+Install the latest tagged release with Go:
+
+```bash
+go install github.com/MohamedElashri/sanad/cmd/sanad@latest
+```
+
+Tagged releases also publish Linux, macOS, and Windows archives on GitHub Releases. Download the archive for your platform, place the `sanad` binary on your `PATH`, and verify it against the published `sanad_<version>_checksums.txt` file.
+
+Check the installed build:
+
+```bash
+sanad version
+```
+
+## Quickstart
+
+Scan workflows without making network calls:
+
+```bash
+sanad scan
+```
+
+Preview policy decisions and proposed pin updates:
+
+```bash
+GITHUB_TOKEN=... sanad plan
+```
+
+Show the rewrite diff without changing files:
+
+```bash
+GITHUB_TOKEN=... sanad apply --dry-run
+```
+
+Apply in automation:
+
+```bash
+GITHUB_TOKEN=... sanad apply --yes --write
+```
+
+Validate in CI:
+
+```bash
+GITHUB_TOKEN=... sanad check
+```
+
+`sanad plan`, `sanad check`, and `sanad apply` may contact GitHub when resolution is needed. `sanad scan` is local-only.
+
+## Example
+
+Before:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+```
+
+After:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # sanad: ref=v4
+      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # sanad: ref=v5
+```
+
+The workflow executes immutable SHAs. The comments and lockfile tell `sanad` which logical refs to resolve on future runs.
+
+## Configuration
+
+Create `.sanad.toml` when the defaults are not enough:
+
+```toml
+workflow_paths = [".github/workflows"]
+cooldown = "14d"
+
+[updates]
+tags = "track"
+branches = "deny"
+unpinned = "deny"
+reusable_workflows = true
+
+[ignore]
+actions = [
+  "./*",
+  "docker://*"
+]
+files = []
+
+[github]
+api_url = "https://api.github.com"
+```
+
+See [docs/config.md](docs/config.md) for exact supported keys. Some settings in `.sanad.toml.example` are reserved for future behavior and are documented as such.
+
+## Commands
+
+```bash
+sanad scan
+sanad check
+sanad plan
+sanad apply
+sanad version
+```
+
+All commands accept:
+
+```bash
+--config .sanad.toml
+--format table
+--format json
+```
+
+`sanad check --format sarif` emits SARIF for code scanning, and `sanad plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
+
+Command-specific usage is covered in [docs/usage.md](docs/usage.md).
+
+## GitHub Authentication
+
+`sanad` reads tokens from environment variables:
+
+1. `GITHUB_TOKEN`
+2. `GH_TOKEN`
+
+Tokens are used for GitHub API requests and are never printed by the CLI. Public repositories can work without a token, but authenticated requests are strongly recommended for CI and private repositories.
+
+Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enterprise.
+
+## Security Model
+
+The core policy is simple: workflow dependencies should run immutable full-length SHAs. Mutable tags and branches are resolved to commits, short SHAs are rejected, local and Docker actions are skipped by default, and branch or unpinned behavior must be explicitly allowed before it is managed non-interactively.
+
+See [docs/security-model.md](docs/security-model.md) for the full model.
+
+## Cooldown
+
+The default cooldown is `14d`. When an upstream tag or branch resolves to a newer SHA, `sanad` checks the candidate timestamp before adopting it. If the candidate is newer than the cooldown window, the decision is `pending-cooldown` and no rewrite is applied yet.
+
+## CI
+
+Example enforcement job:
+
+```yaml
+name: Check pinned actions
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  sanad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
+        with:
+          go-version: "1.23"
+      - run: go install github.com/MohamedElashri/sanad/cmd/sanad@latest
+      - run: sanad check --format json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+See [docs/ci.md](docs/ci.md) for update workflows and pull request automation.
+
+## Development
+
+```bash
+make build
+make test
+make lint
+```
+
+More design context is in [docs/design.md](docs/design.md).

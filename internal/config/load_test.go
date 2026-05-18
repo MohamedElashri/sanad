@@ -1,0 +1,340 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestLoadDefaultWhenMissing(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg, err := Load(DefaultPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.Source != "defaults" {
+		t.Fatalf("Source = %q, want defaults", cfg.Source)
+	}
+	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
+		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
+	}
+	if cfg.Cooldown != 14*24*time.Hour {
+		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
+	}
+	if cfg.Updates.Tags != "track" || cfg.Updates.Branches != "deny" || cfg.Updates.Unpinned != "deny" || !cfg.Updates.ReusableWorkflows {
+		t.Fatalf("Updates = %#v", cfg.Updates)
+	}
+	wantIgnore := []string{"./*", "docker://*"}
+	if len(cfg.Ignore.Actions) != len(wantIgnore) {
+		t.Fatalf("Ignore.Actions = %#v, want %#v", cfg.Ignore.Actions, wantIgnore)
+	}
+	for i := range wantIgnore {
+		if cfg.Ignore.Actions[i] != wantIgnore[i] {
+			t.Fatalf("Ignore.Actions = %#v, want %#v", cfg.Ignore.Actions, wantIgnore)
+		}
+	}
+}
+
+func TestLoadExplicitMissingErrors(t *testing.T) {
+	_, err := Load(filepath.Join(t.TempDir(), "missing.toml"))
+	if err == nil {
+		t.Fatal("Load returned nil error for explicit missing config")
+	}
+}
+
+func TestLoadExistingConfigMarksSource(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("# sanad config\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Source != path {
+		t.Fatalf("Source = %q, want %q", cfg.Source, path)
+	}
+}
+
+func TestLoadWorkflowPaths(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`workflow_paths = ["ci/workflows", ".github/workflows"]
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	want := []string{"ci/workflows", ".github/workflows"}
+	if len(cfg.WorkflowPaths) != len(want) {
+		t.Fatalf("WorkflowPaths = %#v, want %#v", cfg.WorkflowPaths, want)
+	}
+	for i := range want {
+		if cfg.WorkflowPaths[i] != want[i] {
+			t.Fatalf("WorkflowPaths = %#v, want %#v", cfg.WorkflowPaths, want)
+		}
+	}
+}
+
+func TestLoadWorkflowPathsMultiline(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`workflow_paths = [
+  ".github/workflows", # default
+  'ci/workflows',
+]
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	want := []string{".github/workflows", "ci/workflows"}
+	if len(cfg.WorkflowPaths) != len(want) {
+		t.Fatalf("WorkflowPaths = %#v, want %#v", cfg.WorkflowPaths, want)
+	}
+	for i := range want {
+		if cfg.WorkflowPaths[i] != want[i] {
+			t.Fatalf("WorkflowPaths = %#v, want %#v", cfg.WorkflowPaths, want)
+		}
+	}
+}
+
+func TestParseDuration(t *testing.T) {
+	tests := []struct {
+		value string
+		want  time.Duration
+	}{
+		{value: "14d", want: 14 * 24 * time.Hour},
+		{value: "48h", want: 48 * time.Hour},
+		{value: "30m", want: 30 * time.Minute},
+		{value: "0s", want: 0},
+	}
+
+	for _, tt := range tests {
+		got, err := ParseDuration(tt.value)
+		if err != nil {
+			t.Fatalf("ParseDuration(%q) returned error: %v", tt.value, err)
+		}
+		if got != tt.want {
+			t.Fatalf("ParseDuration(%q) = %s, want %s", tt.value, got, tt.want)
+		}
+	}
+}
+
+func TestParseDurationRejectsInvalidValues(t *testing.T) {
+	for _, value := range []string{"", "d", "1w", "1.5d", "-1h"} {
+		if _, err := ParseDuration(value); err == nil {
+			t.Fatalf("ParseDuration(%q) returned nil error", value)
+		}
+	}
+}
+
+func TestLoadCooldown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`workflow_paths = [".github/workflows"]
+cooldown = "48h"
+
+[updates]
+tags = "track"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Cooldown != 48*time.Hour {
+		t.Fatalf("Cooldown = %s, want 48h", cfg.Cooldown)
+	}
+}
+
+func TestLoadCooldownDayDuration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte(`cooldown = "14d"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Cooldown != 14*24*time.Hour {
+		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
+	}
+}
+
+func TestLoadCooldownInvalidDurationErrors(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte(`cooldown = "1w"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for invalid cooldown")
+	}
+}
+
+func TestLoadUpdatesPolicy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[updates]
+tags = "deny"
+branches = "track"
+unpinned = "latest-release"
+reusable_workflows = false
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Updates.Tags != "deny" {
+		t.Fatalf("Updates.Tags = %q, want deny", cfg.Updates.Tags)
+	}
+	if cfg.Updates.Branches != "track" {
+		t.Fatalf("Updates.Branches = %q, want track", cfg.Updates.Branches)
+	}
+	if cfg.Updates.Unpinned != "latest-release" {
+		t.Fatalf("Updates.Unpinned = %q, want latest-release", cfg.Updates.Unpinned)
+	}
+	if cfg.Updates.ReusableWorkflows {
+		t.Fatal("Updates.ReusableWorkflows = true, want false")
+	}
+}
+
+func TestLoadIgnoreActions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[ignore]
+actions = [
+  "owner/repo",
+  "actions/*",
+]
+files = [
+  ".github/workflows/legacy.yml",
+]
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	want := []string{"owner/repo", "actions/*"}
+	if len(cfg.Ignore.Actions) != len(want) {
+		t.Fatalf("Ignore.Actions = %#v, want %#v", cfg.Ignore.Actions, want)
+	}
+	for i := range want {
+		if cfg.Ignore.Actions[i] != want[i] {
+			t.Fatalf("Ignore.Actions = %#v, want %#v", cfg.Ignore.Actions, want)
+		}
+	}
+	wantFiles := []string{".github/workflows/legacy.yml"}
+	if len(cfg.Ignore.Files) != len(wantFiles) {
+		t.Fatalf("Ignore.Files = %#v, want %#v", cfg.Ignore.Files, wantFiles)
+	}
+	for i := range wantFiles {
+		if cfg.Ignore.Files[i] != wantFiles[i] {
+			t.Fatalf("Ignore.Files = %#v, want %#v", cfg.Ignore.Files, wantFiles)
+		}
+	}
+}
+
+func TestLoadGitHubAPIURL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[github]
+api_url = "https://github.example.com/api/v3"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.GitHub.APIURL != "https://github.example.com/api/v3" {
+		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
+	}
+}
+
+func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[github]\napi_url = \"github.local/api/v3\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for relative GitHub API URL")
+	}
+}
+
+func TestLoadOrganizationPolicyFilesApplyBeforeLocalConfig(t *testing.T) {
+	root := t.TempDir()
+	policyPath := filepath.Join(root, "org-policy.toml")
+	if err := os.WriteFile(policyPath, []byte(`[updates]
+tags = "deny"
+branches = "track"
+
+[ignore]
+actions = ["org/internal-action"]
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(root, DefaultPath)
+	content := []byte(`[organization]
+policy_files = ["org-policy.toml"]
+
+[updates]
+tags = "track"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Updates.Tags != "track" {
+		t.Fatalf("Updates.Tags = %q, want local override track", cfg.Updates.Tags)
+	}
+	if cfg.Updates.Branches != "track" {
+		t.Fatalf("Updates.Branches = %q, want organization policy track", cfg.Updates.Branches)
+	}
+	if len(cfg.Ignore.Actions) != 1 || cfg.Ignore.Actions[0] != "org/internal-action" {
+		t.Fatalf("Ignore.Actions = %#v, want organization policy action", cfg.Ignore.Actions)
+	}
+	if len(cfg.Organization.PolicyFiles) != 1 || cfg.Organization.PolicyFiles[0] != "org-policy.toml" {
+		t.Fatalf("Organization.PolicyFiles = %#v", cfg.Organization.PolicyFiles)
+	}
+}
+
+func TestLoadInvalidNestedPolicyErrors(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[updates]\nreusable_workflows = maybe\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for invalid nested policy")
+	}
+}

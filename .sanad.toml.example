@@ -1,0 +1,38 @@
+workflow_paths = [".github/workflows"]
+
+cooldown = "14d"
+
+[updates]
+tags = "track"
+branches = "deny"
+unpinned = "deny"
+reusable_workflows = true
+
+[ignore]
+actions = [
+  "./*",
+  "docker://*"
+]
+files = []
+
+[github]
+api_url = "https://api.github.com"
+
+[organization]
+# Optional shared policy files, resolved relative to this config file. Settings
+# in this repository config override settings loaded from these files.
+policy_files = []
+
+# Reserved for future CLI config support. Current releases always write
+# inline metadata comments when workflow entries are rewritten.
+[comments]
+write = true
+format = "sanad: ref={{ref}}"
+
+# Reserved for future CLI config support. Current releases enforce the core
+# SHA and source-repository checks through built-in policy/resolver behavior.
+[security]
+require_full_sha = true
+require_commit_in_source_repo = true
+allow_private = true
+deny_forks = false

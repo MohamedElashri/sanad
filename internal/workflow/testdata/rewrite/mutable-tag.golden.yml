@@ -1,0 +1,7 @@
+jobs:
+  test:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@2222222222222222222222222222222222222222 # sanad: ref=v4
+      - name: Setup Go
+        uses: actions/setup-go@3333333333333333333333333333333333333333 # important; sanad: ref=v5
