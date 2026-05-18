@@ -12,8 +12,11 @@ Sanad is a normal CLI. It does not need a GitHub Action wrapper.
 On macOS or Linux with Homebrew:
 
 ```bash
-brew tap MohamedElashri/sanad
-brew install sanad
+brew tap MohamedElashri/sanad && brew install sanad
+```
+Check that it is installed 
+
+```bash
 sanad version
 ```
 

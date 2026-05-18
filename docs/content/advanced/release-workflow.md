@@ -27,8 +27,7 @@ The release workflow needs a repository secret named `HOMEBREW_TAP_GITHUB_TOKEN`
 Users install through:
 
 ```bash
-brew tap MohamedElashri/sanad
-brew install sanad
+brew tap MohamedElashri/sanad &&  brew install sanad
 ```
 
 ## Nix flake

@@ -13,8 +13,11 @@
 On macOS or Linux with Homebrew:
 
 ```bash
-brew tap MohamedElashri/sanad
-brew install sanad
+brew tap MohamedElashri/sanad && brew install sanad
+```
+Check that it is installed 
+
+```bash
 sanad version
 ```
 
@@ -30,6 +33,10 @@ Or install it into your profile:
 
 ```bash
 nix profile install github:MohamedElashri/sanad
+```
+Check that it is installed 
+
+```bash
 sanad version
 ```
 
