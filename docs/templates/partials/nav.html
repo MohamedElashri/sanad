@@ -1,0 +1,23 @@
+{{- define "docs-nav" -}}
+<details class="side-nav-details" open>
+<summary>Docs menu</summary>
+<nav>
+  <p>Guide</p>
+  <a{{ if eq .CurrentURL "/guide/getting-started/" }} class="active"{{ end }} href="{{ .BasePath }}/guide/getting-started/">Getting Started</a>
+  <a{{ if eq .CurrentURL "/guide/configuration/" }} class="active"{{ end }} href="{{ .BasePath }}/guide/configuration/">Configuration</a>
+  <a{{ if eq .CurrentURL "/guide/updating-actions/" }} class="active"{{ end }} href="{{ .BasePath }}/guide/updating-actions/">Updating Actions</a>
+  <a{{ if eq .CurrentURL "/guide/ci/" }} class="active"{{ end }} href="{{ .BasePath }}/guide/ci/">CI Usage</a>
+  <p>Reference</p>
+  <a{{ if eq .CurrentURL "/reference/cli/" }} class="active"{{ end }} href="{{ .BasePath }}/reference/cli/">CLI</a>
+  <a{{ if eq .CurrentURL "/reference/config/" }} class="active"{{ end }} href="{{ .BasePath }}/reference/config/">Config</a>
+  <a{{ if eq .CurrentURL "/reference/lockfile/" }} class="active"{{ end }} href="{{ .BasePath }}/reference/lockfile/">Lockfile</a>
+  <p>Advanced</p>
+  <a{{ if eq .CurrentURL "/advanced/security-model/" }} class="active"{{ end }} href="{{ .BasePath }}/advanced/security-model/">Security Model</a>
+  <a{{ if eq .CurrentURL "/advanced/internals/" }} class="active"{{ end }} href="{{ .BasePath }}/advanced/internals/">Internals</a>
+  <a{{ if eq .CurrentURL "/advanced/development/" }} class="active"{{ end }} href="{{ .BasePath }}/advanced/development/">Development</a>
+  <a{{ if eq .CurrentURL "/advanced/release-workflow/" }} class="active"{{ end }} href="{{ .BasePath }}/advanced/release-workflow/">Release Workflow</a>
+  <p>Project</p>
+  <a{{ if eq .CurrentURL "/release-notes/" }} class="active"{{ end }} href="{{ .BasePath }}/release-notes/">Release Notes</a>
+</nav>
+</details>
+{{- end }}

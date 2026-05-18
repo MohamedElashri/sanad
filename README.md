@@ -135,7 +135,7 @@ allow_private = true
 deny_forks = false
 ```
 
-Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See [docs/config.md](docs/config.md) for exact supported keys.
+Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See the [config reference](docs/content/reference/config.md) for exact supported keys.
 
 Interactive apply can optionally persist branch tracking by writing `[updates].branches = "track"` after final confirmation.
 
@@ -162,7 +162,7 @@ All commands accept:
 
 `sanad upgrade --action actions/checkout --to v5` intentionally moves managed pins to a new logical ref while keeping workflow execution pinned to a full SHA.
 
-Command-specific usage is covered in [docs/usage.md](docs/usage.md).
+Command-specific usage is covered in the [CLI reference](docs/content/reference/cli.md).
 
 ## GitHub Authentication
 
@@ -185,7 +185,7 @@ Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enter
 
 The core policy is simple: workflow dependencies should run immutable full-length SHAs. Mutable tags and branches are resolved to commits, short SHAs are rejected, local and Docker actions are skipped by default, and branch or unpinned behavior must be explicitly allowed before it is managed non-interactively.
 
-See [docs/security-model.md](docs/security-model.md) for the full model.
+See the [security model](docs/content/advanced/security-model.md) for the full model.
 
 ## Cooldown
 
@@ -207,17 +207,17 @@ jobs:
   sanad:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: "1.23"
+          go-version: "1.26.x"
       - run: go install github.com/MohamedElashri/sanad/cmd/sanad@latest
       - run: sanad check --format json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-See [docs/ci.md](docs/ci.md) for update workflows and pull request automation.
+See the [CI guide](docs/content/guide/ci.md) for update workflows and pull request automation.
 
 ## Development
 
@@ -225,6 +225,12 @@ See [docs/ci.md](docs/ci.md) for update workflows and pull request automation.
 make build
 make test
 make lint
+make docs-build
 ```
 
-More design context is in [docs/design.md](docs/design.md).
+The documentation site is built with Nida from `docs/`. User docs live under `docs/content/guide`, exact lookup pages under `docs/content/reference`, and contributor/internal docs under `docs/content/advanced`.
+
+
+## LICENCE
+
+This project is released under the [MIT LICENCE](./LICENSE)

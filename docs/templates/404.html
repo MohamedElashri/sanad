@@ -1,0 +1,9 @@
+{{- define "404" -}}{{ template "base" . }}{{- end }}
+{{- define "content" -}}
+<section class="not-found">
+  <p class="eyebrow">404</p>
+  <h1>That page is not pinned.</h1>
+  <p class="hero-copy">The docs path does not exist. Head back to the docs home and pick a known ref.</p>
+  <a class="button primary" href="{{ .BasePath }}/">Return home</a>
+</section>
+{{- end }}
