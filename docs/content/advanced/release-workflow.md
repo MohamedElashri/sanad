@@ -41,7 +41,7 @@ nix run github:MohamedElashri/sanad -- version
 nix profile install github:MohamedElashri/sanad
 ```
 
-When cutting a new release, update the flake version, artifact names if needed, and fixed hashes from the new `sanad_<version>_checksums.txt` file.
+After GoReleaser publishes the release archives, the release workflow updates `flake.nix` from the generated `sanad_<version>_checksums.txt` file and pushes the flake update back to `main`.
 
 The `version` command is populated through linker metadata in release builds:
 
