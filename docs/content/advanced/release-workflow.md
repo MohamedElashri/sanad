@@ -20,7 +20,7 @@ GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64, includ
 
 Tagged releases also update the external Homebrew tap at `MohamedElashri/homebrew-sanad`.
 
-The tap keeps package metadata outside the main source repository, matching the Nida release pattern. GoReleaser writes `Formula/sanad.rb` with platform-specific release archive URLs and SHA-256 values from the release artifacts.
+The tap keeps package metadata outside the main source repository, writes `Formula/sanad.rb` with platform-specific release archive URLs and SHA-256 values from the release artifacts.
 
 The release workflow needs a repository secret named `HOMEBREW_TAP_GITHUB_TOKEN`. It must be a token with contents write access to `MohamedElashri/homebrew-sanad`; the default `GITHUB_TOKEN` can publish the Sanad release, but cannot write to a separate tap repository.
 
