@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Sanad logo</title>
+  <desc id="desc">A minimal chain link forming an S-shaped path with a fixed pin point.</desc>
+  <defs>
+    <linearGradient id="bg" x1="22" y1="12" x2="106" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#121826"/>
+      <stop offset="1" stop-color="#1f6f78"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="108" height="108" rx="26" fill="url(#bg)"/>
+  <path fill="#f4c95d" d="M91.5 17.5 110.5 36.5 98.3 39.7 85 26.4 91.5 17.5Z"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="14" d="M82 42H54c-12 0-22 9-22 21s10 21 22 21h20c7 0 12-5 12-12s-5-12-12-12H47"/>
+  <path fill="none" stroke="#121826" stroke-linecap="round" stroke-width="6" d="M82 42H54c-12 0-22 9-22 21s10 21 22 21h20c7 0 12-5 12-12s-5-12-12-12H47" opacity=".22"/>
+  <circle cx="82" cy="42" r="9" fill="#f4c95d"/>
+  <circle cx="82" cy="42" r="4" fill="#121826"/>
+</svg>

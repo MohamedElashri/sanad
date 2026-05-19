@@ -1,10 +1,30 @@
-# sanad
+<div align="center">
+  <img src="docs/static/logo.svg" alt="Sanad logo" width="128" height="128">
+  <h1>Sanad</h1>
+  <p><strong>Pin GitHub Actions to immutable SHAs, then keep the refs you trust moving.</strong></p>
+  <p>
+    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml"><img alt="Docs" src="https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml/badge.svg?label=docs"></a>
+    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/MohamedElashri/sanad/actions/workflows/release.yml/badge.svg"></a>
+    <a href="https://github.com/MohamedElashri/sanad/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/MohamedElashri/sanad?sort=semver&display_name=tag&logo=github"></a>
+    <a href="https://pkg.go.dev/github.com/MohamedElashri/sanad"><img alt="Go reference" src="https://pkg.go.dev/badge/github.com/MohamedElashri/sanad.svg"></a>
+    <a href="https://goreportcard.com/report/github.com/MohamedElashri/sanad"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/MohamedElashri/sanad"></a>
+    <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/MohamedElashri/sanad"></a>
+  </p>
+  <p>
+    <a href="https://melashri.net/sanad/">Documentation</a>
+    |
+    <a href="#installation">Installation</a>
+    |
+    <a href="#quickstart">Quickstart</a>
+    |
+    <a href="docs/content/reference/cli.md">CLI reference</a>
+    |
+    <a href="docs/content/advanced/security-model.md">Security model</a>
+  </p>
+</div>
 
-[![CI](https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml)
-[![Pages](https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml)
-[![Release](https://github.com/MohamedElashri/sanad/actions/workflows/release.yml/badge.svg)](https://github.com/MohamedElashri/sanad/actions/workflows/release.yml)
-
-`sanad` pins and updates GitHub Actions dependencies to immutable commit SHAs while preserving the logical refs you want to track.
+**sanad** pins and updates GitHub Actions dependencies to immutable commit SHAs while preserving the logical refs you want to track.
 
 ## Installation
 
