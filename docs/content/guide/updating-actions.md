@@ -25,7 +25,7 @@ Apply eligible updates:
 GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
-If a candidate commit is newer than the configured cooldown, Sanad reports `pending-cooldown` and does not rewrite that entry yet.
+By default, Sanad evaluates cooldown with upstream release, tag, or commit timestamps. If `cooldown_source = "first-seen"` is configured, Sanad instead records when a new candidate SHA was first seen locally. If the candidate has not satisfied the configured cooldown, Sanad reports `pending-cooldown` and does not rewrite that entry yet.
 
 ## Change the logical ref
 

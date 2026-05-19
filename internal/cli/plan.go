@@ -85,15 +85,16 @@ type planAction struct {
 }
 
 type evaluatedUse struct {
-	Use         workflow.UseNode
-	Parsed      actions.ParsedAction
-	Recovered   metadata.Metadata
-	HasMetadata bool
-	MetadataErr error
-	Candidate   *githubresolver.ResolvedRef
-	ResolveErr  error
-	Decision    policy.Decision
-	Action      planAction
+	Use             workflow.UseNode
+	Parsed          actions.ParsedAction
+	Recovered       metadata.Metadata
+	HasMetadata     bool
+	MetadataErr     error
+	Candidate       *githubresolver.ResolvedRef
+	CandidateSeenAt time.Time
+	ResolveErr      error
+	Decision        policy.Decision
+	Action          planAction
 }
 
 func newPlanCommand(opts *rootOptions) *cobra.Command {
@@ -157,15 +158,8 @@ func configuredPlanResolver(cfg config.Config, resolver planResolver) (planResol
 	return defaultPlanResolverFactory(cfg)
 }
 
-func newDefaultPlanResolver(cfg config.Config) (planResolver, error) {
-	var options []githubresolver.Option
-	if cfg.GitHub.APIURL != "" {
-		options = append(options, githubresolver.WithBaseURL(cfg.GitHub.APIURL))
-		if cfg.GitHub.SendTokenToCustomAPIURL {
-			options = append(options, githubresolver.WithEnvTokenForCustomBaseURL())
-		}
-	}
-	return githubresolver.NewClientFromEnv(options...)
+func newDefaultPlanResolver(_ config.Config) (planResolver, error) {
+	return githubresolver.NewClientFromEnv()
 }
 
 func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []string, resolver planResolver, now time.Time) (planReport, error) {
@@ -219,8 +213,10 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 	evaluated := make([]evaluatedUse, 0, len(uses))
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
+		lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
 		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
 		var candidate *githubresolver.ResolvedRef
+		var candidateSeenAt time.Time
 		var resolveErr error
 		var decision policy.Decision
 		if metadataErr != nil {
@@ -252,13 +248,15 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 				decision = ignoredDecision(parsed, logicalRef, ignore)
 			} else {
 				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef, policy.UnpinnedPolicy(cfg.Updates.Unpinned))
+				candidateSeenAt = candidateObservationTime(lockfileValue.Entry, hasLockfile, hasMetadata, candidate, now, cfg.CooldownSource)
 				decision = policy.Evaluate(policy.Entry{
-					File:       use.File,
-					Action:     parsed,
-					Candidate:  candidate,
-					ResolveErr: resolveErr,
-					LogicalRef: logicalRef,
-					Now:        now,
+					File:            use.File,
+					Action:          parsed,
+					Candidate:       candidate,
+					ResolveErr:      resolveErr,
+					LogicalRef:      logicalRef,
+					CandidateSeenAt: candidateSeenAt,
+					Now:             now,
 				}, policyOptionsFromConfig(cfg, now))
 			}
 			if metadataSource != "" && decision.LogicalRef == "" {
@@ -271,15 +269,16 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 			action.MetadataSource = string(recovered.Source)
 		}
 		evaluated = append(evaluated, evaluatedUse{
-			Use:         use,
-			Parsed:      parsed,
-			Recovered:   recovered,
-			HasMetadata: hasMetadata,
-			MetadataErr: metadataErr,
-			Candidate:   candidate,
-			ResolveErr:  resolveErr,
-			Decision:    decision,
-			Action:      action,
+			Use:             use,
+			Parsed:          parsed,
+			Recovered:       recovered,
+			HasMetadata:     hasMetadata,
+			MetadataErr:     metadataErr,
+			Candidate:       candidate,
+			CandidateSeenAt: candidateSeenAt,
+			ResolveErr:      resolveErr,
+			Decision:        decision,
+			Action:          action,
 		})
 	}
 	return files, evaluated, nil
@@ -307,7 +306,26 @@ func validateLockfileMetadataAction(parsed actions.ParsedAction, entry metadata.
 			actionSelectorString(parsed),
 		)
 	}
+	if parsed.Pinned && entry.PinnedSHA != "" && parsed.Ref != entry.PinnedSHA {
+		return fmt.Errorf("metadata conflict: workflow pin %q does not match lockfile pin %q", parsed.Ref, entry.PinnedSHA)
+	}
 	return nil
+}
+
+func candidateObservationTime(entry metadata.LockfileEntry, hasLockfile bool, hasMetadata bool, candidate *githubresolver.ResolvedRef, now time.Time, cooldownSource string) time.Time {
+	if candidate == nil {
+		return time.Time{}
+	}
+	if hasLockfile && entry.CandidateSHA == candidate.SHA && entry.CandidateSeenAt != "" {
+		seenAt, err := time.Parse(time.RFC3339, entry.CandidateSeenAt)
+		if err == nil {
+			return seenAt
+		}
+	}
+	if hasLockfile || hasMetadata || cooldownSource == string(policy.CooldownSourceFirstSeen) {
+		return now
+	}
+	return time.Time{}
 }
 
 func lockfileActionName(entry metadata.LockfileEntry) string {
@@ -396,6 +414,7 @@ func policyOptionsFromConfig(cfg config.Config, now time.Time) policy.Options {
 		IgnoreActions:     cfg.Ignore.Actions,
 		IgnoreFiles:       cfg.Ignore.Files,
 		Cooldown:          cfg.Cooldown,
+		CooldownSource:    policy.CooldownSource(cfg.CooldownSource),
 		Now:               now,
 	}
 }

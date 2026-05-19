@@ -14,6 +14,7 @@ If `.sanad.toml` is missing, built-in defaults are used. If a non-default config
 ```toml
 workflow_paths = [".github/workflows"]
 cooldown = "14d"
+cooldown_source = "source"
 
 [updates]
 tags = "track"
@@ -27,9 +28,6 @@ actions = [
   "docker://*"
 ]
 files = []
-
-[github]
-api_url = "https://api.github.com"
 
 [organization]
 policy_files = []
@@ -50,11 +48,19 @@ deny_forks = false
 
 ## `workflow_paths`
 
-Array of workflow files or directories. Directories are searched recursively for `.yml` and `.yaml` files.
+Array of workflow files or directories. Directories are searched recursively for `.yml` and `.yaml` files. Paths must be relative and must not escape the repository root with `..`.
 
 ## `cooldown`
 
 Minimum age before a resolved candidate SHA can be adopted. Supports Go durations such as `48h` and day values such as `14d`.
+
+## `cooldown_source`
+
+Controls which timestamp feeds cooldown evaluation:
+
+`source` uses upstream release, tag, or commit timestamps. This is the default.
+
+`first-seen` uses the time Sanad first recorded a candidate SHA locally in `.github/sanad.lock.json`.
 
 ## `[updates]`
 
@@ -71,12 +77,6 @@ Minimum age before a resolved candidate SHA can be adopted. Supports Go duration
 `actions` skips matching action refs. `files` skips matching workflow files.
 
 Patterns use path-style glob matching, with a prefix fallback for trailing `*` patterns.
-
-## `[github]`
-
-`api_url` sets the GitHub API base URL. It must be an HTTPS URL without embedded credentials.
-
-`send_token_to_custom_api_url` controls whether `GITHUB_TOKEN` or `GH_TOKEN` may be sent to a custom `api_url`. It defaults to `false`; enable it only for a trusted GitHub Enterprise endpoint.
 
 ## `[organization]`
 

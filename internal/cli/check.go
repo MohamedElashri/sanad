@@ -56,9 +56,9 @@ func newCheckCommand(opts *rootOptions) *cobra.Command {
 			return runCheck(cmd, opts, checkOpts, defaultPlanResolver)
 		},
 	}
-	cmd.Flags().BoolVar(&checkOpts.strict, "strict", false, "fail on available and pending managed updates")
+	cmd.Flags().BoolVar(&checkOpts.strict, "strict", false, "deprecated: check now fails on managed updates by default")
 	cmd.Flags().BoolVar(&checkOpts.allowPendingCooldown, "allow-pending-cooldown", false, "do not fail on pending cooldown updates")
-	cmd.Flags().BoolVar(&checkOpts.failOnUpdates, "fail-on-updates", false, "fail when already-pinned managed actions have eligible updates")
+	cmd.Flags().BoolVar(&checkOpts.failOnUpdates, "fail-on-updates", false, "deprecated: check now fails on eligible managed updates by default")
 	cmd.Flags().StringSliceVar(&checkOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
 	return cmd
 }
@@ -138,15 +138,9 @@ func checkActionViolates(action planAction, opts *checkOptions) bool {
 
 	switch action.Decision {
 	case policy.DecisionUpdate:
-		if action.CurrentSHA == "" {
-			return true
-		}
-		return opts.strict || opts.failOnUpdates
+		return true
 	case policy.DecisionPending:
-		if action.CurrentSHA == "" {
-			return true
-		}
-		return opts.strict && !opts.allowPendingCooldown
+		return !opts.allowPendingCooldown
 	default:
 		return false
 	}

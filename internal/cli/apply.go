@@ -452,10 +452,16 @@ func lockfileEntryForDecision(use workflow.UseNode, parsed actions.ParsedAction,
 	default:
 		return metadata.LockfileEntry{}, false
 	}
-	if decision.LogicalRef == "" || !actions.IsFullSHA(pinned) {
+	if decision.LogicalRef == "" {
 		return metadata.LockfileEntry{}, false
 	}
 	if parsed.Owner == "" || parsed.Repo == "" {
+		return metadata.LockfileEntry{}, false
+	}
+	if pinned != "" && !actions.IsFullSHA(pinned) {
+		return metadata.LockfileEntry{}, false
+	}
+	if pinned == "" && (candidate == nil || !actions.IsFullSHA(candidate.SHA)) {
 		return metadata.LockfileEntry{}, false
 	}
 
@@ -469,6 +475,14 @@ func lockfileEntryForDecision(use workflow.UseNode, parsed actions.ParsedAction,
 		LogicalRef: decision.LogicalRef,
 		PinnedSHA:  pinned,
 		ResolvedAt: now.Format(time.RFC3339),
+	}
+	if decision.Kind == policy.DecisionPending && candidate != nil && actions.IsFullSHA(candidate.SHA) {
+		entry.CandidateSHA = candidate.SHA
+		seenAt := decision.CandidateSeenAt
+		if seenAt.IsZero() {
+			seenAt = now
+		}
+		entry.CandidateSeenAt = seenAt.UTC().Format(time.RFC3339)
 	}
 	if candidate != nil {
 		if ts, source := resolvedTimestamp(*candidate); !ts.IsZero() {

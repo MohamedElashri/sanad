@@ -536,6 +536,48 @@ func TestApplyInteractivePersistsBranchTrackingWhenRequested(t *testing.T) {
 	}
 }
 
+func TestApplyFirstSeenCooldownRecordsPendingCandidate(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("6", 40)
+	nextSHA := strings.Repeat("7", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"owner/repo@main": {
+			Owner:      "owner",
+			Repo:       "repo",
+			Ref:        "main",
+			SHA:        nextSHA,
+			Kind:       githubresolver.KindBranch,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte("cooldown_source = \"first-seen\"\n\n[updates]\nbranches = \"track\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: owner/repo@"+currentSHA+" # sanad: ref=main\n")
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("apply returned error: %v", err)
+	}
+	got := readFileString(t, path)
+	if !strings.Contains(got, "owner/repo@"+currentSHA+" # sanad: ref=main") {
+		t.Fatalf("workflow changed before first-seen cooldown elapsed:\n%s", got)
+	}
+	lockfile, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if !ok || len(lockfile.Entries) != 1 || lockfile.Entries[0].CandidateSHA != nextSHA {
+		t.Fatalf("pending candidate was not recorded: ok=%v entries=%#v", ok, lockfile.Entries)
+	}
+}
+
 func withTempWorkingDir(t *testing.T) string {
 	t.Helper()
 

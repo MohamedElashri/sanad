@@ -238,6 +238,7 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
+		lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
 		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
 		if currentEntry, ok := currentUpgradeLockEntry(use, parsed, recovered, hasMetadata, now); ok {
 			plan.LockEntries = append(plan.LockEntries, currentEntry)
@@ -247,14 +248,16 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 		}
 
 		candidate, targetLogicalRef, resolveErr := resolveUpgradeTarget(ctx, resolver, parsed, opts, cfg)
+		candidateSeenAt := candidateObservationTime(lockfileValue.Entry, hasLockfile, hasMetadata, candidate, now, cfg.CooldownSource)
 		decision := policy.Evaluate(policy.Entry{
-			File:       use.File,
-			Action:     parsed,
-			Candidate:  candidate,
-			ResolveErr: resolveErr,
-			LogicalRef: targetLogicalRef,
-			CurrentSHA: parsed.Ref,
-			Now:        now,
+			File:            use.File,
+			Action:          parsed,
+			Candidate:       candidate,
+			ResolveErr:      resolveErr,
+			LogicalRef:      targetLogicalRef,
+			CurrentSHA:      parsed.Ref,
+			CandidateSeenAt: candidateSeenAt,
+			Now:             now,
 		}, policyOptionsFromConfig(cfg, now))
 		if decision.Kind == policy.DecisionUnchanged && recovered.LogicalRef != targetLogicalRef {
 			decision = policy.Decision{
@@ -280,6 +283,7 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)
 		case policy.DecisionPending:
 			plan.Report.Summary.Pending++
+			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)
 		case policy.DecisionUnchanged:
 			plan.Report.Summary.Unchanged++
 			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)

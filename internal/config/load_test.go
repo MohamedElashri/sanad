@@ -24,6 +24,9 @@ func TestLoadDefaultWhenMissing(t *testing.T) {
 	if cfg.Cooldown != 14*24*time.Hour {
 		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
 	}
+	if cfg.CooldownSource != DefaultCooldownSource {
+		t.Fatalf("CooldownSource = %q, want %q", cfg.CooldownSource, DefaultCooldownSource)
+	}
 	if cfg.Updates.Tags != "track" || cfg.Updates.Branches != "deny" || cfg.Updates.Unpinned != "deny" || !cfg.Updates.ReusableWorkflows {
 		t.Fatalf("Updates = %#v", cfg.Updates)
 	}
@@ -188,6 +191,34 @@ func TestLoadWorkflowPathsMultiline(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsWorkflowPathsOutsideRepository(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "absolute", path: filepath.Join(t.TempDir(), ".github", "workflows")},
+		{name: "parent", path: "../workflows"},
+		{name: "empty", path: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), DefaultPath)
+			content := `workflow_paths = [` + quoteTOML(tt.path) + "]\n"
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load(path); err == nil {
+				t.Fatal("Load returned nil error")
+			}
+		})
+	}
+}
+
+func quoteTOML(value string) string {
+	return `"` + strings.ReplaceAll(value, `\`, `\\`) + `"`
+}
+
 func TestLoadExampleConfig(t *testing.T) {
 	path := filepath.Join("..", "..", ".sanad.toml.example")
 
@@ -205,8 +236,8 @@ func TestLoadExampleConfig(t *testing.T) {
 	if cfg.Cooldown != 14*24*time.Hour {
 		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
 	}
-	if cfg.GitHub.APIURL != "https://api.github.com" {
-		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
+	if cfg.CooldownSource != DefaultCooldownSource {
+		t.Fatalf("CooldownSource = %q, want %q", cfg.CooldownSource, DefaultCooldownSource)
 	}
 	if len(cfg.Ignore.Files) != 0 {
 		t.Fatalf("Ignore.Files = %#v, want empty", cfg.Ignore.Files)
@@ -227,7 +258,6 @@ func TestLoadDottedNestedKeys(t *testing.T) {
 	content := []byte(`updates.tags = "deny"
 updates.branches = "track"
 ignore.actions = []
-github.api_url = "https://github.example.com/api/v3"
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
@@ -242,9 +272,6 @@ github.api_url = "https://github.example.com/api/v3"
 	}
 	if len(cfg.Ignore.Actions) != 0 {
 		t.Fatalf("Ignore.Actions = %#v, want explicit empty override", cfg.Ignore.Actions)
-	}
-	if cfg.GitHub.APIURL != "https://github.example.com/api/v3" {
-		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
 	}
 }
 
@@ -325,6 +352,32 @@ func TestLoadCooldownInvalidDurationErrors(t *testing.T) {
 	}
 }
 
+func TestLoadCooldownSource(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte(`cooldown_source = "first-seen"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.CooldownSource != "first-seen" {
+		t.Fatalf("CooldownSource = %q, want first-seen", cfg.CooldownSource)
+	}
+}
+
+func TestLoadCooldownSourceRejectsUnsupportedValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte(`cooldown_source = "lockfile"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for unsupported cooldown_source")
+	}
+}
+
 func TestLoadUpdatesPolicy(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
 	content := []byte(`[updates]
@@ -395,7 +448,7 @@ files = [
 	}
 }
 
-func TestLoadGitHubAPIURL(t *testing.T) {
+func TestLoadRejectsGitHubConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
 	content := []byte(`[github]
 api_url = "https://github.example.com/api/v3"
@@ -405,48 +458,19 @@ send_token_to_custom_api_url = true
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
-	}
-	if cfg.GitHub.APIURL != "https://github.example.com/api/v3" {
-		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
-	}
-	if !cfg.GitHub.SendTokenToCustomAPIURL {
-		t.Fatal("GitHub.SendTokenToCustomAPIURL = false, want true")
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for unsupported GitHub config")
 	}
 }
 
-func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
+func TestLoadRejectsDottedGitHubConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
-	if err := os.WriteFile(path, []byte("[github]\napi_url = \"github.local/api/v3\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`github.api_url = "https://github.example.com/api/v3"`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := Load(path); err == nil {
-		t.Fatal("Load returned nil error for relative GitHub API URL")
-	}
-}
-
-func TestLoadGitHubAPIURLRejectsInsecureURL(t *testing.T) {
-	path := filepath.Join(t.TempDir(), DefaultPath)
-	if err := os.WriteFile(path, []byte("[github]\napi_url = \"http://github.local/api/v3\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := Load(path); err == nil {
-		t.Fatal("Load returned nil error for insecure GitHub API URL")
-	}
-}
-
-func TestLoadGitHubAPIURLRejectsCredentials(t *testing.T) {
-	path := filepath.Join(t.TempDir(), DefaultPath)
-	if err := os.WriteFile(path, []byte("[github]\napi_url = \"https://token@github.local/api/v3\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := Load(path); err == nil {
-		t.Fatal("Load returned nil error for GitHub API URL with credentials")
+		t.Fatal("Load returned nil error for unsupported dotted GitHub config")
 	}
 }
 

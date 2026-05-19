@@ -157,6 +157,7 @@ Create `.sanad.toml` when the defaults are not enough:
 ```toml
 workflow_paths = [".github/workflows"]
 cooldown = "14d"
+cooldown_source = "source"
 
 [updates]
 tags = "track"
@@ -170,10 +171,6 @@ actions = [
   "docker://*"
 ]
 files = []
-
-[github]
-api_url = "https://api.github.com"
-send_token_to_custom_api_url = false
 
 [comments]
 write = true
@@ -232,7 +229,6 @@ For local shell usage, prefer reusing the GitHub CLI token instead of pasting a 
 GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
-Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enterprise. Environment tokens are sent to `https://api.github.com` by default; set `[github].send_token_to_custom_api_url = true` only for a trusted Enterprise API endpoint.
 
 ## Security Model
 
@@ -242,7 +238,7 @@ See the [security model](docs/content/advanced/security-model.md) for the full m
 
 ## Cooldown
 
-The default cooldown is `14d`. When an upstream tag or branch resolves to a newer SHA, `sanad` checks the candidate timestamp before adopting it. If the candidate is newer than the cooldown window, the decision is `pending-cooldown` and no rewrite is applied yet.
+The default cooldown is `14d`, and the default `cooldown_source = "source"` uses the upstream release, tag, or commit timestamp. This keeps routine updates moving while still rejecting missing or future timestamps. Set `cooldown_source = "first-seen"` when you want the stricter mode: Sanad records when a candidate SHA was first seen locally and waits for that observation window before adopting it.
 
 ## CI
 

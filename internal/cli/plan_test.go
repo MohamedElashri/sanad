@@ -216,8 +216,8 @@ func TestPlanDiscoversDefaultBranchForUnpinnedActions(t *testing.T) {
 		},
 	}, now)
 
-	root := withTempWorkingDir(t)
-	workflows := filepath.Join(root, ".github", "workflows")
+	withTempWorkingDir(t)
+	workflows := filepath.Join(".github", "workflows")
 	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"default-branch\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -255,8 +255,8 @@ func TestPlanDiscoversLatestReleaseForUnpinnedActions(t *testing.T) {
 		},
 	}, now)
 
-	root := withTempWorkingDir(t)
-	workflows := filepath.Join(root, ".github", "workflows")
+	withTempWorkingDir(t)
+	workflows := filepath.Join(".github", "workflows")
 	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nunpinned = \"latest-release\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -277,36 +277,6 @@ func TestPlanDiscoversLatestReleaseForUnpinnedActions(t *testing.T) {
 	}
 	if action.CandidateSHA != sha || action.CandidateRefKind != string(githubresolver.KindTag) {
 		t.Fatalf("unexpected candidate: sha=%q kind=%q", action.CandidateSHA, action.CandidateRefKind)
-	}
-}
-
-func TestPlanConfiguresDefaultResolverFromGitHubAPIURL(t *testing.T) {
-	withTempWorkingDir(t)
-	if err := os.WriteFile(".sanad.toml", []byte("[github]\napi_url = \"https://github.example.com/api/v3\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	previousFactory := defaultPlanResolverFactory
-	var gotAPIURL string
-	defaultPlanResolverFactory = func(cfg config.Config) (planResolver, error) {
-		gotAPIURL = cfg.GitHub.APIURL
-		return fakePlanResolver{}, nil
-	}
-	t.Cleanup(func() {
-		defaultPlanResolverFactory = previousFactory
-	})
-	installPlanTestResolver(t, nil, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
-
-	cmd := NewRootCommand()
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"plan"})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute returned error: %v", err)
-	}
-	if gotAPIURL != "https://github.example.com/api/v3" {
-		t.Fatalf("resolver factory GitHub API URL = %q", gotAPIURL)
 	}
 }
 
@@ -590,6 +560,110 @@ func TestPlanReportsLockfileActionMismatch(t *testing.T) {
 	}
 	if !strings.Contains(action.Reason, "lockfile action") {
 		t.Fatalf("Reason = %q, want lockfile action mismatch", action.Reason)
+	}
+}
+
+func TestPlanReportsLockfilePinnedSHADrift(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	lockfileSHA := strings.Repeat("1", 40)
+	workflowSHA := strings.Repeat("2", 40)
+	installPlanTestResolver(t, fakePlanResolver{}, now)
+
+	withTempWorkingDir(t)
+	workflows := filepath.Join(".github", "workflows")
+	path := filepath.Join(workflows, "ci.yml")
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + workflowSHA + " # sanad: ref=v4\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockfile := `{
+  "version": 1,
+  "entries": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "node": "jobs.test.steps[0].uses",
+      "owner": "actions",
+      "repo": "checkout",
+      "kind": "github-action",
+      "logical_ref": "v4",
+      "pinned_sha": "` + lockfileSHA + `"
+    }
+  ]
+}
+`
+	if err := os.WriteFile(filepath.Join(".github", "sanad.lock.json"), []byte(lockfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "error-invalid" {
+		t.Fatalf("Decision = %q, want error-invalid", action.Decision)
+	}
+	if !strings.Contains(action.Reason, "workflow pin") {
+		t.Fatalf("Reason = %q, want workflow pin drift", action.Reason)
+	}
+}
+
+func TestPlanUsesLockfileCandidateFirstSeenForCooldown(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("1", 40)
+	nextSHA := strings.Repeat("2", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        nextSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-30 * 24 * time.Hour),
+		},
+	}, now)
+
+	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte(`cooldown_source = "first-seen"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workflows := filepath.Join(".github", "workflows")
+	path := filepath.Join(workflows, "ci.yml")
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + currentSHA + " # sanad: ref=v4\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockfile := `{
+  "version": 1,
+  "entries": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "node": "jobs.test.steps[0].uses",
+      "owner": "actions",
+      "repo": "checkout",
+      "kind": "github-action",
+      "logical_ref": "v4",
+      "pinned_sha": "` + currentSHA + `",
+      "candidate_sha": "` + nextSHA + `",
+      "candidate_seen_at": "` + now.Add(-15*24*time.Hour).Format(time.RFC3339) + `"
+    }
+  ]
+}
+`
+	if err := os.WriteFile(filepath.Join(".github", "sanad.lock.json"), []byte(lockfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "update" {
+		t.Fatalf("Decision = %q, want update (%s)", action.Decision, action.Reason)
+	}
+	if action.AgeSeconds != int64((15*24*time.Hour)/time.Second) {
+		t.Fatalf("AgeSeconds = %d, want first-seen age", action.AgeSeconds)
 	}
 }
 
