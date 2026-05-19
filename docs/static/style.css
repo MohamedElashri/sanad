@@ -97,15 +97,7 @@ a:focus-visible {
 }
 
 .brand-mark {
-  background: var(--text);
-  border-radius: 7px;
-  color: #fff;
-  display: grid;
-  font-family: var(--mono);
-  font-size: 0.95rem;
-  font-weight: 800;
   height: 1.9rem;
-  place-items: center;
   width: 1.9rem;
 }
 

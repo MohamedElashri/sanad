@@ -21,7 +21,12 @@ Global flags:
 ```bash
 --config string   path to config file (default ".sanad.toml")
 --format string   output format: table, json, or command-specific formats (default "table")
+--color string    colorize human output: auto, always, or never (default "auto")
 ```
+
+`--color auto` enables ANSI color only for capable terminals. `--color never`, `NO_COLOR`, `CLICOLOR=0`, or `SANAD_COLOR=never` disable color; `--color always`, `CLICOLOR_FORCE=1`, or `SANAD_COLOR=always` force it. JSON, SARIF, and generated Markdown outputs are never colorized.
+
+Sanad uses standard ANSI colors that stay readable on typical dark and light terminal backgrounds. If your terminal exposes `COLORFGBG`, sanad uses it to tune warning colors; `SANAD_COLOR_THEME=dark` or `SANAD_COLOR_THEME=light` can override that detection.
 
 ## `scan`
 

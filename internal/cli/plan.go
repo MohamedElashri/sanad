@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"text/tabwriter"
 	"time"
 
 	"github.com/MohamedElashri/sanad/internal/actions"
@@ -539,38 +538,111 @@ func writePlanJSON(path string, report planReport) error {
 }
 
 func printPlanTable(cmd *cobra.Command, report planReport) error {
-	printPlanSummary(cmd.OutOrStdout(), report.Summary)
-	writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(writer, "FILE\tLINE\tACTION\tCURRENT\tCANDIDATE\tREF\tAGE\tDECISION\tREASON CODE\tREASON")
+	style := styleForCommand(cmd)
+	printPlanSummary(cmd.OutOrStdout(), report.Summary, style)
+	var rows []styledTableRow
 	for _, file := range report.Files {
 		for _, action := range file.Actions {
-			_, _ = fmt.Fprintf(
-				writer,
-				"%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				file.Path,
-				action.Line,
-				planActionName(action),
-				shortSHAOrDash(action.CurrentSHA),
-				shortSHAOrDash(action.CandidateSHA),
-				emptyDash(action.LogicalRef),
-				emptyDash(action.Age),
-				action.Decision,
-				action.ReasonCode,
-				emptyDash(action.Reason),
-			)
+			rows = append(rows, planTableRow(file.Path, action))
 		}
 	}
-	return writer.Flush()
+	return printStyledTable(
+		cmd.OutOrStdout(),
+		style,
+		[]string{"FILE", "LINE", "ACTION", "CURRENT", "CANDIDATE", "REF", "AGE", "DECISION", "REASON CODE", "REASON"},
+		rows,
+	)
 }
 
-func printPlanSummary(out io.Writer, summary planSummary) {
-	_, _ = fmt.Fprintln(out, "Summary:")
+func planTableRow(file string, action planAction) styledTableRow {
+	return styledTableRow{
+		{Text: file, Role: colorFile},
+		{Text: fmt.Sprintf("%d", action.Line), Role: colorLine},
+		{Text: planActionName(action)},
+		{Text: shortSHAOrDash(action.CurrentSHA), Role: currentSHAColorRole(action.Decision, action.CurrentSHA)},
+		{Text: shortSHAOrDash(action.CandidateSHA), Role: candidateSHAColorRole(action.Decision, action.CandidateSHA)},
+		{Text: emptyDash(action.LogicalRef), Role: refColorRole(action.LogicalRef)},
+		{Text: emptyDash(action.Age), Role: ageColorRole(action.Decision, action.Age)},
+		{Text: string(action.Decision), Role: decisionColorRole(action.Decision)},
+		{Text: action.ReasonCode, Role: decisionColorRole(action.Decision)},
+		{Text: emptyDash(action.Reason), Role: colorReason},
+	}
+}
+
+func printPlanSummary(out io.Writer, summary planSummary, style terminalStyle) {
+	_, _ = fmt.Fprintln(out, style.Wrap(colorHeader, "Summary:"))
 	_, _ = fmt.Fprintf(out, "  %d actions found\n", summary.Actions)
-	_, _ = fmt.Fprintf(out, "  %d already pinned\n", summary.AlreadyPinned)
-	_, _ = fmt.Fprintf(out, "  %d updates available\n", summary.UpdatesAvailable)
-	_, _ = fmt.Fprintf(out, "  %d pending cooldown\n", summary.PendingCooldown)
-	_, _ = fmt.Fprintf(out, "  %d policy violations\n", summary.PolicyViolations)
-	_, _ = fmt.Fprintf(out, "  %d skipped\n\n", summary.Skipped)
+	_, _ = fmt.Fprintf(out, "  %s already pinned\n", style.Wrapf(colorSuccess, "%d", summary.AlreadyPinned))
+	_, _ = fmt.Fprintf(out, "  %s updates available\n", style.Wrapf(colorWarning, "%d", summary.UpdatesAvailable))
+	_, _ = fmt.Fprintf(out, "  %s pending cooldown\n", style.Wrapf(colorWarning, "%d", summary.PendingCooldown))
+	_, _ = fmt.Fprintf(out, "  %s policy violations\n", style.Wrapf(colorDanger, "%d", summary.PolicyViolations))
+	_, _ = fmt.Fprintf(out, "  %s skipped\n\n", style.Wrapf(colorMuted, "%d", summary.Skipped))
+}
+
+func currentSHAColorRole(kind policy.DecisionKind, value string) colorRole {
+	if value == "" {
+		return colorMuted
+	}
+	if kind == policy.DecisionUpdate {
+		return colorDelete
+	}
+	if isBlockingDecision(kind) {
+		return colorDanger
+	}
+	return colorSuccess
+}
+
+func candidateSHAColorRole(kind policy.DecisionKind, value string) colorRole {
+	if value == "" {
+		return colorMuted
+	}
+	switch kind {
+	case policy.DecisionUpdate:
+		return colorAdd
+	case policy.DecisionPending:
+		return colorWarning
+	default:
+		if isBlockingDecision(kind) {
+			return colorDanger
+		}
+		return colorInfo
+	}
+}
+
+func refColorRole(value string) colorRole {
+	if value == "" {
+		return colorMuted
+	}
+	return colorInfo
+}
+
+func ageColorRole(kind policy.DecisionKind, value string) colorRole {
+	if value == "" {
+		return colorMuted
+	}
+	if kind == policy.DecisionPending {
+		return colorWarning
+	}
+	return colorMuted
+}
+
+func decisionColorRole(kind policy.DecisionKind) colorRole {
+	switch {
+	case isBlockingDecision(kind):
+		return colorDanger
+	}
+	switch kind {
+	case policy.DecisionUnchanged:
+		return colorSuccess
+	case policy.DecisionUpdate:
+		return colorWarning
+	case policy.DecisionPending:
+		return colorWarning
+	case policy.DecisionSkip, policy.DecisionSkipLocalAction, policy.DecisionSkipDockerAction, policy.DecisionSkipIgnored:
+		return colorMuted
+	default:
+		return colorNone
+	}
 }
 
 func planActionName(action planAction) string {

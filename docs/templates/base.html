@@ -18,7 +18,7 @@
   <meta name="twitter:title" content="{{ if ne .Title .Config.Title }}{{ .Title }} | {{ end }}{{ .Config.Title }}">
   <meta name="twitter:description" content="{{ default .Description .Config.Description }}">
   <meta name="robots" content="index, follow">
-  <link rel="icon" href="{{ asset "favicon.svg" }}" type="image/svg+xml">
+  <link rel="icon" href="{{ asset "logo.svg" }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ asset "style.css" }}">
 </head>
 <body>
@@ -26,7 +26,7 @@
   <div class="site-shell">
     <header class="site-header">
       <a class="brand" href="{{ .BasePath }}/" aria-label="Sanad documentation home">
-        <span class="brand-mark">s</span>
+        <img class="brand-mark" src="{{ asset "logo.svg" }}" alt="" width="32" height="32">
         <span class="brand-text">Sanad Docs</span>
       </a>
       {{ if .Config.Search.Enabled }}
