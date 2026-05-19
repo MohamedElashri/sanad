@@ -41,7 +41,7 @@ nix run github:MohamedElashri/sanad -- version
 nix profile install github:MohamedElashri/sanad
 ```
 
-After GoReleaser publishes the release archives, the release workflow updates `flake.nix` from the generated `sanad_<version>_checksums.txt` file and pushes the flake update back to `main`.
+After GoReleaser publishes the release archives, the release workflow updates `flake.nix` from the generated `sanad_<version>_checksums.txt` file and opens a pull request against `main` with the flake update.
 
 The `version` command is populated through linker metadata in release builds:
 
