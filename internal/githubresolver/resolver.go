@@ -81,9 +81,11 @@ type Client struct {
 }
 
 type clientOptions struct {
-	baseURL    string
-	httpClient *http.Client
-	token      string
+	baseURL                     string
+	httpClient                  *http.Client
+	token                       string
+	sendEnvTokenToCustomBaseURL bool
+	tokenCameFromEnvironment    bool
 }
 
 type Option func(*clientOptions)
@@ -106,11 +108,17 @@ func WithToken(token string) Option {
 	}
 }
 
+func WithEnvTokenForCustomBaseURL() Option {
+	return func(opts *clientOptions) {
+		opts.sendEnvTokenToCustomBaseURL = true
+	}
+}
+
 func NewClient(options ...Option) (*Client, error) {
 	opts := applyOptions(options)
 
 	httpClient := opts.httpClient
-	if opts.token != "" {
+	if opts.token != "" && shouldSendToken(opts) {
 		ctx := context.Background()
 		if httpClient != nil {
 			ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
@@ -137,9 +145,15 @@ func NewClientFromEnv(options ...Option) (*Client, error) {
 	}
 
 	withToken := make([]Option, 0, len(options)+1)
-	withToken = append(withToken, WithToken(token))
+	withToken = append(withToken, WithToken(token), withEnvironmentToken())
 	withToken = append(withToken, options...)
 	return NewClient(withToken...)
+}
+
+func withEnvironmentToken() Option {
+	return func(opts *clientOptions) {
+		opts.tokenCameFromEnvironment = true
+	}
 }
 
 func TokenFromEnv() string {
@@ -147,54 +161,6 @@ func TokenFromEnv() string {
 		return token
 	}
 	return strings.TrimSpace(os.Getenv("GH_TOKEN"))
-}
-
-func Resolve(ctx context.Context, selector ActionSelector) (ResolvedRef, error) {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return ResolvedRef{}, err
-	}
-	return client.Resolve(ctx, selector)
-}
-
-func ResolveTag(ctx context.Context, owner, repo, tag string) (ResolvedRef, error) {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return ResolvedRef{}, err
-	}
-	return client.ResolveTag(ctx, owner, repo, tag)
-}
-
-func ResolveBranch(ctx context.Context, owner, repo, branch string) (ResolvedRef, error) {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return ResolvedRef{}, err
-	}
-	return client.ResolveBranch(ctx, owner, repo, branch)
-}
-
-func ResolveDefaultBranch(ctx context.Context, owner, repo string) (ResolvedRef, error) {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return ResolvedRef{}, err
-	}
-	return client.ResolveDefaultBranch(ctx, owner, repo)
-}
-
-func ResolveLatestRelease(ctx context.Context, owner, repo string) (ResolvedRef, error) {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return ResolvedRef{}, err
-	}
-	return client.ResolveLatestRelease(ctx, owner, repo)
-}
-
-func VerifyCommit(ctx context.Context, owner, repo, sha string) error {
-	client, err := NewClientFromEnv()
-	if err != nil {
-		return err
-	}
-	return client.VerifyCommit(ctx, owner, repo, sha)
 }
 
 func (c *Client) Resolve(ctx context.Context, selector ActionSelector) (ResolvedRef, error) {
@@ -421,6 +387,20 @@ func applyOptions(options []Option) clientOptions {
 		option(&opts)
 	}
 	return opts
+}
+
+func shouldSendToken(opts clientOptions) bool {
+	if !opts.tokenCameFromEnvironment || opts.baseURL == "" {
+		return true
+	}
+	if opts.sendEnvTokenToCustomBaseURL {
+		return true
+	}
+	baseURL, err := normalizeBaseURL(opts.baseURL)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(baseURL.Host, "api.github.com")
 }
 
 func normalizeBaseURL(raw string) (*url.URL, error) {

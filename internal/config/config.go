@@ -32,7 +32,8 @@ type IgnoreConfig struct {
 }
 
 type GitHubConfig struct {
-	APIURL string
+	APIURL                  string
+	SendTokenToCustomAPIURL bool
 }
 
 type OrganizationConfig struct {

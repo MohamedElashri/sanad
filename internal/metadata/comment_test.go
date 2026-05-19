@@ -114,11 +114,14 @@ func TestLoadLockfileMetadata(t *testing.T) {
 		t.Fatal("LoadLockfileMetadata ok = false, want true")
 	}
 	key := Key(".github/workflows/ci.yml", "jobs.test.steps[0].uses")
-	if got[key].LogicalRef != "v4" {
-		t.Fatalf("LogicalRef = %q, want v4", got[key].LogicalRef)
+	if got[key].Metadata.LogicalRef != "v4" {
+		t.Fatalf("LogicalRef = %q, want v4", got[key].Metadata.LogicalRef)
 	}
-	if got[key].Source != SourceLockfile {
-		t.Fatalf("Source = %q, want lockfile", got[key].Source)
+	if got[key].Metadata.Source != SourceLockfile {
+		t.Fatalf("Source = %q, want lockfile", got[key].Metadata.Source)
+	}
+	if got[key].Entry.Owner != "actions" {
+		t.Fatalf("Entry.Owner = %q, want actions", got[key].Entry.Owner)
 	}
 }
 

@@ -108,6 +108,9 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 		}
 		cfg.GitHub.APIURL = apiURL
 	}
+	if meta.IsDefined("github", "send_token_to_custom_api_url") {
+		cfg.GitHub.SendTokenToCustomAPIURL = raw.GitHub.SendTokenToCustomAPIURL
+	}
 
 	if meta.IsDefined("organization", "policy_files") {
 		cfg.Organization.PolicyFiles = raw.Organization.PolicyFiles
@@ -175,7 +178,8 @@ type ignoreFileConfig struct {
 }
 
 type githubFileConfig struct {
-	APIURL string `toml:"api_url"`
+	APIURL                  string `toml:"api_url"`
+	SendTokenToCustomAPIURL bool   `toml:"send_token_to_custom_api_url"`
 }
 
 type organizationFileConfig struct {
@@ -249,6 +253,12 @@ func validateAPIURL(value string) (string, error) {
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return "", fmt.Errorf("github.api_url must be an absolute URL")
+	}
+	if parsed.Scheme != "https" {
+		return "", fmt.Errorf("github.api_url must use https")
+	}
+	if parsed.User != nil {
+		return "", fmt.Errorf("github.api_url must not include credentials")
 	}
 	return value, nil
 }

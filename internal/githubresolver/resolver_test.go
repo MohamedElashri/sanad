@@ -360,6 +360,50 @@ func TestTokenFromEnvAndAuthenticatedClient(t *testing.T) {
 	}
 }
 
+func TestNewClientFromEnvDoesNotSendTokenToCustomBaseURLByDefault(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty", got)
+		}
+		writeJSON(t, w, gitRef("refs/heads/main", "commit", branchSHA))
+	})
+
+	client, err := NewClientFromEnv(WithHTTPClient(server.Client()), WithBaseURL(server.URL))
+	if err != nil {
+		t.Fatalf("NewClientFromEnv returned error: %v", err)
+	}
+	_, _, err = client.github.Git.GetRef(context.Background(), "actions", "checkout", "heads/main")
+	if err != nil {
+		t.Fatalf("GetRef returned error: %v", err)
+	}
+}
+
+func TestNewClientFromEnvCanSendTokenToCustomBaseURLWhenOptedIn(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
+			t.Fatalf("Authorization = %q, want Bearer secret-token", got)
+		}
+		writeJSON(t, w, gitRef("refs/heads/main", "commit", branchSHA))
+	})
+
+	client, err := NewClientFromEnv(
+		WithHTTPClient(server.Client()),
+		WithBaseURL(server.URL),
+		WithEnvTokenForCustomBaseURL(),
+	)
+	if err != nil {
+		t.Fatalf("NewClientFromEnv returned error: %v", err)
+	}
+	_, _, err = client.github.Git.GetRef(context.Background(), "actions", "checkout", "heads/main")
+	if err != nil {
+		t.Fatalf("GetRef returned error: %v", err)
+	}
+}
+
 func TestVerifyCommitReportsNetworkFailure(t *testing.T) {
 	client, err := NewClient(WithHTTPClient(&http.Client{
 		Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {

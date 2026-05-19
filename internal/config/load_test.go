@@ -399,6 +399,7 @@ func TestLoadGitHubAPIURL(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
 	content := []byte(`[github]
 api_url = "https://github.example.com/api/v3"
+send_token_to_custom_api_url = true
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
@@ -411,6 +412,9 @@ api_url = "https://github.example.com/api/v3"
 	if cfg.GitHub.APIURL != "https://github.example.com/api/v3" {
 		t.Fatalf("GitHub.APIURL = %q", cfg.GitHub.APIURL)
 	}
+	if !cfg.GitHub.SendTokenToCustomAPIURL {
+		t.Fatal("GitHub.SendTokenToCustomAPIURL = false, want true")
+	}
 }
 
 func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
@@ -421,6 +425,28 @@ func TestLoadGitHubAPIURLRejectsRelativeURL(t *testing.T) {
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load returned nil error for relative GitHub API URL")
+	}
+}
+
+func TestLoadGitHubAPIURLRejectsInsecureURL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[github]\napi_url = \"http://github.local/api/v3\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for insecure GitHub API URL")
+	}
+}
+
+func TestLoadGitHubAPIURLRejectsCredentials(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[github]\napi_url = \"https://token@github.local/api/v3\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for GitHub API URL with credentials")
 	}
 }
 

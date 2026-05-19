@@ -74,7 +74,9 @@ Patterns use path-style glob matching, with a prefix fallback for trailing `*` p
 
 ## `[github]`
 
-`api_url` sets the GitHub API base URL. Use it for GitHub Enterprise.
+`api_url` sets the GitHub API base URL. It must be an HTTPS URL without embedded credentials.
+
+`send_token_to_custom_api_url` controls whether `GITHUB_TOKEN` or `GH_TOKEN` may be sent to a custom `api_url`. It defaults to `false`; enable it only for a trusted GitHub Enterprise endpoint.
 
 ## `[organization]`
 
