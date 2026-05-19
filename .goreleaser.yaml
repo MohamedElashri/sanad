@@ -65,6 +65,7 @@ brews:
       email: goreleaserbot@users.noreply.github.com
     install: |
       bin.install "sanad"
+      generate_completions_from_executable(bin/"sanad", "completion", shells: [:bash, :zsh, :fish, :pwsh])
     test: |
       assert_match version.to_s, shell_output("#{bin}/sanad version")
 

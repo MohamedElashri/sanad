@@ -48,9 +48,20 @@
 
             sourceRoot = ".";
 
+            nativeBuildInputs = [
+              pkgs.installShellFiles
+            ];
+
             installPhase = ''
               runHook preInstall
               install -Dm755 sanad "$out/bin/sanad"
+              "$out/bin/sanad" completion bash > sanad.bash
+              "$out/bin/sanad" completion zsh > _sanad
+              "$out/bin/sanad" completion fish > sanad.fish
+              installShellCompletion --cmd sanad \
+                --bash sanad.bash \
+                --zsh _sanad \
+                --fish sanad.fish
               runHook postInstall
             '';
 
