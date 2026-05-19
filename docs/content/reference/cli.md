@@ -83,12 +83,15 @@ GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 Move managed full-SHA pins from one logical ref to another.
 
 ```bash
+GITHUB_TOKEN=$(gh auth token) sanad upgrade
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/setup-go --to v6 --write
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --latest-release --dry-run
 ```
 
-Use exactly one target selector: `--to <ref>` or `--latest-release`.
+With no selector, `upgrade` scans all managed pins. With no target, it uses the latest GitHub release. The command is dry-run by default; add `--write` after reviewing the diff.
+
+Use exactly one selector when overriding the default scope: `--action <owner/repo>` or `--all`. Use exactly one target when overriding the default target: `--to <ref>` or `--latest-release`.
 
 ## `version`
 

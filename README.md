@@ -211,7 +211,9 @@ All commands accept:
 
 `sanad check --format sarif` emits SARIF for code scanning, and `sanad plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 
-`sanad upgrade --action actions/checkout --to v5` intentionally moves managed pins to a new logical ref while keeping workflow execution pinned to a full SHA.
+`sanad upgrade` previews upgrades for all managed pins to their latest GitHub release. It is dry-run by default; add `--write` after reviewing the diff.
+
+`sanad upgrade --action actions/checkout --to v5` intentionally moves one managed pin to a specific logical ref while keeping workflow execution pinned to a full SHA.
 
 Command-specific usage is covered in the [CLI reference](docs/content/reference/cli.md).
 

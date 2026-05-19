@@ -147,6 +147,53 @@ func TestUpgradeLatestReleaseUsesConfiguredReleaseMode(t *testing.T) {
 	}
 }
 
+func TestUpgradeBareCommandDefaultsToAllLatestReleaseDryRun(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("a", 40)
+	targetSHA := strings.Repeat("b", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@latest-release": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v6",
+			SHA:        targetSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v5\n")
+	original := readFileString(t, path)
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"upgrade"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := readFileString(t, path); got != original {
+		t.Fatalf("workflow changed during default dry-run\nwant:\n%s\ngot:\n%s", original, got)
+	}
+
+	text := out.String()
+	for _, want := range []string{
+		"Matched 1 managed action pin(s)",
+		"v5",
+		"v6",
+		"update",
+		"-      - uses: actions/checkout@" + currentSHA + " # sanad: ref=v5",
+		"+      - uses: actions/checkout@" + targetSHA + " # sanad: ref=v6",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("upgrade default output missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestUpgradeNoOpWhenTargetAlreadyCurrent(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("7", 40)
