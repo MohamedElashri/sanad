@@ -2,6 +2,30 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.3 - 2026-05-19
+
+### Security
+
+- Removed repository-configurable custom GitHub API endpoints. Sanad now resolves refs through `github.com` only, so repository config cannot redirect CI tokens to another host.
+- Added lockfile pin-drift detection so a managed workflow SHA that no longer matches `.github/sanad.lock.json` is reported as invalid metadata instead of being treated as a normal managed update.
+- Restricted configured `workflow_paths` to relative in-repository paths and rejected workflow YAML symlinks during discovery.
+- Made `sanad check` fail by default when a managed pin has an eligible update or cooldown-pending candidate. Use `--allow-pending-cooldown` only when pending managed candidates should be allowed in CI.
+
+### Added
+
+- Added `cooldown_source` with the default `source` mode for upstream release/tag/commit timestamps and an optional stricter `first-seen` mode based on `.github/sanad.lock.json` candidate observation time.
+- Added `candidate_sha` and `candidate_seen_at` lockfile fields to record pending managed candidates for auditability and first-seen cooldown mode.
+- Added colorized table output with CLI and environment controls for color behavior.
+
+### Changed
+
+- Made bare `sanad upgrade` a safe dry run by default, using all managed pins and latest GitHub releases unless explicit selector or target flags are passed.
+- Add colors to cli output to make better UX.
+
+### Fixed
+
+- Improved command error reporting so CLI errors are printed consistently.
+
 ## 0.1.2 - 2026-05-19
 
 ### Security
