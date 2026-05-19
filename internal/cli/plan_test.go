@@ -536,6 +536,63 @@ func TestPlanReportsConflictingLockfileAndCommentMetadata(t *testing.T) {
 	}
 }
 
+func TestPlanReportsLockfileActionMismatch(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("1", 40)
+	installPlanTestResolver(t, fakePlanResolver{}, now)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previousWorkingDir); err != nil {
+			t.Fatalf("restore working directory: %v", err)
+		}
+	})
+
+	workflows := filepath.Join(".github", "workflows")
+	path := filepath.Join(workflows, "ci.yml")
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@" + currentSHA + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockfile := `{
+  "version": 1,
+  "entries": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "node": "jobs.test.steps[0].uses",
+      "owner": "actions",
+      "repo": "checkout",
+      "kind": "github-action",
+      "logical_ref": "v4",
+      "pinned_sha": "` + currentSHA + `"
+    }
+  ]
+}
+`
+	if err := os.WriteFile(filepath.Join(".github", "sanad.lock.json"), []byte(lockfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "error-invalid" {
+		t.Fatalf("Decision = %q, want error-invalid", action.Decision)
+	}
+	if !strings.Contains(action.Reason, "lockfile action") {
+		t.Fatalf("Reason = %q, want lockfile action mismatch", action.Reason)
+	}
+}
+
 func TestPlanSkipsIgnoredActionsWithoutResolving(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	installPlanTestResolver(t, failingResolver{}, now)

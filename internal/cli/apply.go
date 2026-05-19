@@ -155,88 +155,33 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 }
 
 func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []string, resolver planResolver, now time.Time, interactive *interactiveApplySession) (applyPlan, error) {
-	paths := cfg.WorkflowPaths
-	if len(workflowPaths) > 0 {
-		paths = workflowPaths
-	}
-
-	files, err := workflow.DiscoverWorkflowFiles(paths)
+	files, evaluated, err := evaluateWorkflowUses(ctx, cfg, workflowPaths, resolver, now)
 	if err != nil {
 		return applyPlan{}, err
 	}
-	uses, err := workflow.ExtractUsesFromFiles(files)
-	if err != nil {
-		return applyPlan{}, err
-	}
-
-	lockfile, hasLockfile, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
-	if err != nil {
-		return applyPlan{}, err
-	}
-	lockfileMetadata := lockfileMetadataFromLockfile(lockfile, hasLockfile)
 
 	plan := applyPlan{
 		Report:        planReport{Version: 1},
 		ChangesByFile: make(map[string][]workflow.RewriteChange),
 	}
 	actionsByFile := make(map[string][]planAction)
-	for _, use := range uses {
-		parsed := actions.Parse(use.Raw)
-		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, lockfileMetadata)
-		var candidate *githubresolver.ResolvedRef
-		var resolveErr error
-		var decision policy.Decision
-		if metadataErr != nil {
-			decision = policy.Decision{
-				Kind:       policy.DecisionErrorInvalid,
-				Reason:     metadataErr.Error(),
-				CurrentSHA: currentPinnedSHA(parsed),
-			}
-		} else {
-			logicalRef := ""
-			if hasMetadata {
-				logicalRef = recovered.LogicalRef
-			}
-			var ignore policy.IgnoreMatch
-			var ignoreErr error
-			if shouldCheckIgnoreBeforeResolve(parsed) {
-				ignore, ignoreErr = policy.MatchIgnore(parsed, use.File, policyOptionsFromConfig(cfg, now))
-			}
-			if ignoreErr != nil {
-				decision = policy.Decision{
-					Kind:       policy.DecisionErrorUnsupported,
-					Reason:     ignoreErr.Error(),
-					CurrentSHA: currentPinnedSHA(parsed),
-					LogicalRef: logicalRefForDecision(parsed, logicalRef),
-				}
-			} else if ignore.Ignored {
-				decision = ignoredDecision(parsed, logicalRef, ignore)
-			} else {
-				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef, policy.UnpinnedPolicy(cfg.Updates.Unpinned))
-				decision = policy.Evaluate(policy.Entry{
-					File:       use.File,
-					Action:     parsed,
-					Candidate:  candidate,
-					ResolveErr: resolveErr,
-					LogicalRef: logicalRef,
-					Now:        now,
-				}, policyOptionsFromConfig(cfg, now))
-			}
-			if hasMetadata && decision.LogicalRef == "" {
-				decision.LogicalRef = logicalRef
-			}
-		}
+	for _, item := range evaluated {
+		use := item.Use
+		parsed := item.Parsed
+		candidate := item.Candidate
+		resolveErr := item.ResolveErr
+		decision := item.Decision
 		if interactive != nil {
 			var promptErr error
-			parsed, candidate, resolveErr, decision, promptErr = applyInteractiveDecision(ctx, interactive, cfg, resolver, now, use, parsed, candidate, resolveErr, decision, hasMetadata, metadataErr)
+			parsed, candidate, resolveErr, decision, promptErr = applyInteractiveDecision(ctx, interactive, cfg, resolver, now, use, parsed, candidate, resolveErr, decision, item.HasMetadata, item.MetadataErr)
 			if promptErr != nil {
 				return applyPlan{}, promptErr
 			}
 		}
 
 		action := planActionFromDecision(use, parsed, candidate, decision)
-		if hasMetadata && metadataErr == nil {
-			action.MetadataSource = string(recovered.Source)
+		if item.HasMetadata && item.MetadataErr == nil {
+			action.MetadataSource = string(item.Recovered.Source)
 		}
 		actionsByFile[use.File] = append(actionsByFile[use.File], action)
 
@@ -246,7 +191,7 @@ func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []stri
 				Line:     use.Line,
 				Decision: decision.Kind,
 				Reason:   decision.Reason,
-				Err:      errors.Join(metadataErr, resolveErr),
+				Err:      errors.Join(item.MetadataErr, resolveErr),
 			})
 			continue
 		}
@@ -486,9 +431,12 @@ func lockfileMetadataFromLockfile(lockfile metadata.Lockfile, ok bool) metadata.
 	}
 	values := make(metadata.LockfileMetadata, len(lockfile.Entries))
 	for _, entry := range lockfile.Entries {
-		values[metadata.Key(entry.File, entry.Node)] = metadata.Metadata{
-			LogicalRef: entry.LogicalRef,
-			Source:     metadata.SourceLockfile,
+		values[metadata.Key(entry.File, entry.Node)] = metadata.LockfileMetadataValue{
+			Metadata: metadata.Metadata{
+				LogicalRef: entry.LogicalRef,
+				Source:     metadata.SourceLockfile,
+			},
+			Entry: entry,
 		}
 	}
 	return values

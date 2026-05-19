@@ -47,26 +47,6 @@ func RewriteWorkflowBytes(data []byte, changes []RewriteChange, opts RewriteOpti
 	return rewritten, nil
 }
 
-func RewriteWorkflowFile(path string, changes []RewriteChange, opts RewriteOptions) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read workflow %q: %w", path, err)
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return fmt.Errorf("stat workflow %q: %w", path, err)
-	}
-
-	rewritten, err := RewriteWorkflowBytes(data, changes, opts)
-	if err != nil {
-		return err
-	}
-	if bytes.Equal(data, rewritten) {
-		return nil
-	}
-	return AtomicWriteFile(path, rewritten, info.Mode().Perm())
-}
-
 func BuildSourceEdits(data []byte, changes []RewriteChange, opts RewriteOptions) ([]SourceEdit, error) {
 	lines := indexLines(data)
 	edits := make([]SourceEdit, 0, len(changes))

@@ -85,6 +85,18 @@ type planAction struct {
 	AgeSeconds       int64               `json:"age_seconds,omitempty"`
 }
 
+type evaluatedUse struct {
+	Use         workflow.UseNode
+	Parsed      actions.ParsedAction
+	Recovered   metadata.Metadata
+	HasMetadata bool
+	MetadataErr error
+	Candidate   *githubresolver.ResolvedRef
+	ResolveErr  error
+	Decision    policy.Decision
+	Action      planAction
+}
+
 func newPlanCommand(opts *rootOptions) *cobra.Command {
 	planOpts := &planOptions{}
 
@@ -150,11 +162,42 @@ func newDefaultPlanResolver(cfg config.Config) (planResolver, error) {
 	var options []githubresolver.Option
 	if cfg.GitHub.APIURL != "" {
 		options = append(options, githubresolver.WithBaseURL(cfg.GitHub.APIURL))
+		if cfg.GitHub.SendTokenToCustomAPIURL {
+			options = append(options, githubresolver.WithEnvTokenForCustomBaseURL())
+		}
 	}
 	return githubresolver.NewClientFromEnv(options...)
 }
 
 func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []string, resolver planResolver, now time.Time) (planReport, error) {
+	files, evaluated, err := evaluateWorkflowUses(ctx, cfg, workflowPaths, resolver, now)
+	if err != nil {
+		return planReport{}, err
+	}
+
+	actionsByFile := make(map[string][]planAction)
+	for _, item := range evaluated {
+		actionsByFile[item.Use.File] = append(actionsByFile[item.Use.File], item.Action)
+	}
+
+	report := planReport{Version: 1}
+	for _, file := range files {
+		if len(actionsByFile[file]) == 0 {
+			continue
+		}
+		report.Files = append(report.Files, planFile{
+			Path:    file,
+			Actions: actionsByFile[file],
+		})
+	}
+	sort.Slice(report.Files, func(i, j int) bool {
+		return report.Files[i].Path < report.Files[j].Path
+	})
+	report.Summary = summarizePlan(report)
+	return report, nil
+}
+
+func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths []string, resolver planResolver, now time.Time) ([]string, []evaluatedUse, error) {
 	paths := cfg.WorkflowPaths
 	if len(workflowPaths) > 0 {
 		paths = workflowPaths
@@ -162,22 +205,22 @@ func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []str
 
 	files, err := workflow.DiscoverWorkflowFiles(paths)
 	if err != nil {
-		return planReport{}, err
+		return nil, nil, err
 	}
 
 	uses, err := workflow.ExtractUsesFromFiles(files)
 	if err != nil {
-		return planReport{}, err
+		return nil, nil, err
 	}
 	lockfileMetadata, _, err := metadata.LoadLockfileMetadata(metadata.DefaultLockfilePath)
 	if err != nil {
-		return planReport{}, err
+		return nil, nil, err
 	}
 
-	actionsByFile := make(map[string][]planAction)
+	evaluated := make([]evaluatedUse, 0, len(uses))
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
-		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, lockfileMetadata)
+		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
 		var candidate *githubresolver.ResolvedRef
 		var resolveErr error
 		var decision policy.Decision
@@ -228,33 +271,52 @@ func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []str
 		if hasMetadata && metadataErr == nil {
 			action.MetadataSource = string(recovered.Source)
 		}
-		actionsByFile[use.File] = append(actionsByFile[use.File], action)
-	}
-
-	report := planReport{Version: 1}
-	for _, file := range files {
-		if len(actionsByFile[file]) == 0 {
-			continue
-		}
-		report.Files = append(report.Files, planFile{
-			Path:    file,
-			Actions: actionsByFile[file],
+		evaluated = append(evaluated, evaluatedUse{
+			Use:         use,
+			Parsed:      parsed,
+			Recovered:   recovered,
+			HasMetadata: hasMetadata,
+			MetadataErr: metadataErr,
+			Candidate:   candidate,
+			ResolveErr:  resolveErr,
+			Decision:    decision,
+			Action:      action,
 		})
 	}
-	sort.Slice(report.Files, func(i, j int) bool {
-		return report.Files[i].Path < report.Files[j].Path
-	})
-	report.Summary = summarizePlan(report)
-	return report, nil
+	return files, evaluated, nil
 }
 
-func recoverUseMetadata(use workflow.UseNode, lockfileMetadata metadata.LockfileMetadata) (metadata.Metadata, bool, error) {
+func recoverUseMetadata(use workflow.UseNode, parsed actions.ParsedAction, lockfileMetadata metadata.LockfileMetadata) (metadata.Metadata, bool, error) {
 	comment, err := metadata.ParseComment(use.InlineComment)
 	if err != nil {
 		return metadata.Metadata{}, false, err
 	}
 	lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
-	return metadata.Merge(comment, lockfileValue, hasLockfile)
+	if hasLockfile && parsed.Valid {
+		if err := validateLockfileMetadataAction(parsed, lockfileValue.Entry); err != nil {
+			return metadata.Metadata{}, false, err
+		}
+	}
+	return metadata.Merge(comment, lockfileValue.Metadata, hasLockfile)
+}
+
+func validateLockfileMetadataAction(parsed actions.ParsedAction, entry metadata.LockfileEntry) error {
+	if parsed.Owner != entry.Owner || parsed.Repo != entry.Repo || parsed.Path != entry.Path || string(parsed.Kind) != entry.Kind {
+		return fmt.Errorf(
+			"metadata conflict: lockfile action %s does not match workflow action %s",
+			lockfileActionName(entry),
+			actionSelectorString(parsed),
+		)
+	}
+	return nil
+}
+
+func lockfileActionName(entry metadata.LockfileEntry) string {
+	selector := entry.Owner + "/" + entry.Repo
+	if entry.Path != "" {
+		selector += "/" + entry.Path
+	}
+	return selector
 }
 
 func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, logicalRef string, unpinned policy.UnpinnedPolicy) (*githubresolver.ResolvedRef, error) {

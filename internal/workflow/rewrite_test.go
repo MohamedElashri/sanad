@@ -180,7 +180,7 @@ func TestRewriteWorkflowBytesRefusesInvalidOutputYAML(t *testing.T) {
 	}
 }
 
-func TestRewriteWorkflowFileWritesAtomicallyAndPreservesPermissions(t *testing.T) {
+func TestAtomicWriteFilePreservesRequestedPermissions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ci.yml")
 	input := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n"
 	if err := os.WriteFile(path, []byte(input), 0o640); err != nil {
@@ -192,8 +192,12 @@ func TestRewriteWorkflowFileWritesAtomicallyAndPreservesPermissions(t *testing.T
 		t.Fatal(err)
 	}
 	change := rewriteChangeForUse(uses[0], rewriteNewSHA, "v4")
-	if err := RewriteWorkflowFile(path, []RewriteChange{change}, RewriteOptions{WriteMetadataComment: true}); err != nil {
-		t.Fatalf("RewriteWorkflowFile returned error: %v", err)
+	rewritten, err := RewriteWorkflowBytes([]byte(input), []RewriteChange{change}, RewriteOptions{WriteMetadataComment: true})
+	if err != nil {
+		t.Fatalf("RewriteWorkflowBytes returned error: %v", err)
+	}
+	if err := AtomicWriteFile(path, rewritten, 0o640); err != nil {
+		t.Fatalf("AtomicWriteFile returned error: %v", err)
 	}
 
 	got, err := os.ReadFile(path)

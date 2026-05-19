@@ -84,7 +84,12 @@ type LockfileEntry struct {
 	TimestampSource string `json:"timestamp_source,omitempty"`
 }
 
-type LockfileMetadata map[string]Metadata
+type LockfileMetadataValue struct {
+	Metadata Metadata
+	Entry    LockfileEntry
+}
+
+type LockfileMetadata map[string]LockfileMetadataValue
 
 func LoadLockfileMetadata(path string) (LockfileMetadata, bool, error) {
 	lockfile, ok, err := LoadLockfile(path)
@@ -94,9 +99,12 @@ func LoadLockfileMetadata(path string) (LockfileMetadata, bool, error) {
 
 	values := make(LockfileMetadata)
 	for _, entry := range lockfile.Entries {
-		values[Key(entry.File, entry.Node)] = Metadata{
-			LogicalRef: entry.LogicalRef,
-			Source:     SourceLockfile,
+		values[Key(entry.File, entry.Node)] = LockfileMetadataValue{
+			Metadata: Metadata{
+				LogicalRef: entry.LogicalRef,
+				Source:     SourceLockfile,
+			},
+			Entry: entry,
 		}
 	}
 	return values, true, nil

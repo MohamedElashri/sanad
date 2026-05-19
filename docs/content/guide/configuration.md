@@ -28,6 +28,7 @@ files = []
 
 [github]
 api_url = "https://api.github.com"
+send_token_to_custom_api_url = false
 
 [comments]
 write = true
@@ -61,8 +62,9 @@ Set the API endpoint for GitHub Enterprise:
 ```toml
 [github]
 api_url = "https://github.example.com/api/v3"
+send_token_to_custom_api_url = true
 ```
 
-Token lookup is unchanged: `GITHUB_TOKEN` has priority, then `GH_TOKEN`.
+Token lookup is unchanged: `GITHUB_TOKEN` has priority, then `GH_TOKEN`. Environment tokens are sent to `https://api.github.com` by default; enable `send_token_to_custom_api_url` only for a trusted Enterprise API endpoint.
 
 For all supported keys and validation behavior, see [Config Reference](../../reference/config/).

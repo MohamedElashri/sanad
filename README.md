@@ -151,6 +151,7 @@ files = []
 
 [github]
 api_url = "https://api.github.com"
+send_token_to_custom_api_url = false
 
 [comments]
 write = true
@@ -207,7 +208,7 @@ For local shell usage, prefer reusing the GitHub CLI token instead of pasting a 
 GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
-Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enterprise.
+Set `[github].api_url` in `.sanad.toml` when resolving refs through GitHub Enterprise. Environment tokens are sent to `https://api.github.com` by default; set `[github].send_token_to_custom_api_url = true` only for a trusted Enterprise API endpoint.
 
 ## Security Model
 

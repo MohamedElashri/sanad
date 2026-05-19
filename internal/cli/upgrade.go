@@ -223,7 +223,7 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
-		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, lockfileMetadata)
+		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
 		if currentEntry, ok := currentUpgradeLockEntry(use, parsed, recovered, hasMetadata, now); ok {
 			plan.LockEntries = append(plan.LockEntries, currentEntry)
 		}
