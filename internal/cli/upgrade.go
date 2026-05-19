@@ -91,11 +91,12 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	if err != nil {
 		return err
 	}
-	if err := validateUpgradeOptions(upgradeOpts); err != nil {
+	effectiveOpts := upgradeOptionsWithDefaults(cmd, upgradeOpts)
+	if err := validateUpgradeOptions(&effectiveOpts); err != nil {
 		return categorizedError{code: exitConfig, err: err}
 	}
-	if upgradeOpts.latestReleaseMode != "" {
-		latestRelease, err := normalizeUpgradeLatestReleaseForCLI(upgradeOpts.latestReleaseMode)
+	if effectiveOpts.latestReleaseMode != "" {
+		latestRelease, err := normalizeUpgradeLatestReleaseForCLI(effectiveOpts.latestReleaseMode)
 		if err != nil {
 			return categorizedError{code: exitConfig, err: err}
 		}
@@ -107,7 +108,7 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 		return err
 	}
 
-	plan, err := buildUpgradePlan(cmd.Context(), cfg, upgradeOpts, resolver, planNow())
+	plan, err := buildUpgradePlan(cmd.Context(), cfg, &effectiveOpts, resolver, planNow())
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,10 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	if len(plan.Blockers) > 0 {
 		return categorizedError{code: blockerExitCode(plan.Blockers), err: upgradeBlockersError(plan.Blockers)}
 	}
-	if upgradeOpts.dryRun || !upgradeOpts.write {
+	if effectiveOpts.dryRun || !effectiveOpts.write {
+		if len(rewrites) > 0 && rootOpts.format == "table" {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed. Add --write to apply these upgrades.")
+		}
 		return nil
 	}
 	if len(rewrites) == 0 {
@@ -159,6 +163,18 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d logical ref upgrade(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
 	return nil
+}
+
+func upgradeOptionsWithDefaults(cmd *cobra.Command, opts *upgradeOptions) upgradeOptions {
+	effective := *opts
+	flags := cmd.Flags()
+	if !flags.Changed("action") && !flags.Changed("all") {
+		effective.all = true
+	}
+	if !flags.Changed("to") && !flags.Changed("latest-release") {
+		effective.latestRelease = true
+	}
+	return effective
 }
 
 func validateUpgradeOptions(opts *upgradeOptions) error {

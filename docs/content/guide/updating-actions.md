@@ -29,6 +29,12 @@ If a candidate commit is newer than the configured cooldown, Sanad reports `pend
 
 ## Change the logical ref
 
+Preview upgrades for all managed entries to their latest GitHub release target:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad upgrade
+```
+
 Upgrade a managed action to an explicit ref:
 
 ```bash
@@ -41,7 +47,7 @@ GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5 --write
 ```
 
-Upgrade all managed entries to their latest GitHub release target:
+You can also spell out the default all/latest-release behavior explicitly:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --latest-release
