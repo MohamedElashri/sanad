@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/MohamedElashri/sanad/internal/actions"
@@ -133,7 +132,7 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 		}
 		if len(rewrites) > 0 {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout())
-			if err := printApplyDiff(cmd.OutOrStdout(), rewrites); err != nil {
+			if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
 				return err
 			}
 		}
@@ -394,28 +393,39 @@ func replaceUpgradeLockEntry(entries *[]metadata.LockfileEntry, use workflow.Use
 }
 
 func printUpgradeTable(cmd *cobra.Command, report upgradeReport) error {
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Matched %d managed action pin(s): %d update(s), %d pending cooldown, %d unchanged, %d blocked.\n\n", report.Summary.Matched, report.Summary.Updates, report.Summary.Pending, report.Summary.Unchanged, report.Summary.Blocked)
+	style := styleForCommand(cmd)
+	_, _ = fmt.Fprintf(
+		cmd.OutOrStdout(),
+		"Matched %d managed action pin(s): %s update(s), %s pending cooldown, %s unchanged, %s blocked.\n\n",
+		report.Summary.Matched,
+		style.Wrapf(colorWarning, "%d", report.Summary.Updates),
+		style.Wrapf(colorWarning, "%d", report.Summary.Pending),
+		style.Wrapf(colorSuccess, "%d", report.Summary.Unchanged),
+		style.Wrapf(colorDanger, "%d", report.Summary.Blocked),
+	)
 	if len(report.Actions) == 0 {
 		return nil
 	}
-	writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(writer, "FILE\tLINE\tACTION\tFROM\tTO\tCURRENT\tCANDIDATE\tDECISION\tREASON")
+	rows := make([]styledTableRow, 0, len(report.Actions))
 	for _, action := range report.Actions {
-		_, _ = fmt.Fprintf(
-			writer,
-			"%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			action.File,
-			action.Line,
-			action.Action,
-			emptyDash(action.CurrentLogicalRef),
-			emptyDash(action.TargetLogicalRef),
-			shortSHAOrDash(action.CurrentSHA),
-			shortSHAOrDash(action.CandidateSHA),
-			action.Decision,
-			emptyDash(action.Reason),
-		)
+		rows = append(rows, styledTableRow{
+			{Text: action.File, Role: colorFile},
+			{Text: fmt.Sprintf("%d", action.Line), Role: colorLine},
+			{Text: action.Action},
+			{Text: emptyDash(action.CurrentLogicalRef), Role: refColorRole(action.CurrentLogicalRef)},
+			{Text: emptyDash(action.TargetLogicalRef), Role: refColorRole(action.TargetLogicalRef)},
+			{Text: shortSHAOrDash(action.CurrentSHA), Role: currentSHAColorRole(action.Decision, action.CurrentSHA)},
+			{Text: shortSHAOrDash(action.CandidateSHA), Role: candidateSHAColorRole(action.Decision, action.CandidateSHA)},
+			{Text: string(action.Decision), Role: decisionColorRole(action.Decision)},
+			{Text: emptyDash(action.Reason), Role: colorReason},
+		})
 	}
-	return writer.Flush()
+	return printStyledTable(
+		cmd.OutOrStdout(),
+		style,
+		[]string{"FILE", "LINE", "ACTION", "FROM", "TO", "CURRENT", "CANDIDATE", "DECISION", "REASON"},
+		rows,
+	)
 }
 
 func upgradeBlockersError(blockers []applyBlocker) error {

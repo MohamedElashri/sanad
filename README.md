@@ -94,6 +94,8 @@ GITHUB_TOKEN=$(gh auth token) sanad check
 
 `sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` may contact GitHub when resolution is needed. `sanad scan` is local-only.
 
+Human-readable output uses color automatically when the terminal supports it. Use `--color never` or `NO_COLOR=1` to disable color, and `--color always` to force it for pagers or demos.
+
 ## Example
 
 Before:

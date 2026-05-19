@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/MohamedElashri/sanad/internal/policy"
 	"github.com/spf13/cobra"
@@ -171,31 +170,30 @@ func checkViolationFromPlanAction(file string, action planAction) checkViolation
 }
 
 func printCheckTable(cmd *cobra.Command, report checkReport) error {
+	style := styleForCommand(cmd)
 	if report.Passed {
 		_, _ = fmt.Fprintf(
 			cmd.OutOrStdout(),
-			"All workflow dependencies comply with sanad policy. Checked %d action(s).\n",
+			"%s Checked %d action(s).\n",
+			style.Wrap(colorSuccess, "All workflow dependencies comply with sanad policy."),
 			report.Summary.Checked,
 		)
 		return nil
 	}
 
-	writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(writer, "FILE\tLINE\tACTION\tDECISION\tREASON")
+	rows := make([]styledTableRow, 0, len(report.Violations))
 	for _, violation := range report.Violations {
-		_, _ = fmt.Fprintf(
-			writer,
-			"%s\t%d\t%s\t%s\t%s\n",
-			violation.File,
-			violation.Line,
-			violation.Action,
-			violation.Decision,
-			emptyDash(strings.TrimSpace(violation.Reason)),
-		)
+		rows = append(rows, styledTableRow{
+			{Text: violation.File, Role: colorFile},
+			{Text: fmt.Sprintf("%d", violation.Line), Role: colorLine},
+			{Text: violation.Action},
+			{Text: string(violation.Decision), Role: decisionColorRole(violation.Decision)},
+			{Text: emptyDash(strings.TrimSpace(violation.Reason)), Role: colorReason},
+		})
 	}
-	if err := writer.Flush(); err != nil {
+	if err := printStyledTable(cmd.OutOrStdout(), style, []string{"FILE", "LINE", "ACTION", "DECISION", "REASON"}, rows); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nCheck failed with %d violation(s).\n", report.Summary.Violations)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n", style.Wrapf(colorDanger, "Check failed with %d violation(s).", report.Summary.Violations))
 	return nil
 }

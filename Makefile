@@ -3,11 +3,13 @@
 .DEFAULT_GOAL := help
 
 GOCACHE ?= $(CURDIR)/.gocache
+GOMODCACHE ?= $(CURDIR)/.gomodcache
+BIN_DIR ?= $(CURDIR)/bin
 NIDA ?= nida
 
 help:
 	@printf '%s\n' 'Sanad development targets:'
-	@printf '  %-20s %s\n' 'make build' 'Build all Go packages'
+	@printf '  %-20s %s\n' 'make build' 'Build the sanad binary into ./bin'
 	@printf '  %-20s %s\n' 'make test' 'Run the test suite'
 	@printf '  %-20s %s\n' 'make race' 'Run tests with the race detector'
 	@printf '  %-20s %s\n' 'make lint' 'Run go vet'
@@ -20,22 +22,23 @@ help:
 	@printf '  %-20s %s\n' 'make clean' 'Remove local build, docs, and cache artifacts'
 
 build:
-	GOCACHE=$(GOCACHE) go build ./...
+	mkdir -p $(BIN_DIR)
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go build -o $(BIN_DIR)/sanad ./cmd/sanad
 
 test:
-	GOCACHE=$(GOCACHE) go test ./...
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test ./...
 
 race:
-	GOCACHE=$(GOCACHE) go test -race ./...
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test -race ./...
 
 lint:
-	GOCACHE=$(GOCACHE) go vet ./...
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go vet ./...
 
 staticcheck:
-	GOCACHE=$(GOCACHE) go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go run honnef.co/go/tools/cmd/staticcheck@latest ./...
 
 bench:
-	GOCACHE=$(GOCACHE) go test -run '^$$' -bench BenchmarkExtractUsesFromLargeWorkflow ./internal/workflow
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test -run '^$$' -bench BenchmarkExtractUsesFromLargeWorkflow ./internal/workflow
 
 fmt:
 	gofmt -w cmd internal
@@ -43,7 +46,7 @@ fmt:
 check: fmt lint test build
 
 docs-release-notes:
-	GOCACHE=$(GOCACHE) go run ./scripts/generate_release_notes.go
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go run ./scripts/generate_release_notes.go
 
 docs-build: docs-release-notes
 	$(NIDA) build --site ./docs
@@ -52,4 +55,4 @@ docs-serve: docs-release-notes
 	$(NIDA) serve --site ./docs
 
 clean:
-	$(RM) -r sanad dist .gocache .gomodcache docs/public docs/content/release-notes.md
+	$(RM) -r sanad bin dist .gocache docs/public docs/content/release-notes.md

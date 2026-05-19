@@ -111,7 +111,7 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
 			return nil
 		}
-		return printApplyDiff(cmd.OutOrStdout(), rewrites)
+		return printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd))
 	}
 
 	if len(rewrites) == 0 {
@@ -675,7 +675,7 @@ func authorizeApply(cmd *cobra.Command, opts *applyOptions, report planReport, r
 		}
 		if len(rewrites) > 0 {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout())
-			if err := printApplyDiff(cmd.OutOrStdout(), rewrites); err != nil {
+			if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
 				return err
 			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout())
@@ -696,34 +696,27 @@ func authorizeApply(cmd *cobra.Command, opts *applyOptions, report planReport, r
 }
 
 func isTerminal(in io.Reader) bool {
-	file, ok := in.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
+	return isTerminalFile(in)
 }
 
-func printApplyDiff(out io.Writer, rewrites []workflowRewrite) error {
+func printApplyDiff(out io.Writer, rewrites []workflowRewrite, style terminalStyle) error {
 	for i, rewrite := range rewrites {
 		if i > 0 {
 			_, _ = fmt.Fprintln(out)
 		}
-		_, _ = fmt.Fprintf(out, "--- %s\n+++ %s\n", rewrite.Path, rewrite.Path)
-		printUnifiedHunk(out, string(rewrite.Old), string(rewrite.New))
+		printStyledLine(out, style, colorDelete, fmt.Sprintf("--- %s\n", rewrite.Path))
+		printStyledLine(out, style, colorAdd, fmt.Sprintf("+++ %s\n", rewrite.Path))
+		printUnifiedHunk(out, string(rewrite.Old), string(rewrite.New), style)
 	}
 	return nil
 }
 
-func printUnifiedHunk(out io.Writer, oldText string, newText string) {
+func printUnifiedHunk(out io.Writer, oldText string, newText string, style terminalStyle) {
 	oldLines := splitDiffLines(oldText)
 	newLines := splitDiffLines(newText)
-	fmt.Fprintf(out, "@@ -1,%d +1,%d @@\n", len(oldLines), len(newLines))
+	printStyledLine(out, style, colorHunk, fmt.Sprintf("@@ -1,%d +1,%d @@\n", len(oldLines), len(newLines)))
 	for _, op := range diffLineOps(oldLines, newLines) {
-		printDiffLine(out, op.prefix, op.line)
+		printDiffLine(out, op.prefix, op.line, style)
 	}
 }
 
@@ -785,11 +778,18 @@ func splitDiffLines(text string) []string {
 	return lines
 }
 
-func printDiffLine(out io.Writer, prefix byte, line string) {
-	_, _ = fmt.Fprintf(out, "%c%s", prefix, line)
+func printDiffLine(out io.Writer, prefix byte, line string, style terminalStyle) {
+	role := colorNone
+	switch prefix {
+	case '+':
+		role = colorAdd
+	case '-':
+		role = colorDelete
+	}
+	printStyledLine(out, style, role, fmt.Sprintf("%c%s", prefix, line))
 	if !strings.HasSuffix(line, "\n") {
 		_, _ = fmt.Fprintln(out)
-		_, _ = fmt.Fprintln(out, "\\ No newline at end of file")
+		printStyledLine(out, style, colorHunk, "\\ No newline at end of file\n")
 	}
 }
 

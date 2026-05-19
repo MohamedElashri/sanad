@@ -34,6 +34,7 @@ func (e configError) Unwrap() error {
 type rootOptions struct {
 	configPath string
 	format     string
+	color      string
 }
 
 func NewRootCommand() *cobra.Command {
@@ -48,6 +49,13 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&opts.configPath, "config", config.DefaultPath, "path to config file")
 	cmd.PersistentFlags().StringVar(&opts.format, "format", "table", "output format (table, json, or command-specific formats)")
+	cmd.PersistentFlags().StringVar(&opts.color, "color", colorModeAuto, "colorize human output: auto, always, or never")
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if _, err := colorSettingsForCommand(cmd); err != nil {
+			return categorizedError{code: exitConfig, err: err}
+		}
+		return nil
+	}
 
 	cmd.AddCommand(
 		newScanCommand(opts),

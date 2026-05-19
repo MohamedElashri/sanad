@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"text/tabwriter"
 	"time"
 
 	"github.com/MohamedElashri/sanad/internal/actions"
@@ -124,25 +123,77 @@ func classifyUses(uses []workflow.UseNode, opts policy.Options) ([]scanEntry, er
 }
 
 func printScanTable(cmd *cobra.Command, entries []scanEntry) error {
-	writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(writer, "FILE\tLINE\tACTION\tREF\tKIND\tPINNED\tVALID\tIGNORED\tIGNORE RULE\tERROR")
+	rows := make([]styledTableRow, 0, len(entries))
 	for _, entry := range entries {
-		_, _ = fmt.Fprintf(
-			writer,
-			"%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			entry.File,
-			entry.Line,
-			entry.actionName(),
-			emptyDash(entry.Ref),
-			entry.Kind,
-			yesNo(entry.Pinned),
-			yesNo(entry.Valid),
-			yesNo(entry.Ignored),
-			emptyDash(entry.IgnoreRule),
-			emptyDash(entry.Error),
-		)
+		rows = append(rows, styledTableRow{
+			{Text: entry.File, Role: colorFile},
+			{Text: fmt.Sprintf("%d", entry.Line), Role: colorLine},
+			{Text: entry.actionName()},
+			{Text: emptyDash(entry.Ref), Role: scanRefColorRole(entry)},
+			{Text: string(entry.Kind), Role: scanKindColorRole(entry)},
+			{Text: yesNo(entry.Pinned), Role: boolColorRole(entry.Pinned)},
+			{Text: yesNo(entry.Valid), Role: boolColorRole(entry.Valid)},
+			{Text: yesNo(entry.Ignored), Role: ignoredColorRole(entry.Ignored)},
+			{Text: emptyDash(entry.IgnoreRule), Role: mutedIfDash(entry.IgnoreRule)},
+			{Text: emptyDash(entry.Error), Role: scanErrorColorRole(entry)},
+		})
 	}
-	return writer.Flush()
+	return printStyledTable(
+		cmd.OutOrStdout(),
+		styleForCommand(cmd),
+		[]string{"FILE", "LINE", "ACTION", "REF", "KIND", "PINNED", "VALID", "IGNORED", "IGNORE RULE", "ERROR"},
+		rows,
+	)
+}
+
+func scanRefColorRole(entry scanEntry) colorRole {
+	if entry.Ref == "" {
+		return colorMuted
+	}
+	if entry.Valid && entry.Pinned {
+		return colorSuccess
+	}
+	if !entry.Valid {
+		return colorDanger
+	}
+	return colorWarning
+}
+
+func scanKindColorRole(entry scanEntry) colorRole {
+	switch entry.Kind {
+	case actions.KindLocalAction, actions.KindDockerAction:
+		return colorMuted
+	default:
+		return colorInfo
+	}
+}
+
+func scanErrorColorRole(entry scanEntry) colorRole {
+	if entry.Error != "" {
+		return colorDanger
+	}
+	return colorMuted
+}
+
+func boolColorRole(value bool) colorRole {
+	if value {
+		return colorSuccess
+	}
+	return colorDanger
+}
+
+func ignoredColorRole(value bool) colorRole {
+	if value {
+		return colorMuted
+	}
+	return colorNone
+}
+
+func mutedIfDash(value string) colorRole {
+	if value == "" {
+		return colorMuted
+	}
+	return colorNone
 }
 
 func (e scanEntry) actionName() string {
