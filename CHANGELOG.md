@@ -2,6 +2,18 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.2 - 2026-05-19
+
+### Security
+
+- Stopped sending `GITHUB_TOKEN` or `GH_TOKEN` to custom `[github].api_url` endpoints by default. GitHub Enterprise users can opt in explicitly with `[github].send_token_to_custom_api_url = true`.
+- Hardened `[github].api_url` validation so custom GitHub API endpoints must use HTTPS and cannot include embedded credentials.
+
+### Fixed
+
+- Detected lockfile entries that no longer match the workflow action at the same YAML node, reporting a metadata conflict instead of applying stale tracking metadata to a different action.
+- Made `sanad plan`, `sanad apply`, and `sanad upgrade` handle lockfile and inline-comment metadata recovery consistently.
+
 ## 0.1.1 - 2026-05-18
 
 ### Added
