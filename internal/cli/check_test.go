@@ -276,18 +276,22 @@ func TestCheckStrictControlsManagedUpdatesAndPendingCooldown(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	if err := executeCheckWithArgs("check"); err != nil {
-		t.Fatalf("default check returned error for pending managed pin: %v", err)
+	err := executeCheckWithArgs("check")
+	if err == nil {
+		t.Fatal("default check returned nil error, want pending violation")
 	}
-	err := executeCheckWithArgs("check", "--strict")
+	if ExitCode(err) != exitPolicy {
+		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+	}
+	err = executeCheckWithArgs("check", "--strict")
 	if err == nil {
 		t.Fatal("strict check returned nil error, want pending violation")
 	}
 	if ExitCode(err) != exitPolicy {
 		t.Fatalf("strict ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
 	}
-	if err := executeCheckWithArgs("check", "--strict", "--allow-pending-cooldown"); err != nil {
-		t.Fatalf("strict check with allow-pending-cooldown returned error: %v", err)
+	if err := executeCheckWithArgs("check", "--allow-pending-cooldown"); err != nil {
+		t.Fatalf("check with allow-pending-cooldown returned error: %v", err)
 	}
 }
 
@@ -308,10 +312,14 @@ func TestCheckFailOnUpdatesControlsManagedEligibleUpdates(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	if err := executeCheckWithArgs("check"); err != nil {
-		t.Fatalf("default check returned error for eligible managed update: %v", err)
+	err := executeCheckWithArgs("check")
+	if err == nil {
+		t.Fatal("default check returned nil error, want update violation")
 	}
-	err := executeCheckWithArgs("check", "--fail-on-updates")
+	if ExitCode(err) != exitPolicy {
+		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+	}
+	err = executeCheckWithArgs("check", "--fail-on-updates")
 	if err == nil {
 		t.Fatal("check --fail-on-updates returned nil error, want update violation")
 	}

@@ -27,7 +27,15 @@ Sanad verifies resolved SHAs through the declared source repository. Relaxing th
 
 ## Cooldown
 
-Cooldown delays adoption of newly resolved commits. This helps avoid immediately adopting a tag or branch movement that was just published or compromised.
+Cooldown delays adoption of newly resolved commits. By default, Sanad uses upstream release, tag, or commit timestamps as the adoption clock. This keeps normal action updates ergonomic while still refusing missing or future timestamps.
+
+For stricter repositories, set:
+
+```toml
+cooldown_source = "first-seen"
+```
+
+In that mode, Sanad uses the time a candidate SHA was first recorded in `.github/sanad.lock.json`.
 
 The default cooldown is:
 
@@ -35,7 +43,7 @@ The default cooldown is:
 cooldown = "14d"
 ```
 
-If a candidate is newer than the cooldown, Sanad reports `pending-cooldown` and does not rewrite it.
+If a candidate has not satisfied the selected cooldown source, Sanad reports `pending-cooldown` and does not rewrite it.
 
 ## Non-goals
 

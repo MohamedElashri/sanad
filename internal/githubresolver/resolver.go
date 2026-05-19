@@ -81,16 +81,15 @@ type Client struct {
 }
 
 type clientOptions struct {
-	baseURL                     string
-	httpClient                  *http.Client
-	token                       string
-	sendEnvTokenToCustomBaseURL bool
-	tokenCameFromEnvironment    bool
+	baseURL                  string
+	httpClient               *http.Client
+	token                    string
+	tokenCameFromEnvironment bool
 }
 
 type Option func(*clientOptions)
 
-func WithBaseURL(baseURL string) Option {
+func withBaseURL(baseURL string) Option {
 	return func(opts *clientOptions) {
 		opts.baseURL = baseURL
 	}
@@ -105,12 +104,6 @@ func WithHTTPClient(httpClient *http.Client) Option {
 func WithToken(token string) Option {
 	return func(opts *clientOptions) {
 		opts.token = token
-	}
-}
-
-func WithEnvTokenForCustomBaseURL() Option {
-	return func(opts *clientOptions) {
-		opts.sendEnvTokenToCustomBaseURL = true
 	}
 }
 
@@ -391,9 +384,6 @@ func applyOptions(options []Option) clientOptions {
 
 func shouldSendToken(opts clientOptions) bool {
 	if !opts.tokenCameFromEnvironment || opts.baseURL == "" {
-		return true
-	}
-	if opts.sendEnvTokenToCustomBaseURL {
 		return true
 	}
 	baseURL, err := normalizeBaseURL(opts.baseURL)

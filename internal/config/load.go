@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -70,6 +69,9 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 	}
 
 	if meta.IsDefined("workflow_paths") {
+		if err := validateWorkflowPaths(raw.WorkflowPaths); err != nil {
+			return Config{}, fmt.Errorf("load config %q: workflow_paths: %w", path, err)
+		}
 		cfg.WorkflowPaths = raw.WorkflowPaths
 	}
 
@@ -79,6 +81,13 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 			return Config{}, fmt.Errorf("load config %q: cooldown: %w", path, err)
 		}
 		cfg.Cooldown = cooldown
+	}
+	if meta.IsDefined("cooldown_source") {
+		cooldownSource, err := normalizeCooldownSource(raw.CooldownSource)
+		if err != nil {
+			return Config{}, fmt.Errorf("load config %q: %w", path, err)
+		}
+		cfg.CooldownSource = cooldownSource
 	}
 
 	if meta.IsDefined("updates", "tags") {
@@ -101,15 +110,8 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 		cfg.Ignore.Files = raw.Ignore.Files
 	}
 
-	if meta.IsDefined("github", "api_url") {
-		apiURL, err := validateAPIURL(raw.GitHub.APIURL)
-		if err != nil {
-			return Config{}, fmt.Errorf("load config %q: %w", path, err)
-		}
-		cfg.GitHub.APIURL = apiURL
-	}
-	if meta.IsDefined("github", "send_token_to_custom_api_url") {
-		cfg.GitHub.SendTokenToCustomAPIURL = raw.GitHub.SendTokenToCustomAPIURL
+	if meta.IsDefined("github") {
+		return Config{}, fmt.Errorf("load config %q: [github] is not supported; Sanad resolves refs only through github.com", path)
 	}
 
 	if meta.IsDefined("organization", "policy_files") {
@@ -154,15 +156,15 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 }
 
 type fileConfig struct {
-	WorkflowPaths []string               `toml:"workflow_paths"`
-	Cooldown      string                 `toml:"cooldown"`
-	Updates       updatesFileConfig      `toml:"updates"`
-	Ignore        ignoreFileConfig       `toml:"ignore"`
-	GitHub        githubFileConfig       `toml:"github"`
-	Organization  organizationFileConfig `toml:"organization"`
-	Comments      commentsFileConfig     `toml:"comments"`
-	Security      securityFileConfig     `toml:"security"`
-	Upgrade       upgradeFileConfig      `toml:"upgrade"`
+	WorkflowPaths  []string               `toml:"workflow_paths"`
+	Cooldown       string                 `toml:"cooldown"`
+	CooldownSource string                 `toml:"cooldown_source"`
+	Updates        updatesFileConfig      `toml:"updates"`
+	Ignore         ignoreFileConfig       `toml:"ignore"`
+	Organization   organizationFileConfig `toml:"organization"`
+	Comments       commentsFileConfig     `toml:"comments"`
+	Security       securityFileConfig     `toml:"security"`
+	Upgrade        upgradeFileConfig      `toml:"upgrade"`
 }
 
 type updatesFileConfig struct {
@@ -175,11 +177,6 @@ type updatesFileConfig struct {
 type ignoreFileConfig struct {
 	Actions []string `toml:"actions"`
 	Files   []string `toml:"files"`
-}
-
-type githubFileConfig struct {
-	APIURL                  string `toml:"api_url"`
-	SendTokenToCustomAPIURL bool   `toml:"send_token_to_custom_api_url"`
 }
 
 type organizationFileConfig struct {
@@ -242,25 +239,38 @@ func ParseDuration(value string) (time.Duration, error) {
 	return duration, nil
 }
 
-func validateAPIURL(value string) (string, error) {
+func validateWorkflowPaths(paths []string) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("must include at least one path")
+	}
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return fmt.Errorf("path must not be empty")
+		}
+		if filepath.IsAbs(path) {
+			return fmt.Errorf("%q must be relative to the repository root", path)
+		}
+		cleaned := filepath.Clean(path)
+		if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("%q must stay inside the repository root", path)
+		}
+	}
+	return nil
+}
+
+func normalizeCooldownSource(value string) (string, error) {
 	value = strings.TrimSpace(value)
-	if value == "" {
-		return "", fmt.Errorf("github.api_url must not be empty")
+	switch value {
+	case DefaultCooldownSource, "upstream":
+		return DefaultCooldownSource, nil
+	case "first-seen":
+		return "first-seen", nil
+	case "":
+		return "", fmt.Errorf("cooldown_source must not be empty")
+	default:
+		return "", fmt.Errorf("cooldown_source %q is not supported; expected %q or %q", value, DefaultCooldownSource, "first-seen")
 	}
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return "", fmt.Errorf("github.api_url is invalid: %w", err)
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return "", fmt.Errorf("github.api_url must be an absolute URL")
-	}
-	if parsed.Scheme != "https" {
-		return "", fmt.Errorf("github.api_url must use https")
-	}
-	if parsed.User != nil {
-		return "", fmt.Errorf("github.api_url must not include credentials")
-	}
-	return value, nil
 }
 
 func validateCommentFormat(value string) error {

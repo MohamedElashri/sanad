@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -43,6 +44,12 @@ func discoverWorkflowFiles(path string) ([]string, error) {
 			return err
 		}
 		if entry.IsDir() {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if isWorkflowYAML(current) {
+				return fmt.Errorf("workflow path %q must not be a symlink", current)
+			}
 			return nil
 		}
 		if isWorkflowYAML(current) {

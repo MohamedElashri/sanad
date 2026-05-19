@@ -1,6 +1,7 @@
 workflow_paths = [".github/workflows"]
 
 cooldown = "14d"
+cooldown_source = "source"
 
 [updates]
 tags = "track"
@@ -14,9 +15,6 @@ actions = [
   "docker://*"
 ]
 files = []
-
-[github]
-api_url = "https://api.github.com"
 
 [organization]
 # Optional shared policy files, resolved relative to this config file. Settings

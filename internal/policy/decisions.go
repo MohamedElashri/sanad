@@ -24,10 +24,11 @@ const (
 )
 
 type Decision struct {
-	Kind       DecisionKind  `json:"kind"`
-	Reason     string        `json:"reason,omitempty"`
-	CurrentSHA string        `json:"current_sha,omitempty"`
-	NewSHA     string        `json:"new_sha,omitempty"`
-	LogicalRef string        `json:"logical_ref,omitempty"`
-	Age        time.Duration `json:"age,omitempty"`
+	Kind            DecisionKind  `json:"kind"`
+	Reason          string        `json:"reason,omitempty"`
+	CurrentSHA      string        `json:"current_sha,omitempty"`
+	NewSHA          string        `json:"new_sha,omitempty"`
+	LogicalRef      string        `json:"logical_ref,omitempty"`
+	Age             time.Duration `json:"age,omitempty"`
+	CandidateSeenAt time.Time     `json:"-"`
 }

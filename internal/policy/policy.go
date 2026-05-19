@@ -13,6 +13,7 @@ import (
 type TagPolicy string
 type BranchPolicy string
 type UnpinnedPolicy string
+type CooldownSource string
 
 const (
 	TagTrack      TagPolicy = "track"
@@ -26,6 +27,9 @@ const (
 	UnpinnedDeny          UnpinnedPolicy = "deny"
 	UnpinnedDefaultBranch UnpinnedPolicy = "default-branch"
 	UnpinnedLatestRelease UnpinnedPolicy = "latest-release"
+
+	CooldownSourceUpstream  CooldownSource = "source"
+	CooldownSourceFirstSeen CooldownSource = "first-seen"
 )
 
 type Options struct {
@@ -36,17 +40,19 @@ type Options struct {
 	IgnoreActions     []string
 	IgnoreFiles       []string
 	Cooldown          time.Duration
+	CooldownSource    CooldownSource
 	Now               time.Time
 }
 
 type Entry struct {
-	File       string
-	Action     actions.ParsedAction
-	Candidate  *githubresolver.ResolvedRef
-	ResolveErr error
-	LogicalRef string
-	CurrentSHA string
-	Now        time.Time
+	File            string
+	Action          actions.ParsedAction
+	Candidate       *githubresolver.ResolvedRef
+	ResolveErr      error
+	LogicalRef      string
+	CurrentSHA      string
+	CandidateSeenAt time.Time
+	Now             time.Time
 }
 
 func DefaultOptions() Options {
@@ -57,6 +63,7 @@ func DefaultOptions() Options {
 		ReusableWorkflows: true,
 		IgnoreActions:     []string{"./*", "docker://*"},
 		Cooldown:          14 * 24 * time.Hour,
+		CooldownSource:    CooldownSourceUpstream,
 	}
 }
 
@@ -231,14 +238,18 @@ func candidateDecision(entry Entry, opts Options, reason string) Decision {
 	}
 
 	candidateTime := candidateTimestamp(*entry.Candidate)
+	if opts.CooldownSource == CooldownSourceFirstSeen && !entry.CandidateSeenAt.IsZero() {
+		candidateTime = entry.CandidateSeenAt
+	}
 	cooldown := EvaluateCooldown(now, candidateTime, opts.Cooldown)
 	return Decision{
-		Kind:       cooldown.Kind,
-		Reason:     cooldown.Reason,
-		CurrentSHA: current,
-		NewSHA:     entry.Candidate.SHA,
-		LogicalRef: logical,
-		Age:        cooldown.Age,
+		Kind:            cooldown.Kind,
+		Reason:          cooldown.Reason,
+		CurrentSHA:      current,
+		NewSHA:          entry.Candidate.SHA,
+		LogicalRef:      logical,
+		Age:             cooldown.Age,
+		CandidateSeenAt: candidateTime,
 	}
 }
 
@@ -387,6 +398,9 @@ func withDefaults(opts Options) Options {
 	}
 	if opts.IgnoreActions == nil {
 		opts.IgnoreActions = defaults.IgnoreActions
+	}
+	if opts.CooldownSource == "" {
+		opts.CooldownSource = defaults.CooldownSource
 	}
 	return opts
 }

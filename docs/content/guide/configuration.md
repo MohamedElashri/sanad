@@ -1,6 +1,6 @@
 +++
 title = "Configuration"
-description = "Configure workflow discovery, update policy, cooldown, metadata comments, and GitHub API access."
+description = "Configure workflow discovery, update policy, cooldown, metadata comments, and strict security behavior."
 weight = 20
 template = "page"
 +++
@@ -12,6 +12,7 @@ Start with the defaults and add config only for policy choices your repository n
 ```toml
 workflow_paths = [".github/workflows"]
 cooldown = "14d"
+cooldown_source = "source"
 
 [updates]
 tags = "track"
@@ -26,10 +27,6 @@ actions = [
 ]
 files = []
 
-[github]
-api_url = "https://api.github.com"
-send_token_to_custom_api_url = false
-
 [comments]
 write = true
 format = "sanad: ref={{ref}}"
@@ -43,9 +40,11 @@ deny_forks = false
 
 ## Common settings
 
-`workflow_paths` controls which workflow files or directories are scanned.
+`workflow_paths` controls which workflow files or directories are scanned. Configured paths must be relative and stay inside the repository root.
 
-`cooldown` controls how old a newly resolved candidate commit must be before Sanad can adopt it. The default is `14d`.
+`cooldown` controls how old a resolved candidate must be before Sanad can adopt it. The default is `14d`.
+
+`cooldown_source = "source"` uses upstream release, tag, or commit timestamps and is the default. Set `cooldown_source = "first-seen"` to use the time Sanad first recorded a candidate SHA locally.
 
 `updates.tags = "track"` means refs like `actions/checkout@v4` are resolved, pinned, and tracked through metadata.
 
@@ -55,16 +54,8 @@ deny_forks = false
 
 `comments.write = false` disables inline `sanad: ref=...` comments. The lockfile remains the metadata source.
 
-## GitHub Enterprise
+## GitHub API
 
-Set the API endpoint for GitHub Enterprise:
-
-```toml
-[github]
-api_url = "https://github.example.com/api/v3"
-send_token_to_custom_api_url = true
-```
-
-Token lookup is unchanged: `GITHUB_TOKEN` has priority, then `GH_TOKEN`. Environment tokens are sent to `https://api.github.com` by default; enable `send_token_to_custom_api_url` only for a trusted Enterprise API endpoint.
+Sanad resolves refs through `github.com` only. Custom GitHub API endpoints are intentionally unsupported so repository config cannot redirect CI credentials to another host.
 
 For all supported keys and validation behavior, see [Config Reference](../../reference/config/).

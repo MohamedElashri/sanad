@@ -43,6 +43,6 @@ Rewrites operate on original file bytes. This preserves unrelated formatting, co
 
 ## Resolver strategy
 
-Resolution checks full SHA commits, tags, annotated tags, branches, commit timestamps, and release timestamps. Default-branch and latest-release discovery are separate resolver paths used only when policy asks for them.
+Resolution checks full SHA commits, tags, annotated tags, branches, commit timestamps, and release timestamps. Cooldown uses upstream timestamps by default, or the lockfile's local candidate observation time when `cooldown_source = "first-seen"`. Default-branch and latest-release discovery are separate resolver paths used only when policy asks for them.
 
 The resolver package is named `githubresolver` to avoid colliding with `github.com/google/go-github/v72/github`.

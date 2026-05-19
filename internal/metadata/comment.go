@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/MohamedElashri/sanad/internal/actions"
 )
@@ -78,7 +79,9 @@ type LockfileEntry struct {
 	Path            string `json:"path"`
 	Kind            string `json:"kind"`
 	LogicalRef      string `json:"logical_ref"`
-	PinnedSHA       string `json:"pinned_sha"`
+	PinnedSHA       string `json:"pinned_sha,omitempty"`
+	CandidateSHA    string `json:"candidate_sha,omitempty"`
+	CandidateSeenAt string `json:"candidate_seen_at,omitempty"`
 	ResolvedAt      string `json:"resolved_at,omitempty"`
 	Timestamp       string `json:"timestamp,omitempty"`
 	TimestampSource string `json:"timestamp_source,omitempty"`
@@ -154,8 +157,24 @@ func ValidateLockfile(lockfile Lockfile) error {
 		if entry.LogicalRef == "" {
 			return fmt.Errorf("entry %d logical_ref is required", i)
 		}
-		if !actions.IsFullSHA(entry.PinnedSHA) {
+		if entry.PinnedSHA != "" && !actions.IsFullSHA(entry.PinnedSHA) {
 			return fmt.Errorf("entry %d pinned_sha must be a full 40-character SHA", i)
+		}
+		if entry.CandidateSHA != "" && !actions.IsFullSHA(entry.CandidateSHA) {
+			return fmt.Errorf("entry %d candidate_sha must be a full 40-character SHA", i)
+		}
+		if entry.PinnedSHA == "" && entry.CandidateSHA == "" {
+			return fmt.Errorf("entry %d must include pinned_sha or candidate_sha", i)
+		}
+		if entry.CandidateSHA != "" {
+			if entry.CandidateSeenAt == "" {
+				return fmt.Errorf("entry %d candidate_seen_at is required when candidate_sha is set", i)
+			}
+			if _, err := time.Parse(time.RFC3339, entry.CandidateSeenAt); err != nil {
+				return fmt.Errorf("entry %d candidate_seen_at must be RFC3339: %w", i, err)
+			}
+		} else if entry.CandidateSeenAt != "" {
+			return fmt.Errorf("entry %d candidate_seen_at requires candidate_sha", i)
 		}
 
 		key := Key(entry.File, entry.Node)

@@ -59,12 +59,10 @@ Validate workflows against policy.
 GITHUB_TOKEN=$(gh auth token) sanad check
 GITHUB_TOKEN=$(gh auth token) sanad --format json check
 GITHUB_TOKEN=$(gh auth token) sanad check --format sarif
-GITHUB_TOKEN=$(gh auth token) sanad check --strict
-GITHUB_TOKEN=$(gh auth token) sanad check --fail-on-updates
-GITHUB_TOKEN=$(gh auth token) sanad check --strict --allow-pending-cooldown
+GITHUB_TOKEN=$(gh auth token) sanad check --allow-pending-cooldown
 ```
 
-Default behavior fails on policy violations and mutable refs that still need to be pinned. `--strict` also fails on eligible or cooldown-pending managed updates, unless `--allow-pending-cooldown` is passed.
+Default behavior fails on policy violations, mutable refs that still need to be pinned, and managed pins whose resolved candidate differs from the workflow SHA. Pass `--allow-pending-cooldown` to allow cooldown-pending managed candidates while still failing eligible updates.
 
 ## `apply`
 

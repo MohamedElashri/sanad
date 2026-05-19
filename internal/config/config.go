@@ -5,18 +5,19 @@ import "time"
 const DefaultPath = ".sanad.toml"
 const DefaultCommentFormat = "sanad: ref={{ref}}"
 const DefaultUpgradeLatestRelease = "github-release"
+const DefaultCooldownSource = "source"
 
 type Config struct {
-	Source        string
-	WorkflowPaths []string
-	Cooldown      time.Duration
-	Updates       UpdatesConfig
-	Ignore        IgnoreConfig
-	GitHub        GitHubConfig
-	Organization  OrganizationConfig
-	Comments      CommentsConfig
-	Security      SecurityConfig
-	Upgrade       UpgradeConfig
+	Source         string
+	WorkflowPaths  []string
+	Cooldown       time.Duration
+	CooldownSource string
+	Updates        UpdatesConfig
+	Ignore         IgnoreConfig
+	Organization   OrganizationConfig
+	Comments       CommentsConfig
+	Security       SecurityConfig
+	Upgrade        UpgradeConfig
 }
 
 type UpdatesConfig struct {
@@ -29,11 +30,6 @@ type UpdatesConfig struct {
 type IgnoreConfig struct {
 	Actions []string
 	Files   []string
-}
-
-type GitHubConfig struct {
-	APIURL                  string
-	SendTokenToCustomAPIURL bool
 }
 
 type OrganizationConfig struct {
@@ -58,9 +54,10 @@ type UpgradeConfig struct {
 
 func Default() Config {
 	return Config{
-		Source:        "defaults",
-		WorkflowPaths: []string{".github/workflows"},
-		Cooldown:      14 * 24 * time.Hour,
+		Source:         "defaults",
+		WorkflowPaths:  []string{".github/workflows"},
+		Cooldown:       14 * 24 * time.Hour,
+		CooldownSource: DefaultCooldownSource,
 		Updates: UpdatesConfig{
 			Tags:              "track",
 			Branches:          "deny",
