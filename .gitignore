@@ -6,3 +6,4 @@ plan.md
 .gomodcache/
 /docs/public/
 /docs/content/release-notes.md
+bin
