@@ -22,6 +22,8 @@ Tagged releases also update the external Homebrew tap at `MohamedElashri/homebre
 
 The tap keeps package metadata outside the main source repository, writes `Formula/sanad.rb` with platform-specific release archive URLs and SHA-256 values from the release artifacts.
 
+The formula also generates and installs shell completions from the released `sanad` binary during `brew install`.
+
 The release workflow needs a repository secret named `HOMEBREW_TAP_GITHUB_TOKEN`. It must be a token with contents write access to `MohamedElashri/homebrew-sanad`; the default `GITHUB_TOKEN` can publish the Sanad release, but cannot write to a separate tap repository.
 
 Users install through:
@@ -35,6 +37,8 @@ brew tap MohamedElashri/sanad &&  brew install sanad
 The repository includes `flake.nix` for Linux and macOS on `x86_64` and `aarch64`.
 
 The flake packages the published release archives instead of rebuilding from source. This keeps the package aligned with the release checksums and avoids a separate Nix vendor hash for Go modules.
+
+The package installs bash, zsh, and fish completions from the release binary during the Nix build.
 
 ```bash
 nix run github:MohamedElashri/sanad -- version

@@ -2,6 +2,12 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.4 - 2026-05-19
+
+### Added
+
+- Added shell completion generation and user-level completion installation for bash, zsh, fish, and PowerShell.
+
 ## 0.1.3 - 2026-05-19
 
 ### Security

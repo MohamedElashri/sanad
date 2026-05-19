@@ -22,6 +22,8 @@ sanad version
 
 Homebrew installs the formula from the `MohamedElashri/homebrew-sanad` tap. Release automation updates that formula from the published archives and checksums.
 
+Homebrew installs shell completions for bash, zsh, fish, and PowerShell automatically.
+
 ## Install with Nix
 
 Run the packaged release directly:
@@ -38,6 +40,8 @@ sanad version
 ```
 
 The flake uses the published release archives for Linux and macOS on `x86_64` and `aarch64`, with fixed hashes derived from the release checksums.
+
+The Nix package installs bash, zsh, and fish completions automatically.
 
 ## Install from source
 
@@ -56,6 +60,23 @@ Check the installed binary:
 ```bash
 sanad version
 ```
+
+For manual archive or `go install` usage, install completions for your current shell with:
+
+```bash
+sanad completion install
+```
+
+Sanad detects bash, zsh, fish, and PowerShell from your environment. You can also pass the shell explicitly:
+
+```bash
+sanad completion install bash
+sanad completion install zsh
+sanad completion install fish
+sanad completion install powershell
+```
+
+Use `sanad completion install --dry-run` to preview the files that would be written, or `--no-profile` to install the completion file without updating shell profile files.
 
 ## Scan workflows
 

@@ -5,7 +5,7 @@ weight = 10
 template = "page"
 +++
 
-Sanad has five workflow commands and one metadata command:
+Sanad has five workflow commands, one completion command, and one metadata command:
 
 ```bash
 sanad scan
@@ -13,6 +13,7 @@ sanad plan
 sanad check
 sanad apply
 sanad upgrade
+sanad completion
 sanad version
 ```
 
@@ -98,6 +99,23 @@ Print build metadata:
 ```bash
 sanad version
 ```
+
+## `completion`
+
+Generate or install shell completions:
+
+```bash
+sanad completion bash
+sanad completion zsh
+sanad completion fish
+sanad completion powershell
+sanad completion install
+sanad completion install zsh
+```
+
+`sanad completion install` detects the current shell from the environment and installs completions for the current user. Pass a shell name when detection is not possible. Homebrew and Nix installs include completions automatically.
+
+For manual installs, `completion install` writes completion files under the current user's shell config/data directories. It updates bash, zsh, and PowerShell profile files with a marked activation block when needed. Use `--dry-run` to preview the paths, or `--no-profile` to write only the completion file.
 
 ## Exit codes
 

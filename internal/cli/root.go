@@ -63,6 +63,7 @@ func NewRootCommand() *cobra.Command {
 		newPlanCommand(opts),
 		newApplyCommand(opts),
 		newUpgradeCommand(opts),
+		newCompletionCommand(),
 		newVersionCommand(),
 	)
 
