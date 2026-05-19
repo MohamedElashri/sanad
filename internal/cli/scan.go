@@ -197,15 +197,19 @@ func mutedIfDash(value string) colorRole {
 }
 
 func (e scanEntry) actionName() string {
+	return actionName(e.Owner, e.Repo, e.Path, e.Raw)
+}
+
+func actionName(owner string, repo string, path string, fallback string) string {
 	switch {
-	case e.Owner != "" && e.Repo != "" && e.Path != "":
-		return e.Owner + "/" + e.Repo + "/" + e.Path
-	case e.Owner != "" && e.Repo != "":
-		return e.Owner + "/" + e.Repo
-	case e.Path != "":
-		return e.Path
+	case owner != "" && repo != "" && path != "":
+		return owner + "/" + repo + "/" + path
+	case owner != "" && repo != "":
+		return owner + "/" + repo
+	case path != "":
+		return path
 	default:
-		return e.Raw
+		return fallback
 	}
 }
 

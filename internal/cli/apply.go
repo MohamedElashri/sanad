@@ -663,11 +663,7 @@ func choiceKeys(choices []interactiveChoice) string {
 }
 
 func actionSelectorString(parsed actions.ParsedAction) string {
-	selector := parsed.Owner + "/" + parsed.Repo
-	if parsed.Path != "" {
-		selector += "/" + parsed.Path
-	}
-	return selector
+	return actionName(parsed.Owner, parsed.Repo, parsed.Path, "")
 }
 
 func interactiveSkipDecision(parsed actions.ParsedAction, reason string) policy.Decision {

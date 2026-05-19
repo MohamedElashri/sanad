@@ -10,9 +10,7 @@ import (
 )
 
 type checkOptions struct {
-	strict               bool
 	allowPendingCooldown bool
-	failOnUpdates        bool
 	workflowPaths        []string
 }
 
@@ -48,6 +46,8 @@ type checkViolation struct {
 
 func newCheckCommand(opts *rootOptions) *cobra.Command {
 	checkOpts := &checkOptions{}
+	var strict bool
+	var failOnUpdates bool
 
 	cmd := &cobra.Command{
 		Use:   "check",
@@ -56,9 +56,9 @@ func newCheckCommand(opts *rootOptions) *cobra.Command {
 			return runCheck(cmd, opts, checkOpts, defaultPlanResolver)
 		},
 	}
-	cmd.Flags().BoolVar(&checkOpts.strict, "strict", false, "deprecated: check now fails on managed updates by default")
+	cmd.Flags().BoolVar(&strict, "strict", false, "deprecated: check now fails on managed updates by default")
 	cmd.Flags().BoolVar(&checkOpts.allowPendingCooldown, "allow-pending-cooldown", false, "do not fail on pending cooldown updates")
-	cmd.Flags().BoolVar(&checkOpts.failOnUpdates, "fail-on-updates", false, "deprecated: check now fails on eligible managed updates by default")
+	cmd.Flags().BoolVar(&failOnUpdates, "fail-on-updates", false, "deprecated: check now fails on eligible managed updates by default")
 	cmd.Flags().StringSliceVar(&checkOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
 	return cmd
 }

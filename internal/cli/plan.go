@@ -329,11 +329,7 @@ func candidateObservationTime(entry metadata.LockfileEntry, hasLockfile bool, ha
 }
 
 func lockfileActionName(entry metadata.LockfileEntry) string {
-	selector := entry.Owner + "/" + entry.Repo
-	if entry.Path != "" {
-		selector += "/" + entry.Path
-	}
-	return selector
+	return actionName(entry.Owner, entry.Repo, entry.Path, "")
 }
 
 func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, logicalRef string, unpinned policy.UnpinnedPolicy) (*githubresolver.ResolvedRef, error) {
@@ -665,16 +661,7 @@ func decisionColorRole(kind policy.DecisionKind) colorRole {
 }
 
 func planActionName(action planAction) string {
-	switch {
-	case action.Owner != "" && action.Repo != "" && action.Path != "":
-		return action.Owner + "/" + action.Repo + "/" + action.Path
-	case action.Owner != "" && action.Repo != "":
-		return action.Owner + "/" + action.Repo
-	case action.Path != "":
-		return action.Path
-	default:
-		return action.Raw
-	}
+	return actionName(action.Owner, action.Repo, action.Path, action.Raw)
 }
 
 func shortSHAOrDash(value string) string {
