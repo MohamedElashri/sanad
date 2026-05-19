@@ -58,7 +58,3 @@ docs/
 ```
 
 `docs/content/release-notes.md` is generated from `CHANGELOG.md` by `scripts/generate_release_notes.go`.
-
-## Planning notes
-
-`plan.md` is intentionally gitignored. When a development phase is completed, record completion and deviation notes there, not in a separate planning file.
