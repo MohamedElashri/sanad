@@ -2,10 +2,11 @@
 
 All notable changes to Sanad are documented here.
 
-## Unreleased
+## 0.1.4 - 2026-06-14
 
 ### Added
 
+- Added shell completion generation and user-level completion installation for bash, zsh, fish, and PowerShell.
 - Added `sanad audit`, `sanad update`, and `sanad lock` command groups. The canonical workflow commands are now `sanad audit scan`, `sanad audit plan`, `sanad audit check`, `sanad update apply`, and `sanad update upgrade`.
 - Added `sanad lock status`, `sanad lock refresh`, `sanad lock repair`, and `sanad lock prune` for inspecting and safely repairing stale `.github/sanad.lock.json` entries after Dependabot or manual workflow edits.
 
@@ -13,12 +14,6 @@ All notable changes to Sanad are documented here.
 
 - Kept `sanad scan`, `sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` as hidden compatibility aliases for the migration period. New docs and completion output prefer the nested commands.
 - Reconciled safe lockfile drift from current workflow content and inline `sanad` comments instead of requiring users to delete the lockfile when a valid stale entry can be repaired.
-
-## 0.1.4 - 2026-05-19
-
-### Added
-
-- Added shell completion generation and user-level completion installation for bash, zsh, fish, and PowerShell.
 
 ## 0.1.3 - 2026-05-19
 
