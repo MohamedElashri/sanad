@@ -173,16 +173,13 @@
     },
     {
       "file": ".github/workflows/release.yml",
-      "node": "jobs.goreleaser.steps[2].uses",
+      "node": "jobs.goreleaser.steps[3].uses",
       "owner": "goreleaser",
       "repo": "goreleaser-action",
       "path": "",
       "kind": "github-action",
       "logical_ref": "v7.2.1",
-      "pinned_sha": "1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8",
-      "resolved_at": "2026-05-18T14:34:21Z",
-      "timestamp": "2026-04-26T21:19:29Z",
-      "timestamp_source": "release"
+      "pinned_sha": "1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8"
     }
   ]
 }
