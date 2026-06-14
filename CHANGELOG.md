@@ -2,6 +2,18 @@
 
 All notable changes to Sanad are documented here.
 
+## Unreleased
+
+### Added
+
+- Added `sanad audit`, `sanad update`, and `sanad lock` command groups. The canonical workflow commands are now `sanad audit scan`, `sanad audit plan`, `sanad audit check`, `sanad update apply`, and `sanad update upgrade`.
+- Added `sanad lock status`, `sanad lock refresh`, `sanad lock repair`, and `sanad lock prune` for inspecting and safely repairing stale `.github/sanad.lock.json` entries after Dependabot or manual workflow edits.
+
+### Changed
+
+- Kept `sanad scan`, `sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` as hidden compatibility aliases for the migration period. New docs and completion output prefer the nested commands.
+- Reconciled safe lockfile drift from current workflow content and inline `sanad` comments instead of requiring users to delete the lockfile when a valid stale entry can be repaired.
+
 ## 0.1.4 - 2026-05-19
 
 ### Added

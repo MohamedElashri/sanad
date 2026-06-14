@@ -58,16 +58,62 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		newScanCommand(opts),
-		newCheckCommand(opts),
-		newPlanCommand(opts),
-		newApplyCommand(opts),
-		newUpgradeCommand(opts),
+		newAuditCommand(opts),
+		newUpdateCommand(opts),
+		newLockCommand(opts),
 		newCompletionCommand(),
 		newVersionCommand(),
 	)
+	cmd.AddCommand(newHiddenAliasCommands(opts)...)
 
 	return cmd
+}
+
+func newAuditCommand(opts *rootOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "audit",
+		Short: "Inspect workflow dependencies and policy compliance",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	cmd.AddCommand(
+		newScanCommand(opts),
+		newPlanCommand(opts),
+		newCheckCommand(opts),
+	)
+	return cmd
+}
+
+func newUpdateCommand(opts *rootOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Apply workflow pin and logical ref updates",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	cmd.AddCommand(
+		newApplyCommand(opts),
+		newUpgradeCommand(opts),
+	)
+	return cmd
+}
+
+func newHiddenAliasCommands(opts *rootOptions) []*cobra.Command {
+	commands := []*cobra.Command{
+		newScanCommand(opts),
+		newPlanCommand(opts),
+		newCheckCommand(opts),
+		newApplyCommand(opts),
+		newUpgradeCommand(opts),
+	}
+	for _, command := range commands {
+		command.Hidden = true
+	}
+	return commands
 }
 
 func loadConfig(opts *rootOptions) (config.Config, error) {

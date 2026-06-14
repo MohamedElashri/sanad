@@ -425,23 +425,6 @@ func promptBranchAction(
 	}
 }
 
-func lockfileMetadataFromLockfile(lockfile metadata.Lockfile, ok bool) metadata.LockfileMetadata {
-	if !ok {
-		return nil
-	}
-	values := make(metadata.LockfileMetadata, len(lockfile.Entries))
-	for _, entry := range lockfile.Entries {
-		values[metadata.Key(entry.File, entry.Node)] = metadata.LockfileMetadataValue{
-			Metadata: metadata.Metadata{
-				LogicalRef: entry.LogicalRef,
-				Source:     metadata.SourceLockfile,
-			},
-			Entry: entry,
-		}
-	}
-	return values
-}
-
 func lockfileEntryForDecision(use workflow.UseNode, parsed actions.ParsedAction, decision policy.Decision, candidate *githubresolver.ResolvedRef, now time.Time) (metadata.LockfileEntry, bool) {
 	var pinned string
 	switch decision.Kind {

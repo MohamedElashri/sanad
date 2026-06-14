@@ -205,7 +205,7 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 	if err != nil {
 		return nil, nil, err
 	}
-	lockfileMetadata, _, err := metadata.LoadLockfileMetadata(metadata.DefaultLockfilePath)
+	reconciliation, err := reconcileWorkflowUses(uses)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,8 +213,10 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 	evaluated := make([]evaluatedUse, 0, len(uses))
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
-		lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
-		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
+		reconciled, _ := reconciliation.Use(use.File, use.NodePath)
+		recovered := reconciled.Metadata
+		hasMetadata := reconciled.HasMetadata
+		metadataErr := reconciled.Error
 		var candidate *githubresolver.ResolvedRef
 		var candidateSeenAt time.Time
 		var resolveErr error
@@ -248,7 +250,14 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 				decision = ignoredDecision(parsed, logicalRef, ignore)
 			} else {
 				candidate, resolveErr = resolvePlanCandidate(ctx, resolver, parsed, logicalRef, policy.UnpinnedPolicy(cfg.Updates.Unpinned))
-				candidateSeenAt = candidateObservationTime(lockfileValue.Entry, hasLockfile, hasMetadata, candidate, now, cfg.CooldownSource)
+				candidateSeenAt = candidateObservationTime(
+					reconciled.Entry,
+					reconciled.HasEntry && reconciled.CandidateHistoryPreservable,
+					hasMetadata,
+					candidate,
+					now,
+					cfg.CooldownSource,
+				)
 				decision = policy.Evaluate(policy.Entry{
 					File:            use.File,
 					Action:          parsed,
@@ -284,34 +293,6 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 	return files, evaluated, nil
 }
 
-func recoverUseMetadata(use workflow.UseNode, parsed actions.ParsedAction, lockfileMetadata metadata.LockfileMetadata) (metadata.Metadata, bool, error) {
-	comment, err := metadata.ParseComment(use.InlineComment)
-	if err != nil {
-		return metadata.Metadata{}, false, err
-	}
-	lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
-	if hasLockfile && parsed.Valid {
-		if err := validateLockfileMetadataAction(parsed, lockfileValue.Entry); err != nil {
-			return metadata.Metadata{}, false, err
-		}
-	}
-	return metadata.Merge(comment, lockfileValue.Metadata, hasLockfile)
-}
-
-func validateLockfileMetadataAction(parsed actions.ParsedAction, entry metadata.LockfileEntry) error {
-	if parsed.Owner != entry.Owner || parsed.Repo != entry.Repo || parsed.Path != entry.Path || string(parsed.Kind) != entry.Kind {
-		return fmt.Errorf(
-			"metadata conflict: lockfile action %s does not match workflow action %s",
-			lockfileActionName(entry),
-			actionSelectorString(parsed),
-		)
-	}
-	if parsed.Pinned && entry.PinnedSHA != "" && parsed.Ref != entry.PinnedSHA {
-		return fmt.Errorf("metadata conflict: workflow pin %q does not match lockfile pin %q", parsed.Ref, entry.PinnedSHA)
-	}
-	return nil
-}
-
 func candidateObservationTime(entry metadata.LockfileEntry, hasLockfile bool, hasMetadata bool, candidate *githubresolver.ResolvedRef, now time.Time, cooldownSource string) time.Time {
 	if candidate == nil {
 		return time.Time{}
@@ -328,8 +309,22 @@ func candidateObservationTime(entry metadata.LockfileEntry, hasLockfile bool, ha
 	return time.Time{}
 }
 
-func lockfileActionName(entry metadata.LockfileEntry) string {
-	return actionName(entry.Owner, entry.Repo, entry.Path, "")
+func reconcileWorkflowUses(uses []workflow.UseNode) (metadata.Reconciliation, error) {
+	lockfile, hasLockfile, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		return metadata.Reconciliation{}, err
+	}
+
+	reconcileUses := make([]metadata.ReconcileUse, 0, len(uses))
+	for _, use := range uses {
+		reconcileUses = append(reconcileUses, metadata.ReconcileUse{
+			File:          use.File,
+			Node:          use.NodePath,
+			InlineComment: use.InlineComment,
+			Action:        actions.Parse(use.Raw),
+		})
+	}
+	return metadata.ReconcileLockfile(lockfile, hasLockfile, reconcileUses), nil
 }
 
 func resolvePlanCandidate(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, logicalRef string, unpinned policy.UnpinnedPolicy) (*githubresolver.ResolvedRef, error) {

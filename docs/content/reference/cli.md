@@ -5,17 +5,25 @@ weight = 10
 template = "page"
 +++
 
-Sanad has five workflow commands, one completion command, and one metadata command:
+Sanad exposes five top-level command groups:
 
 ```bash
-sanad scan
-sanad plan
-sanad check
-sanad apply
-sanad upgrade
+sanad audit
+sanad update
+sanad lock
 sanad completion
 sanad version
 ```
+
+Legacy top-level workflow commands remain available as hidden compatibility aliases for one migration period:
+
+| Old command | New command |
+| --- | --- |
+| `sanad scan` | `sanad audit scan` |
+| `sanad plan` | `sanad audit plan` |
+| `sanad check` | `sanad audit check` |
+| `sanad apply` | `sanad update apply` |
+| `sanad upgrade` | `sanad update upgrade` |
 
 Global flags:
 
@@ -29,68 +37,127 @@ Global flags:
 
 Sanad uses standard ANSI colors that stay readable on typical dark and light terminal backgrounds. If your terminal exposes `COLORFGBG`, sanad uses it to tune warning colors; `SANAD_COLOR_THEME=dark` or `SANAD_COLOR_THEME=light` can override that detection.
 
-## `scan`
+## `audit scan`
 
 Discover and classify `uses:` entries without contacting GitHub.
 
 ```bash
-sanad scan
-sanad --format json scan
-sanad scan --workflows .github/workflows
+sanad audit scan
+sanad --format json audit scan
+sanad audit scan --workflows .github/workflows
 ```
 
-## `plan`
+Alias: `sanad scan`.
+
+## `audit plan`
 
 Resolve actionable refs and show decisions without writing files.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad plan
-GITHUB_TOKEN=$(gh auth token) sanad --format json plan
-GITHUB_TOKEN=$(gh auth token) sanad plan --out sanad-plan.json
-GITHUB_TOKEN=$(gh auth token) sanad plan --pr-body-out sanad-pr-body.md
+GITHUB_TOKEN=$(gh auth token) sanad audit plan
+GITHUB_TOKEN=$(gh auth token) sanad --format json audit plan
+GITHUB_TOKEN=$(gh auth token) sanad audit plan --out sanad-plan.json
+GITHUB_TOKEN=$(gh auth token) sanad audit plan --pr-body-out sanad-pr-body.md
 ```
 
 Decision values include `unchanged`, `update`, `pending-cooldown`, skip decisions, and policy errors such as `error-unpinned`, `error-short-sha`, `error-tag-denied`, `error-branch-denied`, and `error-unresolved`.
 
-## `check`
+Alias: `sanad plan`.
+
+## `audit check`
 
 Validate workflows against policy.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad check
-GITHUB_TOKEN=$(gh auth token) sanad --format json check
-GITHUB_TOKEN=$(gh auth token) sanad check --format sarif
-GITHUB_TOKEN=$(gh auth token) sanad check --allow-pending-cooldown
+GITHUB_TOKEN=$(gh auth token) sanad audit check
+GITHUB_TOKEN=$(gh auth token) sanad --format json audit check
+GITHUB_TOKEN=$(gh auth token) sanad audit check --format sarif
+GITHUB_TOKEN=$(gh auth token) sanad audit check --allow-pending-cooldown
 ```
 
 Default behavior fails on policy violations, mutable refs that still need to be pinned, and managed pins whose resolved candidate differs from the workflow SHA. Pass `--allow-pending-cooldown` to allow cooldown-pending managed candidates while still failing eligible updates.
 
-## `apply`
+Alias: `sanad check`.
+
+## `update apply`
 
 Apply approved updates to workflow files and refresh `.github/sanad.lock.json`.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
-GITHUB_TOKEN=$(gh auth token) sanad apply --interactive
-GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update apply --interactive
+GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
 ```
 
 `--dry-run` prints a unified diff and writes nothing. Non-interactive writes require `--yes --write`.
 
-## `upgrade`
+Alias: `sanad apply`.
+
+## `update upgrade`
 
 Move managed full-SHA pins from one logical ref to another.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad upgrade
-GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
-GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/setup-go --to v6 --write
-GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --latest-release --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/setup-go --to v6 --write
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --latest-release --dry-run
 ```
 
 With no selector, `upgrade` scans all managed pins. With no target, it uses the latest GitHub release. The command is dry-run by default; add `--write` after reviewing the diff.
 
 Use exactly one selector when overriding the default scope: `--action <owner/repo>` or `--all`. Use exactly one target when overriding the default target: `--to <ref>` or `--latest-release`.
+
+Alias: `sanad upgrade`.
+
+## `lock status`
+
+Compare `.github/sanad.lock.json` with the current workflow `uses:` nodes and report matched, stale, repairable, and blocking entries.
+
+```bash
+sanad lock status
+sanad --format json lock status
+sanad lock status --workflows .github/workflows
+```
+
+`status` does not write files and does not contact GitHub. Human output includes a summary, diagnostics, and planned lockfile changes when repair or refresh would modify the lockfile. JSON output includes `summary`, `entries`, `diagnostics`, and `changes` fields for CI comments or bots.
+
+## `lock refresh`
+
+Regenerate lock entries for current managed workflow pins without changing workflow files.
+
+```bash
+sanad lock refresh --dry-run
+sanad lock refresh --write
+sanad --format json lock refresh --dry-run
+```
+
+Refresh is dry-run unless `--write` is present. It rebuilds the active managed entry set from current pinned workflow nodes and removes lock entries for workflow nodes that no longer exist.
+
+## `lock repair`
+
+Apply safe reconciliation fixes to the lockfile without changing workflow files.
+
+```bash
+sanad lock repair --dry-run
+sanad lock repair --write
+sanad --format json lock repair --dry-run
+```
+
+Repair updates stale action identity, logical ref, and pinned SHA fields when the current workflow and inline `sanad` metadata make the intended state clear. It removes entries for deleted workflow nodes and preserves compatible candidate history.
+
+Malformed JSON is reported as an explicit lockfile load error. Unsupported lockfile versions, invalid SHA fields, invalid timestamps, duplicate entries, and invalid inline comments remain blocking diagnostics. Write mode exits without changing the lockfile while blocking diagnostics are present.
+
+## `lock prune`
+
+Remove lockfile entries for deleted workflow nodes only.
+
+```bash
+sanad lock prune --dry-run
+sanad lock prune --write
+```
+
+Use prune when you only want to drop entries for missing workflow nodes and leave other stale active entries untouched.
 
 ## `version`
 

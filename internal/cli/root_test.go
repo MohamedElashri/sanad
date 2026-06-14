@@ -1,0 +1,152 @@
+package cli
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	help := out.String()
+	for _, want := range []string{
+		"\n  audit",
+		"\n  update",
+		"\n  lock",
+		"\n  completion",
+		"\n  version",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("root help missing %q:\n%s", want, help)
+		}
+	}
+	for _, legacy := range []string{
+		"\n  scan",
+		"\n  plan",
+		"\n  check",
+		"\n  apply",
+		"\n  upgrade",
+	} {
+		if strings.Contains(help, legacy) {
+			t.Fatalf("root help includes legacy command %q:\n%s", legacy, help)
+		}
+	}
+}
+
+func TestLegacyTopLevelCommandsRemainHiddenAliases(t *testing.T) {
+	root := NewRootCommand()
+	for _, name := range []string{"scan", "plan", "check", "apply", "upgrade"} {
+		command, _, err := root.Find([]string{name})
+		if err != nil {
+			t.Fatalf("Find(%q) returned error: %v", name, err)
+		}
+		if command == nil || command.Name() != name {
+			t.Fatalf("Find(%q) = %#v, want command named %q", name, command, name)
+		}
+		if !command.Hidden {
+			t.Fatalf("legacy command %q is visible in root help", name)
+		}
+	}
+}
+
+func TestNestedAuditScanExecutes(t *testing.T) {
+	workflows := filepath.Join(t.TempDir(), ".github", "workflows")
+	path := filepath.Join(workflows, "ci.yml")
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--format", "json", "audit", "scan", "--workflows", workflows})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	var got []scanEntry
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("audit scan output is not valid JSON: %v\n%s", err, out.String())
+	}
+	if len(got) != 1 || got[0].Raw != "actions/checkout@v4" {
+		t.Fatalf("unexpected audit scan output: %#v", got)
+	}
+}
+
+func TestNestedUpdateApplyExecutes(t *testing.T) {
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: ./.github/actions/local\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"update", "apply", "--dry-run"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "No workflow updates to apply.") {
+		t.Fatalf("unexpected update apply output:\n%s", out.String())
+	}
+}
+
+func TestRuntimeCompletionIncludesNestedCommands(t *testing.T) {
+	rootCompletion := completeCommand(t, "")
+	for _, want := range []string{"audit\t", "update\t", "lock\t", "completion\t", "version\t"} {
+		if !strings.Contains(rootCompletion, want) {
+			t.Fatalf("root completion missing %q:\n%s", want, rootCompletion)
+		}
+	}
+	for _, legacy := range []string{"scan\t", "plan\t", "check\t", "apply\t", "upgrade\t"} {
+		if strings.Contains(rootCompletion, legacy) {
+			t.Fatalf("root completion includes legacy command %q:\n%s", legacy, rootCompletion)
+		}
+	}
+
+	auditCompletion := completeCommand(t, "audit", "")
+	for _, want := range []string{"scan\t", "plan\t", "check\t"} {
+		if !strings.Contains(auditCompletion, want) {
+			t.Fatalf("audit completion missing %q:\n%s", want, auditCompletion)
+		}
+	}
+
+	updateCompletion := completeCommand(t, "update", "")
+	for _, want := range []string{"apply\t", "upgrade\t"} {
+		if !strings.Contains(updateCompletion, want) {
+			t.Fatalf("update completion missing %q:\n%s", want, updateCompletion)
+		}
+	}
+}
+
+func completeCommand(t *testing.T, args ...string) string {
+	t.Helper()
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs(append([]string{"__complete"}, args...))
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	return out.String()
+}

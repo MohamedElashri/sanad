@@ -90,7 +90,7 @@ Patterns use path-style glob matching, with a prefix fallback for trailing `*` p
 
 ## `[upgrade]`
 
-`latest_release = "github-release"` controls `sanad upgrade --latest-release`. `release` is accepted as an alias.
+`latest_release = "github-release"` controls `sanad update upgrade --latest-release`. `release` is accepted as an alias.
 
 ## `[security]`
 

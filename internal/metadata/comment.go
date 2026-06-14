@@ -139,42 +139,8 @@ func ValidateLockfile(lockfile Lockfile) error {
 
 	seen := make(map[string]struct{}, len(lockfile.Entries))
 	for i, entry := range lockfile.Entries {
-		if entry.File == "" {
-			return fmt.Errorf("entry %d file is required", i)
-		}
-		if entry.Node == "" {
-			return fmt.Errorf("entry %d node is required", i)
-		}
-		if entry.Owner == "" {
-			return fmt.Errorf("entry %d owner is required", i)
-		}
-		if entry.Repo == "" {
-			return fmt.Errorf("entry %d repo is required", i)
-		}
-		if entry.Kind == "" {
-			return fmt.Errorf("entry %d kind is required", i)
-		}
-		if entry.LogicalRef == "" {
-			return fmt.Errorf("entry %d logical_ref is required", i)
-		}
-		if entry.PinnedSHA != "" && !actions.IsFullSHA(entry.PinnedSHA) {
-			return fmt.Errorf("entry %d pinned_sha must be a full 40-character SHA", i)
-		}
-		if entry.CandidateSHA != "" && !actions.IsFullSHA(entry.CandidateSHA) {
-			return fmt.Errorf("entry %d candidate_sha must be a full 40-character SHA", i)
-		}
-		if entry.PinnedSHA == "" && entry.CandidateSHA == "" {
-			return fmt.Errorf("entry %d must include pinned_sha or candidate_sha", i)
-		}
-		if entry.CandidateSHA != "" {
-			if entry.CandidateSeenAt == "" {
-				return fmt.Errorf("entry %d candidate_seen_at is required when candidate_sha is set", i)
-			}
-			if _, err := time.Parse(time.RFC3339, entry.CandidateSeenAt); err != nil {
-				return fmt.Errorf("entry %d candidate_seen_at must be RFC3339: %w", i, err)
-			}
-		} else if entry.CandidateSeenAt != "" {
-			return fmt.Errorf("entry %d candidate_seen_at requires candidate_sha", i)
+		if err := validateLockfileEntry(entry, i); err != nil {
+			return err
 		}
 
 		key := Key(entry.File, entry.Node)
@@ -182,6 +148,47 @@ func ValidateLockfile(lockfile Lockfile) error {
 			return fmt.Errorf("duplicate lockfile entry for %s %s", entry.File, entry.Node)
 		}
 		seen[key] = struct{}{}
+	}
+	return nil
+}
+
+func validateLockfileEntry(entry LockfileEntry, i int) error {
+	if entry.File == "" {
+		return fmt.Errorf("entry %d file is required", i)
+	}
+	if entry.Node == "" {
+		return fmt.Errorf("entry %d node is required", i)
+	}
+	if entry.Owner == "" {
+		return fmt.Errorf("entry %d owner is required", i)
+	}
+	if entry.Repo == "" {
+		return fmt.Errorf("entry %d repo is required", i)
+	}
+	if entry.Kind == "" {
+		return fmt.Errorf("entry %d kind is required", i)
+	}
+	if entry.LogicalRef == "" {
+		return fmt.Errorf("entry %d logical_ref is required", i)
+	}
+	if entry.PinnedSHA != "" && !actions.IsFullSHA(entry.PinnedSHA) {
+		return fmt.Errorf("entry %d pinned_sha must be a full 40-character SHA", i)
+	}
+	if entry.CandidateSHA != "" && !actions.IsFullSHA(entry.CandidateSHA) {
+		return fmt.Errorf("entry %d candidate_sha must be a full 40-character SHA", i)
+	}
+	if entry.PinnedSHA == "" && entry.CandidateSHA == "" {
+		return fmt.Errorf("entry %d must include pinned_sha or candidate_sha", i)
+	}
+	if entry.CandidateSHA != "" {
+		if entry.CandidateSeenAt == "" {
+			return fmt.Errorf("entry %d candidate_seen_at is required when candidate_sha is set", i)
+		}
+		if _, err := time.Parse(time.RFC3339, entry.CandidateSeenAt); err != nil {
+			return fmt.Errorf("entry %d candidate_seen_at must be RFC3339: %w", i, err)
+		}
+	} else if entry.CandidateSeenAt != "" {
+		return fmt.Errorf("entry %d candidate_seen_at requires candidate_sha", i)
 	}
 	return nil
 }

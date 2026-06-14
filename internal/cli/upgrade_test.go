@@ -111,6 +111,51 @@ func TestUpgradeWriteUpdatesWorkflowAndLockfile(t *testing.T) {
 	}
 }
 
+func TestUpgradeWriteIgnoresStaleLockfilePinDrift(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("1", 40)
+	lockfileSHA := strings.Repeat("2", 40)
+	targetSHA := strings.Repeat("3", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v5": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v5",
+			SHA:        targetSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	writeTestLockfile(t, lockTestEntry("actions", "checkout", "v4", lockfileSHA))
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	got := readFileString(t, path)
+	if !strings.Contains(got, "actions/checkout@"+targetSHA+" # sanad: ref=v5") {
+		t.Fatalf("workflow was not upgraded:\n%s", got)
+	}
+
+	lockfile, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if !ok || len(lockfile.Entries) != 1 {
+		t.Fatalf("unexpected lockfile state ok=%v entries=%#v", ok, lockfile.Entries)
+	}
+	if lockfile.Entries[0].LogicalRef != "v5" || lockfile.Entries[0].PinnedSHA != targetSHA {
+		t.Fatalf("unexpected lockfile entry: %#v", lockfile.Entries[0])
+	}
+}
+
 func TestUpgradeLatestReleaseUsesConfiguredReleaseMode(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("5", 40)

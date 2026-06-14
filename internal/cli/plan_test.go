@@ -449,10 +449,19 @@ func TestPlanPinnedSHAWithoutMetadataIsUnmanaged(t *testing.T) {
 	}
 }
 
-func TestPlanReportsConflictingLockfileAndCommentMetadata(t *testing.T) {
+func TestPlanUsesInlineCommentWhenLockfileRefDrifts(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("1", 40)
-	installPlanTestResolver(t, fakePlanResolver{}, now)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        currentSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
 
 	root := t.TempDir()
 	previousWorkingDir, err := os.Getwd()
@@ -498,15 +507,15 @@ func TestPlanReportsConflictingLockfileAndCommentMetadata(t *testing.T) {
 
 	report := executePlanJSON(t, workflows)
 	action := report.Files[0].Actions[0]
-	if action.Decision != "error-invalid" {
-		t.Fatalf("Decision = %q, want error-invalid", action.Decision)
+	if action.Decision != "unchanged" {
+		t.Fatalf("Decision = %q, want unchanged", action.Decision)
 	}
-	if !strings.Contains(action.Reason, "metadata conflict") {
-		t.Fatalf("Reason = %q, want metadata conflict", action.Reason)
+	if action.LogicalRef != "v4" || action.MetadataSource != "comment" {
+		t.Fatalf("unexpected reconciled metadata: ref=%q source=%q", action.LogicalRef, action.MetadataSource)
 	}
 }
 
-func TestPlanReportsLockfileActionMismatch(t *testing.T) {
+func TestPlanTreatsActionMismatchWithoutCommentAsUnmanaged(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("1", 40)
 	installPlanTestResolver(t, fakePlanResolver{}, now)
@@ -555,19 +564,28 @@ func TestPlanReportsLockfileActionMismatch(t *testing.T) {
 
 	report := executePlanJSON(t, workflows)
 	action := report.Files[0].Actions[0]
-	if action.Decision != "error-invalid" {
-		t.Fatalf("Decision = %q, want error-invalid", action.Decision)
+	if action.Decision != "unchanged" {
+		t.Fatalf("Decision = %q, want unchanged", action.Decision)
 	}
-	if !strings.Contains(action.Reason, "lockfile action") {
-		t.Fatalf("Reason = %q, want lockfile action mismatch", action.Reason)
+	if action.LogicalRef != "" || action.MetadataSource != "" {
+		t.Fatalf("action mismatch without inline metadata should be unmanaged, got ref=%q source=%q", action.LogicalRef, action.MetadataSource)
 	}
 }
 
-func TestPlanReportsLockfilePinnedSHADrift(t *testing.T) {
+func TestPlanUsesWorkflowPinWhenLockfilePinDrifts(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	lockfileSHA := strings.Repeat("1", 40)
 	workflowSHA := strings.Repeat("2", 40)
-	installPlanTestResolver(t, fakePlanResolver{}, now)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        workflowSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
 
 	withTempWorkingDir(t)
 	workflows := filepath.Join(".github", "workflows")
@@ -600,11 +618,11 @@ func TestPlanReportsLockfilePinnedSHADrift(t *testing.T) {
 
 	report := executePlanJSON(t, workflows)
 	action := report.Files[0].Actions[0]
-	if action.Decision != "error-invalid" {
-		t.Fatalf("Decision = %q, want error-invalid", action.Decision)
+	if action.Decision != "unchanged" {
+		t.Fatalf("Decision = %q, want unchanged", action.Decision)
 	}
-	if !strings.Contains(action.Reason, "workflow pin") {
-		t.Fatalf("Reason = %q, want workflow pin drift", action.Reason)
+	if action.CurrentSHA != workflowSHA || action.LogicalRef != "v4" {
+		t.Fatalf("unexpected action after pin drift reconciliation: %#v", action)
 	}
 }
 
@@ -664,6 +682,66 @@ func TestPlanUsesLockfileCandidateFirstSeenForCooldown(t *testing.T) {
 	}
 	if action.AgeSeconds != int64((15*24*time.Hour)/time.Second) {
 		t.Fatalf("AgeSeconds = %d, want first-seen age", action.AgeSeconds)
+	}
+}
+
+func TestPlanPreservesFirstSeenAcrossLockfilePinDrift(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	lockfileSHA := strings.Repeat("1", 40)
+	workflowSHA := strings.Repeat("2", 40)
+	nextSHA := strings.Repeat("3", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        nextSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-30 * 24 * time.Hour),
+		},
+	}, now)
+
+	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte(`cooldown_source = "first-seen"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workflows := filepath.Join(".github", "workflows")
+	path := filepath.Join(workflows, "ci.yml")
+	if err := os.MkdirAll(workflows, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@" + workflowSHA + " # sanad: ref=v4\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockfile := `{
+  "version": 1,
+  "entries": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "node": "jobs.test.steps[0].uses",
+      "owner": "actions",
+      "repo": "checkout",
+      "kind": "github-action",
+      "logical_ref": "v4",
+      "pinned_sha": "` + lockfileSHA + `",
+      "candidate_sha": "` + nextSHA + `",
+      "candidate_seen_at": "` + now.Add(-15*24*time.Hour).Format(time.RFC3339) + `"
+    }
+  ]
+}
+`
+	if err := os.WriteFile(filepath.Join(".github", "sanad.lock.json"), []byte(lockfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := executePlanJSON(t, workflows)
+	action := report.Files[0].Actions[0]
+	if action.Decision != "update" {
+		t.Fatalf("Decision = %q, want update (%s)", action.Decision, action.Reason)
+	}
+	if action.AgeSeconds != int64((15*24*time.Hour)/time.Second) {
+		t.Fatalf("AgeSeconds = %d, want first-seen age preserved across pin drift", action.AgeSeconds)
 	}
 }
 

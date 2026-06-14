@@ -83,13 +83,13 @@ Use `sanad completion install --dry-run` to preview the files that would be writ
 Run a local scan first. This does not contact GitHub:
 
 ```bash
-sanad scan
+sanad audit scan
 ```
 
 Use JSON when another tool will consume the result:
 
 ```bash
-sanad --format json scan
+sanad --format json audit scan
 ```
 
 ## Preview changes
@@ -97,7 +97,7 @@ sanad --format json scan
 Planning resolves GitHub refs and applies policy without changing files:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad plan
+GITHUB_TOKEN=$(gh auth token) sanad audit plan
 ```
 
 The table output summarizes what Sanad found and whether each action is unchanged, eligible for update, pending cooldown, skipped, or blocked by policy.
@@ -107,13 +107,13 @@ The table output summarizes what Sanad found and whether each action is unchange
 Preview the exact rewrite first:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
 ```
 
 Then write the workflow changes and lockfile:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
 ```
 
 Sanad rewrites only the relevant scalar values. It does not serialize or reformat the whole YAML document.
@@ -123,7 +123,7 @@ Sanad rewrites only the relevant scalar values. It does not serialize or reforma
 Use `check` when a repository should already comply:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad check
+GITHUB_TOKEN=$(gh auth token) sanad audit check
 ```
 
 Exit code `0` means the check passed. Exit code `1` means policy violations or required changes were found.

@@ -41,6 +41,38 @@ func TestCheckPassesWhenManagedPinIsCurrent(t *testing.T) {
 	}
 }
 
+func TestCheckPassesWithRepairableLockfilePinDrift(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("1", 40)
+	lockfileSHA := strings.Repeat("2", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        currentSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	writeTestLockfile(t, lockTestEntry("actions", "checkout", "v4", lockfileSHA))
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"check"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "All workflow dependencies comply") {
+		t.Fatalf("missing success output:\n%s", out.String())
+	}
+}
+
 func TestCheckFailsMutableTagReference(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("b", 40)

@@ -225,11 +225,10 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 	if err != nil {
 		return upgradePlan{}, err
 	}
-	lockfile, hasLockfile, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	reconciliation, err := reconcileWorkflowUses(uses)
 	if err != nil {
 		return upgradePlan{}, err
 	}
-	lockfileMetadata := lockfileMetadataFromLockfile(lockfile, hasLockfile)
 
 	plan := upgradePlan{
 		Report:        upgradeReport{Version: 1},
@@ -238,8 +237,10 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
-		lockfileValue, hasLockfile := lockfileMetadata[metadata.Key(use.File, use.NodePath)]
-		recovered, hasMetadata, metadataErr := recoverUseMetadata(use, parsed, lockfileMetadata)
+		reconciled, _ := reconciliation.Use(use.File, use.NodePath)
+		recovered := reconciled.Metadata
+		hasMetadata := reconciled.HasMetadata
+		metadataErr := reconciled.Error
 		if currentEntry, ok := currentUpgradeLockEntry(use, parsed, recovered, hasMetadata, now); ok {
 			plan.LockEntries = append(plan.LockEntries, currentEntry)
 		}
@@ -248,7 +249,14 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 		}
 
 		candidate, targetLogicalRef, resolveErr := resolveUpgradeTarget(ctx, resolver, parsed, opts, cfg)
-		candidateSeenAt := candidateObservationTime(lockfileValue.Entry, hasLockfile, hasMetadata, candidate, now, cfg.CooldownSource)
+		candidateSeenAt := candidateObservationTime(
+			reconciled.Entry,
+			reconciled.HasEntry && reconciled.CandidateHistoryPreservable,
+			hasMetadata,
+			candidate,
+			now,
+			cfg.CooldownSource,
+		)
 		decision := policy.Evaluate(policy.Entry{
 			File:            use.File,
 			Action:          parsed,

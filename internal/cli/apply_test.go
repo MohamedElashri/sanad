@@ -294,6 +294,54 @@ func TestApplyYesWriteUpdatesLockfileWhenWorkflowAlreadyCurrent(t *testing.T) {
 	}
 }
 
+func TestApplyYesWriteRefreshesStaleLockfilePinDrift(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("1", 40)
+	lockfileSHA := strings.Repeat("2", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        currentSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	original := readFileString(t, path)
+	writeTestLockfile(t, lockTestEntry("actions", "checkout", "v4", lockfileSHA))
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := readFileString(t, path); got != original {
+		t.Fatalf("workflow changed unexpectedly\nwant:\n%s\ngot:\n%s", original, got)
+	}
+
+	lockfile, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if !ok || len(lockfile.Entries) != 1 {
+		t.Fatalf("unexpected lockfile state ok=%v entries=%#v", ok, lockfile.Entries)
+	}
+	if lockfile.Entries[0].PinnedSHA != currentSHA {
+		t.Fatalf("PinnedSHA = %q, want %q", lockfile.Entries[0].PinnedSHA, currentSHA)
+	}
+	if !strings.Contains(out.String(), "Updated lockfile; no workflow updates to apply.") {
+		t.Fatalf("missing lockfile-only summary:\n%s", out.String())
+	}
+}
+
 func TestApplyRetainsManagedPendingPinsInLockfile(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	checkoutSHA := strings.Repeat("e", 40)

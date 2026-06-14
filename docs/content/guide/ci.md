@@ -5,7 +5,7 @@ weight = 40
 template = "page"
 +++
 
-Use `sanad check` to fail pull requests that introduce mutable or invalid action refs.
+Use `sanad audit check` to fail pull requests that introduce mutable or invalid action refs.
 
 ```yaml
 name: Check pinned actions
@@ -29,7 +29,7 @@ jobs:
         run: go install github.com/MohamedElashri/sanad/cmd/sanad@latest
 
       - name: Check workflow pins
-        run: sanad check --format json
+        run: sanad audit check --format json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -40,7 +40,7 @@ To publish findings as GitHub code scanning annotations:
 
 ```yaml
       - name: Check workflow pins
-        run: sanad check --format sarif > sanad.sarif
+        run: sanad audit check --format sarif > sanad.sarif
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -52,7 +52,7 @@ To publish findings as GitHub code scanning annotations:
 
 ## Automated update pull requests
 
-Use `sanad plan --pr-body-out` and `sanad apply --yes --write`, then create a pull request if files changed.
+Use `sanad audit plan --pr-body-out` and `sanad update apply --yes --write`, then create a pull request if files changed.
 
 ```yaml
 name: Update pinned actions
@@ -79,10 +79,10 @@ jobs:
           go-version: "1.26.x"
 
       - run: go install github.com/MohamedElashri/sanad/cmd/sanad@latest
-      - run: sanad plan --pr-body-out sanad-pr-body.md
+      - run: sanad audit plan --pr-body-out sanad-pr-body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: sanad apply --yes --write
+      - run: sanad update apply --yes --write
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
