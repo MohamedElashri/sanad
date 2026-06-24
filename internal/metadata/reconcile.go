@@ -265,8 +265,8 @@ func reconcileEntry(result *Reconciliation, use ReconcileUse, entry LockfileEntr
 		})
 	}
 
-	value.CandidateHistoryPreservable = actionMatch && value.HasMetadata && value.Metadata.LogicalRef == entry.LogicalRef
-	if entry.CandidateSHA != "" && !value.CandidateHistoryPreservable {
+	value.CandidateHistoryPreservable = actionMatch
+	if len(entry.Candidates) > 0 && !value.CandidateHistoryPreservable {
 		addDiagnostic(ReconciliationDiagnostic{
 			Status:     ReconciliationCandidateDrift,
 			File:       use.File,

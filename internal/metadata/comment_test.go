@@ -139,11 +139,11 @@ func TestLoadLockfileValidationErrors(t *testing.T) {
 		{
 			name: "version mismatch",
 			content: `{
-  "version": 2,
+  "version": 99,
   "entries": []
 }
 `,
-			errSub: "unsupported lockfile version 2",
+			errSub: "unsupported lockfile version 99",
 		},
 		{
 			name: "missing required field",
@@ -162,6 +162,24 @@ func TestLoadLockfileValidationErrors(t *testing.T) {
 }
 `,
 			errSub: "logical_ref is required",
+		},
+		{
+			name: "legacy candidate fields in version two",
+			content: `{
+  "version": 2,
+  "entries": [{
+    "file": ".github/workflows/ci.yml",
+    "node": "jobs.test.steps[0].uses",
+    "owner": "actions",
+    "repo": "checkout",
+    "kind": "github-action",
+    "logical_ref": "v4",
+    "pinned_sha": "` + testSHA + `",
+    "candidate_sha": "` + testOtherSHA + `",
+    "candidate_seen_at": "2026-05-01T12:00:00Z"
+  }]
+}`,
+			errSub: "version 1 candidate fields",
 		},
 		{
 			name: "short sha",
@@ -254,6 +272,42 @@ func TestUpdateLockfileRemovesStaleAndSortsDeterministically(t *testing.T) {
 	}
 	if got.Entries[1].File != ".github/workflows/z.yml" {
 		t.Fatalf("second file = %q, want sorted z.yml", got.Entries[1].File)
+	}
+}
+
+func TestLoadLockfileMigratesVersionOneCandidateHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultLockfilePath)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seenAt := "2026-05-01T12:00:00Z"
+	content := `{
+  "version": 1,
+  "entries": [{
+    "file": ".github/workflows/ci.yml",
+    "node": "jobs.test.steps[0].uses",
+    "owner": "actions",
+    "repo": "checkout",
+    "kind": "github-action",
+    "logical_ref": "v5",
+    "pinned_sha": "` + testSHA + `",
+    "candidate_sha": "` + testOtherSHA + `",
+    "candidate_seen_at": "` + seenAt + `"
+  }]
+}`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockfile, ok, err := LoadLockfile(path)
+	if err != nil || !ok {
+		t.Fatalf("LoadLockfile returned ok=%v err=%v", ok, err)
+	}
+	if lockfile.Version != LockfileVersion || len(lockfile.Entries[0].Candidates) != 1 {
+		t.Fatalf("lockfile was not migrated: %#v", lockfile)
+	}
+	candidate := lockfile.Entries[0].Candidates[0]
+	if candidate.LogicalRef != "v5" || candidate.SHA != testOtherSHA || candidate.SeenAt != seenAt {
+		t.Fatalf("unexpected migrated candidate: %#v", candidate)
 	}
 }
 

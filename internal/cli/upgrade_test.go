@@ -239,6 +239,35 @@ func TestUpgradeBareCommandDefaultsToAllLatestReleaseDryRun(t *testing.T) {
 	}
 }
 
+func TestUpgradeJSONReportVersionTwoIncludesEffectivePolicyAndCandidates(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v5.0.0": resolvedRelease("actions", "checkout", "v5.0.0", strings.Repeat("b", 40), now.Add(-20*24*time.Hour)),
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+strings.Repeat("a", 40)+" # sanad: ref=v4\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--format", "json", "update", "upgrade"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	var report upgradeReport
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("decode JSON report: %v\n%s", err, out.String())
+	}
+	if report.Version != 2 || len(report.Actions) != 1 {
+		t.Fatalf("unexpected report: %#v", report)
+	}
+	action := report.Actions[0]
+	if action.Level != "major" || action.Selection != "latest-eligible" || action.SelectedRelease != "v5.0.0" || len(action.Candidates) != 1 {
+		t.Fatalf("missing policy or candidate audit fields: %#v", action)
+	}
+}
+
 func TestUpgradeNoOpWhenTargetAlreadyCurrent(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("7", 40)
@@ -323,5 +352,26 @@ func TestUpgradeRejectsSHATarget(t *testing.T) {
 	}
 	if ExitCode(err) != exitConfig {
 		t.Fatalf("ExitCode = %d, want %d; err=%v", ExitCode(err), exitConfig, err)
+	}
+}
+
+func TestValidateUpgradeAutomaticPolicyFlags(t *testing.T) {
+	for _, opts := range []upgradeOptions{
+		{all: true, level: "minor", levelSet: true, constraint: "< 6", constraintSet: true},
+		{all: true, to: "v5", level: "minor", levelSet: true},
+		{all: true, latestRelease: true, selection: "latest-eligible", selectionSet: true},
+		{all: true, level: "breaking", levelSet: true},
+		{all: true, constraint: "not a range", constraintSet: true},
+		{all: true, selection: "oldest", selectionSet: true},
+	} {
+		if err := validateUpgradeOptions(&opts); err == nil {
+			t.Fatalf("validateUpgradeOptions(%#v) returned nil error", opts)
+		}
+	}
+	if err := validateUpgradeOptions(&upgradeOptions{all: true, level: "minor", levelSet: true, selection: "latest-eligible", selectionSet: true}); err != nil {
+		t.Fatalf("valid automatic options returned error: %v", err)
+	}
+	if err := validateUpgradeOptions(&upgradeOptions{action: "actions/checkout", to: "v5"}); err != nil {
+		t.Fatalf("valid explicit options returned error: %v", err)
 	}
 }

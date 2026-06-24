@@ -29,9 +29,16 @@ write = true
 format = "sanad: ref={{ref}}"
 
 [upgrade]
-# Controls what `sanad upgrade --latest-release` means. `release` is accepted
-# as an alias for the GitHub latest-release API mode.
-latest_release = "github-release"
+# Automatic upgrades use stable GitHub releases. `minor` stays within the
+# current major; `patch` stays within the current major and minor.
+level = "major"
+selection = "latest-eligible"
+# Use an absolute SemVer constraint instead of `level` when needed:
+# constraint = ">= 4, < 6"
+
+# Per-action policies override the repository defaults above.
+[upgrade.actions."actions/checkout"]
+level = "minor"
 
 [security]
 # These strict checks are enforced by built-in policy/resolver behavior.

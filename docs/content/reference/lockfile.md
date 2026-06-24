@@ -17,7 +17,7 @@ Example:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "generated_by": "sanad",
   "entries": [
     {
@@ -29,8 +29,13 @@ Example:
       "kind": "github-action",
       "logical_ref": "v4",
       "pinned_sha": "11bd71901bbe5b1630ceea73d27597364c9af683",
-      "candidate_sha": "2222222222222222222222222222222222222222",
-      "candidate_seen_at": "2026-05-18T00:00:00Z",
+      "candidates": [
+        {
+          "logical_ref": "v5.0.0",
+          "sha": "2222222222222222222222222222222222222222",
+          "seen_at": "2026-05-18T00:00:00Z"
+        }
+      ],
       "resolved_at": "2026-05-18T00:00:00Z",
       "timestamp": "2026-04-20T10:30:00Z",
       "timestamp_source": "release"
@@ -41,9 +46,9 @@ Example:
 
 Entries are keyed by workflow file and YAML node path. Sanad validates schema version, required fields, duplicate entries, full-SHA pins, and pending candidate observations when loading the lockfile.
 
-`pinned_sha` records the SHA currently present in the workflow when one exists. `candidate_sha` and `candidate_seen_at` record a newer resolved target while it is cooling down; Sanad uses that local observation time when `cooldown_source = "first-seen"` is configured.
+`pinned_sha` records the SHA currently present in the workflow. `candidates` records newer ref and SHA pairs and their independent local observation times when `cooldown_source = "first-seen"` is configured. Version 1 lockfiles with singular `candidate_sha` and `candidate_seen_at` fields are migrated in memory and written as version 2 on the next authorized lockfile write.
 
-When `sanad update apply --yes --write` or `sanad update upgrade --write` succeeds, Sanad replaces the lockfile entry set with the currently active managed entries. This removes stale entries for workflow nodes that no longer exist.
+When `sanad update apply --yes --write` or `sanad update upgrade --write` succeeds, Sanad updates entries for the workflow nodes it evaluated and preserves all other lockfile entries. Read-only audit commands never write the lockfile. Deletion is reserved for explicit `lock refresh` or `lock prune --write` operations.
 
 ## Reconciliation
 
@@ -54,7 +59,7 @@ During reconciliation:
 - Current workflow action identity wins over lockfile action identity.
 - Current workflow full SHA wins over lockfile `pinned_sha`.
 - Inline `sanad: ref=...` comments win over lockfile `logical_ref`.
-- Lockfile candidate history is preserved only when it still belongs to the same workflow file, YAML node, action identity, and logical ref. Update planning reuses a first-seen candidate time only when the resolved candidate SHA still matches the recorded candidate.
+- Lockfile candidate history is preserved while the workflow file, YAML node, and action identity still match. Update planning reuses a first-seen time only when both the candidate logical ref and resolved SHA match; a retargeted tag starts a new observation window.
 
 Reconciliation diagnostics use these status values:
 
@@ -69,7 +74,7 @@ Reconciliation diagnostics use these status values:
 | `invalid` | A lockfile entry or inline comment is invalid. |
 | `duplicate` | More than one lockfile entry uses the same workflow file and YAML node key. |
 
-`missing-node`, `action-mismatch`, `pin-drift`, `logical-ref-conflict`, and `candidate-drift` are repairable when the rest of the lockfile is valid. Invalid entries, duplicate entries, unsupported lockfile versions, invalid SHA fields, and invalid timestamps are blocking. Malformed JSON is reported as an explicit lockfile load error before reconciliation.
+`action-mismatch`, `pin-drift`, `logical-ref-conflict`, and `candidate-drift` can be handled by `lock repair`. `missing-node` entries are preserved by repair and removed only by `lock prune` or a full refresh. Invalid entries, duplicate entries, unsupported lockfile versions, invalid SHA fields, and invalid timestamps are blocking. Malformed JSON is reported as an explicit lockfile load error before reconciliation.
 
 ## Repair commands
 

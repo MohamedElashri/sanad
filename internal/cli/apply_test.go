@@ -621,8 +621,130 @@ func TestApplyFirstSeenCooldownRecordsPendingCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLockfile returned error: %v", err)
 	}
-	if !ok || len(lockfile.Entries) != 1 || lockfile.Entries[0].CandidateSHA != nextSHA {
+	if !ok || len(lockfile.Entries) != 1 || len(lockfile.Entries[0].Candidates) != 1 || lockfile.Entries[0].Candidates[0].SHA != nextSHA {
 		t.Fatalf("pending candidate was not recorded: ok=%v entries=%#v", ok, lockfile.Entries)
+	}
+}
+
+func TestApplyPreservesFutureUpgradeCandidateHistory(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("8", 40)
+	futureSHA := strings.Repeat("9", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        currentSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-30 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	writeTestLockfile(t, metadata.LockfileEntry{
+		File:       ".github/workflows/ci.yml",
+		Node:       "jobs.test.steps[0].uses",
+		Owner:      "actions",
+		Repo:       "checkout",
+		Kind:       "github-action",
+		LogicalRef: "v4",
+		PinnedSHA:  currentSHA,
+		Candidates: []metadata.CandidateHistoryEntry{{LogicalRef: "v5.0.0", SHA: futureSHA, SeenAt: now.Format(time.RFC3339)}},
+	})
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	lockfile, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil || !ok || len(lockfile.Entries) != 1 {
+		t.Fatalf("unexpected lockfile: ok=%v err=%v entries=%#v", ok, err, lockfile.Entries)
+	}
+	if len(lockfile.Entries[0].Candidates) != 1 || lockfile.Entries[0].Candidates[0].LogicalRef != "v5.0.0" {
+		t.Fatalf("future candidate history was not preserved: %#v", lockfile.Entries[0])
+	}
+}
+
+func TestApplyScopedWorkflowPreservesOutOfScopeLockEntries(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("a", 40)
+	nextSHA := strings.Repeat("b", 40)
+	otherSHA := strings.Repeat("c", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        nextSHA,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-30 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	otherPath := filepath.Join(".github", "workflows", "other.yml")
+	if err := os.WriteFile(otherPath, []byte("jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+otherSHA+" # sanad: ref=v5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeTestLockfile(t,
+		metadata.LockfileEntry{File: ".github/workflows/ci.yml", Node: lockTestNode, Owner: "actions", Repo: "checkout", Kind: "github-action", LogicalRef: "v4", PinnedSHA: currentSHA},
+		metadata.LockfileEntry{File: filepath.ToSlash(otherPath), Node: lockTestNode, Owner: "actions", Repo: "setup-go", Kind: "github-action", LogicalRef: "v5", PinnedSHA: otherSHA},
+	)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"update", "apply", "--workflows", ".github/workflows/ci.yml", "--yes", "--write"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	lockfile, _, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if len(lockfile.Entries) != 2 {
+		t.Fatalf("scoped apply removed out-of-scope entries: %#v", lockfile.Entries)
+	}
+	for _, entry := range lockfile.Entries {
+		if entry.File == filepath.ToSlash(otherPath) && entry.PinnedSHA != otherSHA {
+			t.Fatalf("scoped apply changed out-of-scope entry: %#v", entry)
+		}
+	}
+}
+
+func TestAuditCommandsNeverModifyLockfile(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("d", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        sha,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-30 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+sha+" # sanad: ref=v4\n")
+	writeTestLockfile(t, metadata.LockfileEntry{File: ".github/workflows/ci.yml", Node: lockTestNode, Owner: "actions", Repo: "checkout", Kind: "github-action", LogicalRef: "v4", PinnedSHA: sha})
+	original := readFileString(t, metadata.DefaultLockfilePath)
+
+	for _, args := range [][]string{{"audit", "scan"}, {"audit", "plan"}, {"audit", "check"}} {
+		cmd := NewRootCommand()
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%v returned error: %v", args, err)
+		}
+		if got := readFileString(t, metadata.DefaultLockfilePath); got != original {
+			t.Fatalf("%v modified the lockfile", args)
+		}
 	}
 }
 

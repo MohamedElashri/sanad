@@ -2,6 +2,22 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.5 - 2026-06-24
+
+### Added
+
+- Added SemVer upgrade levels, arbitrary constraints, per-action overrides, and `latest` versus `latest-eligible` release selection.
+- Added paginated stable GitHub release discovery and audit details for every newer candidate considered by `sanad update upgrade`.
+
+### Changed
+
+- Made bare `sanad update upgrade` choose the highest cooldown-eligible stable release instead of always waiting for GitHub's single latest release.
+- Upgraded the lockfile to version 2 with multi-candidate first-seen history and backward migration from version 1.
+
+### Fixed
+
+- Prevented audit commands, scoped update operations, and `lock repair` from dropping unrelated lockfile entries. Entry deletion now requires explicit `lock refresh` or `lock prune --write` intent.
+
 ## 0.1.4 - 2026-06-14
 
 ### Added

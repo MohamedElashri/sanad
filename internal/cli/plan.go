@@ -30,6 +30,10 @@ type latestReleaseResolver interface {
 	ResolveLatestRelease(context.Context, string, string) (githubresolver.ResolvedRef, error)
 }
 
+type releaseResolver interface {
+	ListReleases(context.Context, string, string) ([]githubresolver.Release, error)
+}
+
 var (
 	defaultPlanResolver        planResolver
 	defaultPlanResolverFactory = newDefaultPlanResolver
@@ -85,16 +89,17 @@ type planAction struct {
 }
 
 type evaluatedUse struct {
-	Use             workflow.UseNode
-	Parsed          actions.ParsedAction
-	Recovered       metadata.Metadata
-	HasMetadata     bool
-	MetadataErr     error
-	Candidate       *githubresolver.ResolvedRef
-	CandidateSeenAt time.Time
-	ResolveErr      error
-	Decision        policy.Decision
-	Action          planAction
+	Use              workflow.UseNode
+	Parsed           actions.ParsedAction
+	Recovered        metadata.Metadata
+	HasMetadata      bool
+	MetadataErr      error
+	Candidate        *githubresolver.ResolvedRef
+	CandidateSeenAt  time.Time
+	CandidateHistory []metadata.CandidateHistoryEntry
+	ResolveErr       error
+	Decision         policy.Decision
+	Action           planAction
 }
 
 func newPlanCommand(opts *rootOptions) *cobra.Command {
@@ -277,17 +282,22 @@ func evaluateWorkflowUses(ctx context.Context, cfg config.Config, workflowPaths 
 		if hasMetadata && metadataErr == nil {
 			action.MetadataSource = string(recovered.Source)
 		}
+		var candidateHistory []metadata.CandidateHistoryEntry
+		if reconciled.CandidateHistoryPreservable {
+			candidateHistory = append(candidateHistory, reconciled.Entry.Candidates...)
+		}
 		evaluated = append(evaluated, evaluatedUse{
-			Use:             use,
-			Parsed:          parsed,
-			Recovered:       recovered,
-			HasMetadata:     hasMetadata,
-			MetadataErr:     metadataErr,
-			Candidate:       candidate,
-			CandidateSeenAt: candidateSeenAt,
-			ResolveErr:      resolveErr,
-			Decision:        decision,
-			Action:          action,
+			Use:              use,
+			Parsed:           parsed,
+			Recovered:        recovered,
+			HasMetadata:      hasMetadata,
+			MetadataErr:      metadataErr,
+			Candidate:        candidate,
+			CandidateSeenAt:  candidateSeenAt,
+			CandidateHistory: candidateHistory,
+			ResolveErr:       resolveErr,
+			Decision:         decision,
+			Action:           action,
 		})
 	}
 	return files, evaluated, nil
@@ -297,10 +307,14 @@ func candidateObservationTime(entry metadata.LockfileEntry, hasLockfile bool, ha
 	if candidate == nil {
 		return time.Time{}
 	}
-	if hasLockfile && entry.CandidateSHA == candidate.SHA && entry.CandidateSeenAt != "" {
-		seenAt, err := time.Parse(time.RFC3339, entry.CandidateSeenAt)
-		if err == nil {
-			return seenAt
+	if hasLockfile {
+		for _, observed := range entry.Candidates {
+			if observed.LogicalRef == candidate.Ref && observed.SHA == candidate.SHA {
+				seenAt, err := time.Parse(time.RFC3339, observed.SeenAt)
+				if err == nil {
+					return seenAt
+				}
+			}
 		}
 	}
 	if hasLockfile || hasMetadata || cooldownSource == string(policy.CooldownSourceFirstSeen) {

@@ -786,9 +786,39 @@ func (r fakePlanResolver) Resolve(_ context.Context, selector githubresolver.Act
 	key := selector.Owner + "/" + selector.Repo + "@" + selector.Ref
 	resolved, ok := r[key]
 	if !ok {
+		if latest, latestOK := r[selector.Owner+"/"+selector.Repo+"@latest-release"]; latestOK && latest.Ref == selector.Ref {
+			return latest, nil
+		}
+	}
+	if !ok {
 		return githubresolver.ResolvedRef{}, fmt.Errorf("unexpected resolve %s", key)
 	}
 	return resolved, nil
+}
+
+func (r fakePlanResolver) ListReleases(_ context.Context, owner, repo string) ([]githubresolver.Release, error) {
+	prefix := owner + "/" + repo + "@"
+	seen := make(map[string]struct{})
+	var releases []githubresolver.Release
+	for key, resolved := range r {
+		if !strings.HasPrefix(key, prefix) || resolved.Kind != githubresolver.KindTag {
+			continue
+		}
+		tag := resolved.Ref
+		if tag == "" || tag == "latest-release" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		published := resolved.CommitTime
+		if resolved.ReleaseTime != nil {
+			published = *resolved.ReleaseTime
+		}
+		releases = append(releases, githubresolver.Release{TagName: tag, PublishedAt: published})
+	}
+	return releases, nil
 }
 
 func (r fakePlanResolver) ResolveDefaultBranch(ctx context.Context, owner, repo string) (githubresolver.ResolvedRef, error) {

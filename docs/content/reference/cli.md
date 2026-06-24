@@ -100,13 +100,16 @@ Move managed full-SHA pins from one logical ref to another.
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/setup-go --to v6 --write
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --latest-release --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --constraint '< 6' --write
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --selection latest
 ```
 
-With no selector, `upgrade` scans all managed pins. With no target, it uses the latest GitHub release. The command is dry-run by default; add `--write` after reviewing the diff.
+With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command is dry-run by default; add `--write` after reviewing the diff.
 
-Use exactly one selector when overriding the default scope: `--action <owner/repo>` or `--all`. Use exactly one target when overriding the default target: `--to <ref>` or `--latest-release`.
+`--level major|minor|patch` and `--constraint <range>` are mutually exclusive. `--selection latest-eligible|latest` controls cooldown fallback. `--to <ref>` bypasses automatic SemVer selection but still enforces cooldown and cannot be combined with automatic policy flags.
+
+`--latest-release` remains as a compatibility alias for `--selection latest`; `--latest-release-mode` is deprecated. Automatic selection rejects non-SemVer current refs, drafts, prereleases, and non-SemVer release tags. Use `--to` for those refs.
 
 Alias: `sanad upgrade`.
 
@@ -132,7 +135,7 @@ sanad lock refresh --write
 sanad --format json lock refresh --dry-run
 ```
 
-Refresh is dry-run unless `--write` is present. It rebuilds the active managed entry set from current pinned workflow nodes and removes lock entries for workflow nodes that no longer exist.
+Refresh is dry-run unless `--write` is present. It rebuilds the active managed entry set from current pinned workflow nodes, removing entries no longer represented in the refreshed scope. With `--workflows`, entries outside the requested files or directories are preserved.
 
 ## `lock repair`
 
@@ -144,7 +147,7 @@ sanad lock repair --write
 sanad --format json lock repair --dry-run
 ```
 
-Repair updates stale action identity, logical ref, and pinned SHA fields when the current workflow and inline `sanad` metadata make the intended state clear. It removes entries for deleted workflow nodes and preserves compatible candidate history.
+Repair updates stale action identity, logical ref, and pinned SHA fields when the current workflow and inline `sanad` metadata make the intended state clear. It preserves missing-node and out-of-scope entries, as well as compatible candidate history. Use `lock prune` when deletion is intended.
 
 Malformed JSON is reported as an explicit lockfile load error. Unsupported lockfile versions, invalid SHA fields, invalid timestamps, duplicate entries, and invalid inline comments remain blocking diagnostics. Write mode exits without changing the lockfile while blocking diagnostics are present.
 
@@ -157,7 +160,7 @@ sanad lock prune --dry-run
 sanad lock prune --write
 ```
 
-Use prune when you only want to drop entries for missing workflow nodes and leave other stale active entries untouched.
+Use prune when you explicitly want to drop entries for missing workflow nodes and leave other stale active entries untouched. With `--workflows`, only missing entries inside that scope are removed.
 
 ## `version`
 

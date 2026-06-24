@@ -35,7 +35,7 @@ For stricter repositories, set:
 cooldown_source = "first-seen"
 ```
 
-In that mode, Sanad uses the time a candidate SHA was first recorded in `.github/sanad.lock.json`.
+In that mode, Sanad uses the time each candidate ref and SHA pair was first recorded in `.github/sanad.lock.json`. Retargeting a release tag resets that candidate's observation clock.
 
 The default cooldown is:
 
@@ -43,7 +43,7 @@ The default cooldown is:
 cooldown = "14d"
 ```
 
-If a candidate has not satisfied the selected cooldown source, Sanad reports `pending-cooldown` and does not rewrite it.
+Automatic `latest-eligible` upgrades evaluate stable releases from highest SemVer downward and select the first candidate that has satisfied cooldown. Newer ineligible releases remain visible in reports and, in first-seen mode, in lockfile history. If no candidate qualifies, Sanad reports `pending-cooldown` and does not rewrite the workflow.
 
 ## Non-goals
 

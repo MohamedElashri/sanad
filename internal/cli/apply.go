@@ -204,6 +204,17 @@ func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []stri
 			})
 		}
 		if entry, ok := lockfileEntryForDecision(use, parsed, decision, candidate, now); ok {
+			entry.Candidates = append([]metadata.CandidateHistoryEntry(nil), item.CandidateHistory...)
+			if cfg.CooldownSource == string(policy.CooldownSourceFirstSeen) && decision.Kind == policy.DecisionPending && candidate != nil {
+				seenAt := decision.CandidateSeenAt
+				if seenAt.IsZero() {
+					seenAt = now
+				}
+				entry.Candidates = observeUpgradeCandidate(entry.Candidates, *candidate, seenAt)
+			}
+			if decision.Kind == policy.DecisionUpdate || decision.Kind == policy.DecisionUnchanged {
+				entry.Candidates = removeUpgradeCandidate(entry.Candidates, decision.LogicalRef, candidate)
+			}
 			plan.LockEntries = append(plan.LockEntries, entry)
 		}
 	}
@@ -460,12 +471,15 @@ func lockfileEntryForDecision(use workflow.UseNode, parsed actions.ParsedAction,
 		ResolvedAt: now.Format(time.RFC3339),
 	}
 	if decision.Kind == policy.DecisionPending && candidate != nil && actions.IsFullSHA(candidate.SHA) {
-		entry.CandidateSHA = candidate.SHA
 		seenAt := decision.CandidateSeenAt
 		if seenAt.IsZero() {
 			seenAt = now
 		}
-		entry.CandidateSeenAt = seenAt.UTC().Format(time.RFC3339)
+		entry.Candidates = []metadata.CandidateHistoryEntry{{
+			LogicalRef: candidate.Ref,
+			SHA:        candidate.SHA,
+			SeenAt:     seenAt.UTC().Format(time.RFC3339),
+		}}
 	}
 	if candidate != nil {
 		if ts, source := resolvedTimestamp(*candidate); !ts.IsZero() {
@@ -547,6 +561,7 @@ func saveApplyLockfile(entries []metadata.LockfileEntry) error {
 	if err != nil {
 		return categorizedError{code: exitConfig, err: err}
 	}
+	entries = mergeActiveLockEntries(existing.Entries, entries)
 	updated, err := metadata.UpdateLockfile(existing, entries)
 	if err != nil {
 		return categorizedError{code: exitInternal, err: err}
@@ -555,6 +570,21 @@ func saveApplyLockfile(entries []metadata.LockfileEntry) error {
 		return categorizedError{code: exitFileSystem, err: err}
 	}
 	return nil
+}
+
+func mergeActiveLockEntries(existing []metadata.LockfileEntry, active []metadata.LockfileEntry) []metadata.LockfileEntry {
+	activeKeys := make(map[string]struct{}, len(active))
+	for _, entry := range active {
+		activeKeys[metadata.Key(entry.File, entry.Node)] = struct{}{}
+	}
+	merged := make([]metadata.LockfileEntry, 0, len(existing)+len(active))
+	for _, entry := range existing {
+		if _, replaced := activeKeys[metadata.Key(entry.File, entry.Node)]; replaced {
+			continue
+		}
+		merged = append(merged, entry)
+	}
+	return append(merged, active...)
 }
 
 func applyLockfileWouldWrite(entries []metadata.LockfileEntry) (bool, error) {

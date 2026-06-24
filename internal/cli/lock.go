@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/MohamedElashri/sanad/internal/actions"
 	"github.com/MohamedElashri/sanad/internal/metadata"
@@ -37,6 +39,7 @@ type lockState struct {
 	hasLockfile    bool
 	lockfileValid  bool
 	reconciliation metadata.Reconciliation
+	scopePaths     []string
 }
 
 type lockReport struct {
@@ -263,6 +266,11 @@ func buildLockState(rootOpts *rootOptions, workflowPaths []string) (lockState, e
 		lockfileValid = metadata.ValidateLockfile(lockfile) == nil
 	}
 
+	reconciliationLockfile := lockfile
+	if len(workflowPaths) > 0 {
+		reconciliationLockfile.Entries = filterLockEntriesByScope(lockfile.Entries, workflowPaths, true)
+	}
+
 	return lockState{
 		files:          files,
 		uses:           uses,
@@ -270,7 +278,8 @@ func buildLockState(rootOpts *rootOptions, workflowPaths []string) (lockState, e
 		lockfile:       lockfile,
 		hasLockfile:    hasLockfile,
 		lockfileValid:  lockfileValid,
-		reconciliation: metadata.ReconcileLockfile(lockfile, hasLockfile, reconcileUses),
+		reconciliation: metadata.ReconcileLockfile(reconciliationLockfile, hasLockfile, reconcileUses),
+		scopePaths:     append([]string(nil), workflowPaths...),
 	}, nil
 }
 
@@ -286,7 +295,11 @@ func loadLockfileForReconciliation(path string) (metadata.Lockfile, bool, error)
 	if err := json.Unmarshal(data, &lockfile); err != nil {
 		return metadata.Lockfile{}, true, fmt.Errorf("load lockfile %q: invalid JSON: %w", path, err)
 	}
-	return lockfile, true, nil
+	migrated, err := metadata.MigrateLockfile(lockfile)
+	if err != nil {
+		return lockfile, true, nil
+	}
+	return migrated, true, nil
 }
 
 func buildLockReport(state lockState, mode lockMode, dryRun bool) (lockReport, error) {
@@ -314,13 +327,18 @@ func targetLockEntries(state lockState, mode lockMode) ([]metadata.LockfileEntry
 	switch mode {
 	case lockModePrune:
 		return pruneLockEntries(state), nil
+	case lockModeRepair:
+		return repairLockEntries(state)
 	default:
 		return refreshLockEntries(state)
 	}
 }
 
 func refreshLockEntries(state lockState) ([]metadata.LockfileEntry, error) {
-	entries := make([]metadata.LockfileEntry, 0, len(state.uses))
+	entries := make([]metadata.LockfileEntry, 0, len(state.uses)+len(state.lockfile.Entries))
+	if len(state.scopePaths) > 0 {
+		entries = append(entries, filterLockEntriesByScope(state.lockfile.Entries, state.scopePaths, false)...)
+	}
 	for _, use := range state.uses {
 		key := metadata.Key(use.File, use.NodePath)
 		reconciled, ok := state.reconciliation.Use(use.File, use.NodePath)
@@ -337,6 +355,63 @@ func refreshLockEntries(state lockState) ([]metadata.LockfileEntry, error) {
 		return nil, categorizedError{code: exitInternal, err: err}
 	}
 	return lockfile.Entries, nil
+}
+
+func repairLockEntries(state lockState) ([]metadata.LockfileEntry, error) {
+	entries, err := refreshLockEntries(state)
+	if err != nil {
+		return nil, err
+	}
+	present := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		present[metadata.Key(entry.File, entry.Node)] = struct{}{}
+	}
+	missing := make(map[string]struct{})
+	for _, diagnostic := range state.reconciliation.Diagnostics {
+		if diagnostic.Status == metadata.ReconciliationMissingNode {
+			missing[metadata.Key(diagnostic.File, diagnostic.Node)] = struct{}{}
+		}
+	}
+	for _, entry := range state.lockfile.Entries {
+		key := metadata.Key(entry.File, entry.Node)
+		if _, ok := missing[key]; !ok {
+			continue
+		}
+		if _, ok := present[key]; ok {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	lockfile, err := metadata.NewLockfile(entries)
+	if err != nil {
+		return nil, categorizedError{code: exitInternal, err: err}
+	}
+	return lockfile.Entries, nil
+}
+
+func filterLockEntriesByScope(entries []metadata.LockfileEntry, scopePaths []string, include bool) []metadata.LockfileEntry {
+	filtered := make([]metadata.LockfileEntry, 0, len(entries))
+	for _, entry := range entries {
+		if lockEntryInWorkflowScope(entry, scopePaths) == include {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
+}
+
+func lockEntryInWorkflowScope(entry metadata.LockfileEntry, scopePaths []string) bool {
+	entryPath := filepath.Clean(entry.File)
+	for _, scopePath := range scopePaths {
+		scopePath = filepath.Clean(scopePath)
+		relative, err := filepath.Rel(scopePath, entryPath)
+		if err != nil {
+			continue
+		}
+		if relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
+			return true
+		}
+	}
+	return false
 }
 
 func pruneLockEntries(state lockState) []metadata.LockfileEntry {
@@ -386,9 +461,8 @@ func lockEntryForReconciledUse(use workflow.UseNode, parsed actions.ParsedAction
 		entry.Timestamp = reconciled.Entry.Timestamp
 		entry.TimestampSource = reconciled.Entry.TimestampSource
 	}
-	if reconciled.HasEntry && reconciled.CandidateHistoryPreservable && reconciled.Entry.CandidateSHA != "" {
-		entry.CandidateSHA = reconciled.Entry.CandidateSHA
-		entry.CandidateSeenAt = reconciled.Entry.CandidateSeenAt
+	if reconciled.HasEntry && reconciled.CandidateHistoryPreservable {
+		entry.Candidates = append([]metadata.CandidateHistoryEntry(nil), reconciled.Entry.Candidates...)
 	}
 	return entry, true
 }
@@ -557,7 +631,7 @@ func lockReportEntries(state lockState) []lockReportEntry {
 			CurrentSHA:                currentPinnedSHA(parsed),
 			Managed:                   managed,
 			Status:                    lockEntryStatuses(reconciled, managed),
-			CandidateHistoryPreserved: managed && entry.CandidateSHA != "",
+			CandidateHistoryPreserved: managed && len(entry.Candidates) > 0,
 			Diagnostics:               reconciled.Diagnostics,
 		}
 		if reconciled.HasMetadata {

@@ -55,8 +55,8 @@ func TestReconcileLockfileCommentRefWinsOverLockfile(t *testing.T) {
 	if got.Metadata.LogicalRef != "v4" || got.Metadata.Source != SourceComment {
 		t.Fatalf("Metadata = %#v, want comment v4", got.Metadata)
 	}
-	if got.CandidateHistoryPreservable {
-		t.Fatal("CandidateHistoryPreservable = true, want false")
+	if !got.CandidateHistoryPreservable {
+		t.Fatal("CandidateHistoryPreservable = false, want true")
 	}
 	assertDiagnostic(t, got.Diagnostics, ReconciliationLogicalRefConflict, true, false)
 }
@@ -205,8 +205,7 @@ func TestReconcileLockfileInvalidEntryReportsBlockingDiagnostic(t *testing.T) {
 
 func TestReconcileLockfileCandidateDriftWhenHistoryCannotBePreserved(t *testing.T) {
 	entry := reconcileLockfileEntry("actions", "checkout", "v4", testSHA)
-	entry.CandidateSHA = testOtherSHA
-	entry.CandidateSeenAt = time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	entry.Candidates = []CandidateHistoryEntry{{LogicalRef: "v5", SHA: testOtherSHA, SeenAt: time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)}}
 	lockfile := Lockfile{
 		Version: LockfileVersion,
 		Entries: []LockfileEntry{
@@ -217,10 +216,9 @@ func TestReconcileLockfileCandidateDriftWhenHistoryCannotBePreserved(t *testing.
 
 	result := ReconcileLockfile(lockfile, true, []ReconcileUse{use})
 	got, _ := result.Use(use.File, use.Node)
-	if got.CandidateHistoryPreservable {
-		t.Fatal("CandidateHistoryPreservable = true, want false")
+	if !got.CandidateHistoryPreservable {
+		t.Fatal("CandidateHistoryPreservable = false, want true")
 	}
-	assertDiagnostic(t, got.Diagnostics, ReconciliationCandidateDrift, true, false)
 }
 
 func reconcileUse(raw string, comment string) ReconcileUse {

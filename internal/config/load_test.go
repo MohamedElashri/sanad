@@ -251,6 +251,9 @@ func TestLoadExampleConfig(t *testing.T) {
 	if cfg.Upgrade.LatestRelease != DefaultUpgradeLatestRelease {
 		t.Fatalf("Upgrade.LatestRelease = %q, want %q", cfg.Upgrade.LatestRelease, DefaultUpgradeLatestRelease)
 	}
+	if cfg.Upgrade.Level != DefaultUpgradeLevel || cfg.Upgrade.Selection != DefaultUpgradeSelection || cfg.Upgrade.Constraint != "" {
+		t.Fatalf("unexpected default upgrade policy: %#v", cfg.Upgrade)
+	}
 }
 
 func TestLoadDottedNestedKeys(t *testing.T) {
@@ -503,6 +506,49 @@ func TestLoadUpgradeLatestReleaseRejectsUnsupportedMode(t *testing.T) {
 	}
 }
 
+func TestLoadUpgradePoliciesAndPerActionOverrides(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	content := []byte(`[upgrade]
+constraint = ">= 4, < 7"
+selection = "latest"
+
+[upgrade.actions."actions/checkout"]
+level = "minor"
+selection = "latest-eligible"
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Upgrade.Level != "" || cfg.Upgrade.Constraint != ">= 4, < 7" || cfg.Upgrade.Selection != "latest" {
+		t.Fatalf("unexpected global upgrade policy: %#v", cfg.Upgrade)
+	}
+	override := cfg.Upgrade.Actions["actions/checkout"]
+	if override.Level != "minor" || override.Constraint != "" || override.Selection != "latest-eligible" {
+		t.Fatalf("unexpected action override: %#v", override)
+	}
+}
+
+func TestLoadUpgradePolicyRejectsInvalidCombinations(t *testing.T) {
+	for _, content := range []string{
+		"[upgrade]\nlevel = \"minor\"\nconstraint = \"< 5\"\n",
+		"[upgrade]\nlevel = \"breaking\"\n",
+		"[upgrade]\nconstraint = \"not a constraint\"\n",
+		"[upgrade]\nselection = \"oldest\"\n",
+	} {
+		path := filepath.Join(t.TempDir(), DefaultPath)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Fatalf("Load returned nil error for %q", content)
+		}
+	}
+}
+
 func TestLoadCommentsConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
 	content := []byte(`[comments]
@@ -602,6 +648,13 @@ branches = "track"
 
 [ignore]
 actions = ["org/internal-action"]
+
+[upgrade]
+constraint = "< 7"
+
+[upgrade.actions."actions/checkout"]
+constraint = "< 6"
+selection = "latest"
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -612,6 +665,12 @@ policy_files = ["org-policy.toml"]
 
 [updates]
 tags = "track"
+
+[upgrade]
+level = "minor"
+
+[upgrade.actions."actions/checkout"]
+selection = "latest-eligible"
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
@@ -632,6 +691,13 @@ tags = "track"
 	}
 	if len(cfg.Organization.PolicyFiles) != 1 || cfg.Organization.PolicyFiles[0] != "org-policy.toml" {
 		t.Fatalf("Organization.PolicyFiles = %#v", cfg.Organization.PolicyFiles)
+	}
+	if cfg.Upgrade.Level != "minor" || cfg.Upgrade.Constraint != "" {
+		t.Fatalf("local global upgrade policy did not override organization policy: %#v", cfg.Upgrade)
+	}
+	upgradeOverride := cfg.Upgrade.Actions["actions/checkout"]
+	if upgradeOverride.Constraint != "< 6" || upgradeOverride.Selection != "latest-eligible" {
+		t.Fatalf("per-action upgrade policy was not merged field by field: %#v", upgradeOverride)
 	}
 }
 

@@ -24,16 +24,23 @@ type upgradeOptions struct {
 	to                string
 	latestRelease     bool
 	latestReleaseMode string
+	level             string
+	constraint        string
+	selection         string
+	levelSet          bool
+	constraintSet     bool
+	selectionSet      bool
 	dryRun            bool
 	write             bool
 	workflowPaths     []string
 }
 
 type upgradePlan struct {
-	Report        upgradeReport
-	ChangesByFile map[string][]workflow.RewriteChange
-	LockEntries   []metadata.LockfileEntry
-	Blockers      []applyBlocker
+	Report              upgradeReport
+	ChangesByFile       map[string][]workflow.RewriteChange
+	LockEntries         []metadata.LockfileEntry
+	Blockers            []applyBlocker
+	ObservationsChanged bool
 }
 
 type upgradeReport struct {
@@ -63,6 +70,20 @@ type upgradeAction struct {
 	ReasonCode        string              `json:"reason_code"`
 	Reason            string              `json:"reason,omitempty"`
 	Age               string              `json:"age,omitempty"`
+	Level             string              `json:"level,omitempty"`
+	Constraint        string              `json:"constraint,omitempty"`
+	Selection         string              `json:"selection,omitempty"`
+	SelectedRelease   string              `json:"selected_release,omitempty"`
+	Candidates        []upgradeCandidate  `json:"candidates,omitempty"`
+}
+
+type upgradeCandidate struct {
+	LogicalRef string              `json:"logical_ref"`
+	Version    string              `json:"version"`
+	SHA        string              `json:"sha,omitempty"`
+	Decision   policy.DecisionKind `json:"decision"`
+	Reason     string              `json:"reason,omitempty"`
+	Age        string              `json:"age,omitempty"`
 }
 
 func newUpgradeCommand(opts *rootOptions) *cobra.Command {
@@ -78,8 +99,11 @@ func newUpgradeCommand(opts *rootOptions) *cobra.Command {
 	cmd.Flags().StringVar(&upgradeOpts.action, "action", "", "managed action selector to upgrade, such as actions/checkout")
 	cmd.Flags().BoolVar(&upgradeOpts.all, "all", false, "upgrade all managed action pins")
 	cmd.Flags().StringVar(&upgradeOpts.to, "to", "", "target logical ref, such as v5")
-	cmd.Flags().BoolVar(&upgradeOpts.latestRelease, "latest-release", false, "upgrade to the configured latest release target")
-	cmd.Flags().StringVar(&upgradeOpts.latestReleaseMode, "latest-release-mode", "", "override upgrade.latest_release for this run")
+	cmd.Flags().BoolVar(&upgradeOpts.latestRelease, "latest-release", false, "compatibility alias for --selection latest")
+	cmd.Flags().StringVar(&upgradeOpts.latestReleaseMode, "latest-release-mode", "", "deprecated compatibility override for upgrade.latest_release")
+	cmd.Flags().StringVar(&upgradeOpts.level, "level", "", "maximum automatic SemVer change: major, minor, or patch")
+	cmd.Flags().StringVar(&upgradeOpts.constraint, "constraint", "", "automatic release SemVer constraint")
+	cmd.Flags().StringVar(&upgradeOpts.selection, "selection", "", "automatic release selection: latest-eligible or latest")
 	cmd.Flags().BoolVar(&upgradeOpts.dryRun, "dry-run", false, "show proposed changes without writing files")
 	cmd.Flags().BoolVar(&upgradeOpts.write, "write", false, "write changes to workflow files and lockfile")
 	cmd.Flags().StringSliceVar(&upgradeOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
@@ -151,6 +175,13 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 		return nil
 	}
 	if len(rewrites) == 0 {
+		if plan.ObservationsChanged {
+			if err := saveApplyLockfile(plan.LockEntries); err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile observations; no eligible upgrades to apply.")
+			return nil
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No eligible upgrades to apply.")
 		return nil
 	}
@@ -168,11 +199,19 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 func upgradeOptionsWithDefaults(cmd *cobra.Command, opts *upgradeOptions) upgradeOptions {
 	effective := *opts
 	flags := cmd.Flags()
+	effective.levelSet = flags.Changed("level")
+	effective.constraintSet = flags.Changed("constraint")
+	effective.selectionSet = flags.Changed("selection")
 	if !flags.Changed("action") && !flags.Changed("all") {
 		effective.all = true
 	}
-	if !flags.Changed("to") && !flags.Changed("latest-release") {
-		effective.latestRelease = true
+	if effective.latestRelease {
+		if effective.selectionSet && strings.TrimSpace(effective.selection) != "latest" {
+			effective.selection = strings.TrimSpace(effective.selection)
+		} else {
+			effective.selection = "latest"
+			effective.selectionSet = true
+		}
 	}
 	return effective
 }
@@ -184,11 +223,29 @@ func validateUpgradeOptions(opts *upgradeOptions) error {
 	if opts.all == (strings.TrimSpace(opts.action) != "") {
 		return fmt.Errorf("pass exactly one of --action or --all")
 	}
-	if opts.to == "" && !opts.latestRelease {
-		return fmt.Errorf("pass exactly one of --to or --latest-release")
+	if opts.levelSet && opts.constraintSet {
+		return fmt.Errorf("--level and --constraint cannot be used together")
 	}
-	if opts.to != "" && opts.latestRelease {
-		return fmt.Errorf("pass exactly one of --to or --latest-release")
+	if opts.to != "" && (opts.latestRelease || opts.levelSet || opts.constraintSet || opts.selectionSet) {
+		return fmt.Errorf("--to cannot be combined with automatic release policy flags")
+	}
+	if opts.latestRelease && opts.selectionSet && strings.TrimSpace(opts.selection) != "latest" {
+		return fmt.Errorf("--latest-release cannot be combined with --selection %q", opts.selection)
+	}
+	if opts.levelSet {
+		if _, err := normalizeUpgradeLevelForCLI(opts.level); err != nil {
+			return err
+		}
+	}
+	if opts.constraintSet {
+		if _, err := normalizeUpgradeConstraintForCLI(opts.constraint); err != nil {
+			return err
+		}
+	}
+	if opts.selectionSet {
+		if _, err := normalizeUpgradeSelectionForCLI(opts.selection); err != nil {
+			return err
+		}
 	}
 	if strings.Contains(opts.action, "@") {
 		return fmt.Errorf("--action must not include @ref")
@@ -198,6 +255,26 @@ func validateUpgradeOptions(opts *upgradeOptions) error {
 		return fmt.Errorf("--to must be a logical ref, not a commit SHA")
 	}
 	return nil
+}
+
+func normalizeUpgradeLevelForCLI(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "major", "minor", "patch":
+		return value, nil
+	default:
+		return "", fmt.Errorf("--level %q is not supported; expected major, minor, or patch", value)
+	}
+}
+
+func normalizeUpgradeSelectionForCLI(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "latest-eligible", "latest":
+		return value, nil
+	default:
+		return "", fmt.Errorf("--selection %q is not supported; expected latest-eligible or latest", value)
+	}
 }
 
 func normalizeUpgradeLatestReleaseForCLI(value string) (string, error) {
@@ -231,9 +308,10 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 	}
 
 	plan := upgradePlan{
-		Report:        upgradeReport{Version: 1},
+		Report:        upgradeReport{Version: 2},
 		ChangesByFile: make(map[string][]workflow.RewriteChange),
 	}
+	discovery := newUpgradeDiscovery(resolver)
 
 	for _, use := range uses {
 		parsed := actions.Parse(use.Raw)
@@ -241,32 +319,72 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 		recovered := reconciled.Metadata
 		hasMetadata := reconciled.HasMetadata
 		metadataErr := reconciled.Error
-		if currentEntry, ok := currentUpgradeLockEntry(use, parsed, recovered, hasMetadata, now); ok {
+		if currentEntry, ok := currentUpgradeLockEntry(use, parsed, recovered, hasMetadata, reconciled.Entry, reconciled.HasEntry && reconciled.CandidateHistoryPreservable, now); ok {
 			plan.LockEntries = append(plan.LockEntries, currentEntry)
 		}
 		if metadataErr != nil || !isManagedUpgradeCandidate(parsed, hasMetadata) || !upgradeMatchesAction(parsed, opts) {
 			continue
 		}
 
-		candidate, targetLogicalRef, resolveErr := resolveUpgradeTarget(ctx, resolver, parsed, opts, cfg)
-		candidateSeenAt := candidateObservationTime(
-			reconciled.Entry,
-			reconciled.HasEntry && reconciled.CandidateHistoryPreservable,
-			hasMetadata,
-			candidate,
-			now,
-			cfg.CooldownSource,
-		)
-		decision := policy.Evaluate(policy.Entry{
-			File:            use.File,
-			Action:          parsed,
-			Candidate:       candidate,
-			ResolveErr:      resolveErr,
-			LogicalRef:      targetLogicalRef,
-			CurrentSHA:      parsed.Ref,
-			CandidateSeenAt: candidateSeenAt,
-			Now:             now,
-		}, policyOptionsFromConfig(cfg, now))
+		var candidate *githubresolver.ResolvedRef
+		var targetLogicalRef string
+		var resolveErr error
+		var decision policy.Decision
+		var effectivePolicy effectiveUpgradePolicy
+		var candidateReports []upgradeCandidate
+		var history []metadata.CandidateHistoryEntry
+		if reconciled.CandidateHistoryPreservable {
+			history = append(history, reconciled.Entry.Candidates...)
+		}
+		if strings.TrimSpace(opts.to) != "" {
+			candidate, targetLogicalRef, resolveErr = resolveExplicitUpgradeTarget(ctx, discovery, parsed, opts.to)
+			candidateSeenAt := candidateObservationTime(
+				reconciled.Entry,
+				reconciled.HasEntry && reconciled.CandidateHistoryPreservable,
+				hasMetadata,
+				candidate,
+				now,
+				cfg.CooldownSource,
+			)
+			if candidate != nil && cfg.CooldownSource == string(policy.CooldownSourceFirstSeen) {
+				history = observeUpgradeCandidate(history, *candidate, candidateSeenAt)
+			}
+			decision = policy.Evaluate(policy.Entry{
+				File:            use.File,
+				Action:          parsed,
+				Candidate:       candidate,
+				ResolveErr:      resolveErr,
+				LogicalRef:      targetLogicalRef,
+				CurrentSHA:      parsed.Ref,
+				CandidateSeenAt: candidateSeenAt,
+				Now:             now,
+			}, policyOptionsFromConfig(cfg, now))
+			if decision.Kind == policy.DecisionUpdate || decision.Kind == policy.DecisionUnchanged {
+				history = removeUpgradeCandidate(history, targetLogicalRef, candidate)
+			}
+		} else {
+			effectivePolicy, resolveErr = effectivePolicyForAction(cfg, opts, actionSelectorString(parsed))
+			if resolveErr == nil {
+				selection, err := selectAutomaticUpgrade(ctx, discovery, parsed, recovered.LogicalRef, history, effectivePolicy, cfg, now)
+				resolveErr = err
+				candidate = selection.Candidate
+				targetLogicalRef = selection.TargetLogicalRef
+				decision = selection.Decision
+				candidateReports = selection.Candidates
+				history = selection.History
+			}
+			if resolveErr != nil {
+				decision = policy.Evaluate(policy.Entry{
+					File:       use.File,
+					Action:     parsed,
+					Candidate:  candidate,
+					ResolveErr: resolveErr,
+					LogicalRef: targetLogicalRef,
+					CurrentSHA: parsed.Ref,
+					Now:        now,
+				}, policyOptionsFromConfig(cfg, now))
+			}
+		}
 		if decision.Kind == policy.DecisionUnchanged && recovered.LogicalRef != targetLogicalRef {
 			decision = policy.Decision{
 				Kind:       policy.DecisionUpdate,
@@ -278,6 +396,17 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 		}
 
 		action := upgradeActionFromDecision(use, parsed, recovered.LogicalRef, targetLogicalRef, candidate, decision)
+		action.Level = effectivePolicy.Level
+		action.Constraint = effectivePolicy.Constraint
+		action.Selection = effectivePolicy.Selection
+		action.SelectedRelease = targetLogicalRef
+		action.Candidates = candidateReports
+		if len(candidateReports) > 1 && (decision.Kind == policy.DecisionUpdate || decision.Kind == policy.DecisionUnchanged) {
+			action.Reason = fmt.Sprintf("%s; selected %s after %d newer release(s) were ineligible", action.Reason, targetLogicalRef, len(candidateReports)-1)
+		}
+		if cfg.CooldownSource == string(policy.CooldownSourceFirstSeen) && !candidateHistoriesEqual(reconciled.Entry.Candidates, history) {
+			plan.ObservationsChanged = true
+		}
 		plan.Report.Actions = append(plan.Report.Actions, action)
 		plan.Report.Summary.Matched++
 		switch decision.Kind {
@@ -288,13 +417,13 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 				Action:   parsed,
 				Decision: decision,
 			})
-			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)
+			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, recovered.LogicalRef, decision, candidate, history, now)
 		case policy.DecisionPending:
 			plan.Report.Summary.Pending++
-			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)
+			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, recovered.LogicalRef, decision, candidate, history, now)
 		case policy.DecisionUnchanged:
 			plan.Report.Summary.Unchanged++
-			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, decision, candidate, now)
+			replaceUpgradeLockEntry(&plan.LockEntries, use, parsed, recovered.LogicalRef, decision, candidate, history, now)
 		default:
 			if isBlockingDecision(decision.Kind) {
 				plan.Report.Summary.Blocked++
@@ -334,31 +463,16 @@ func upgradeMatchesAction(parsed actions.ParsedAction, opts *upgradeOptions) boo
 	return actionSelectorString(parsed) == strings.TrimSpace(opts.action)
 }
 
-func resolveUpgradeTarget(ctx context.Context, resolver planResolver, parsed actions.ParsedAction, opts *upgradeOptions, cfg config.Config) (*githubresolver.ResolvedRef, string, error) {
-	if resolver == nil {
+func resolveExplicitUpgradeTarget(ctx context.Context, discovery *upgradeDiscovery, parsed actions.ParsedAction, target string) (*githubresolver.ResolvedRef, string, error) {
+	if discovery == nil || discovery.resolver == nil {
 		return nil, "", fmt.Errorf("resolver is required")
 	}
-	if opts.latestRelease {
-		if cfg.Upgrade.LatestRelease != config.DefaultUpgradeLatestRelease {
-			return nil, "", fmt.Errorf("upgrade.latest_release %q is not supported", cfg.Upgrade.LatestRelease)
-		}
-		latestRelease, ok := resolver.(latestReleaseResolver)
-		if !ok {
-			return nil, "", fmt.Errorf("resolver does not support latest release discovery")
-		}
-		resolved, err := latestRelease.ResolveLatestRelease(ctx, parsed.Owner, parsed.Repo)
-		if err != nil {
-			return nil, "", err
-		}
-		return &resolved, resolved.Ref, nil
-	}
-
-	target := strings.TrimSpace(opts.to)
+	target = strings.TrimSpace(target)
 	targetParsed := actions.Parse(actionSelectorString(parsed) + "@" + target)
 	if !targetParsed.Valid {
 		return nil, target, fmt.Errorf("invalid target ref %q: %s", target, targetParsed.Error)
 	}
-	resolved, err := resolver.Resolve(ctx, githubresolver.ActionSelector{
+	resolved, err := discovery.resolve(ctx, githubresolver.ActionSelector{
 		Owner: parsed.Owner,
 		Repo:  parsed.Repo,
 		Ref:   target,
@@ -394,22 +508,31 @@ func upgradeActionFromDecision(use workflow.UseNode, parsed actions.ParsedAction
 	return action
 }
 
-func currentUpgradeLockEntry(use workflow.UseNode, parsed actions.ParsedAction, recovered metadata.Metadata, hasMetadata bool, now time.Time) (metadata.LockfileEntry, bool) {
+func currentUpgradeLockEntry(use workflow.UseNode, parsed actions.ParsedAction, recovered metadata.Metadata, hasMetadata bool, previous metadata.LockfileEntry, preserveHistory bool, now time.Time) (metadata.LockfileEntry, bool) {
 	if !isManagedUpgradeCandidate(parsed, hasMetadata) {
 		return metadata.LockfileEntry{}, false
 	}
-	return lockfileEntryForDecision(use, parsed, policy.Decision{
+	entry, ok := lockfileEntryForDecision(use, parsed, policy.Decision{
 		Kind:       policy.DecisionUnchanged,
 		CurrentSHA: parsed.Ref,
 		LogicalRef: recovered.LogicalRef,
 	}, nil, now)
+	if ok && preserveHistory {
+		entry.Candidates = append([]metadata.CandidateHistoryEntry(nil), previous.Candidates...)
+	}
+	return entry, ok
 }
 
-func replaceUpgradeLockEntry(entries *[]metadata.LockfileEntry, use workflow.UseNode, parsed actions.ParsedAction, decision policy.Decision, candidate *githubresolver.ResolvedRef, now time.Time) {
-	entry, ok := lockfileEntryForDecision(use, parsed, decision, candidate, now)
+func replaceUpgradeLockEntry(entries *[]metadata.LockfileEntry, use workflow.UseNode, parsed actions.ParsedAction, activeLogicalRef string, decision policy.Decision, candidate *githubresolver.ResolvedRef, history []metadata.CandidateHistoryEntry, now time.Time) {
+	lockDecision := decision
+	if decision.Kind == policy.DecisionPending {
+		lockDecision.LogicalRef = activeLogicalRef
+	}
+	entry, ok := lockfileEntryForDecision(use, parsed, lockDecision, candidate, now)
 	if !ok {
 		return
 	}
+	entry.Candidates = append([]metadata.CandidateHistoryEntry(nil), history...)
 	key := metadata.Key(use.File, use.NodePath)
 	for i := range *entries {
 		if metadata.Key((*entries)[i].File, (*entries)[i].Node) == key {

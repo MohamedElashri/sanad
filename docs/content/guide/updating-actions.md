@@ -29,11 +29,20 @@ By default, Sanad evaluates cooldown with upstream release, tag, or commit times
 
 ## Change the logical ref
 
-Preview upgrades for all managed entries to their latest GitHub release target:
+Preview the highest stable release allowed by the configured SemVer policy and cooldown:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade
 ```
+
+Restrict one run to minor upgrades, or use an absolute constraint:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --constraint '< 6'
+```
+
+The default `--selection latest-eligible` skips newer releases that are still cooling down and selects the highest mature match. Use `--selection latest` when the command should wait for the newest matching release instead.
 
 Upgrade a managed action to an explicit ref:
 
@@ -47,11 +56,13 @@ GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --t
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5 --write
 ```
 
-You can also spell out the default all/latest-release behavior explicitly:
+The legacy latest-release spelling selects only the newest matching release:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --latest-release
 ```
+
+With `cooldown_source = "first-seen"`, use `--write` to record observations even when no workflow rewrite is eligible. The lockfile keeps multiple observed candidates so an older mature release can be selected while a newer release starts its own cooldown.
 
 `sanad update upgrade` only operates on managed full-SHA pins. It does not convert unmanaged pins or unpinned mutable refs; use `sanad update apply` or interactive apply for those.
 

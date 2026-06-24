@@ -5,6 +5,8 @@ import "time"
 const DefaultPath = ".sanad.toml"
 const DefaultCommentFormat = "sanad: ref={{ref}}"
 const DefaultUpgradeLatestRelease = "github-release"
+const DefaultUpgradeLevel = "major"
+const DefaultUpgradeSelection = "latest-eligible"
 const DefaultCooldownSource = "source"
 
 type Config struct {
@@ -50,6 +52,16 @@ type SecurityConfig struct {
 
 type UpgradeConfig struct {
 	LatestRelease string
+	Level         string
+	Constraint    string
+	Selection     string
+	Actions       map[string]UpgradePolicy
+}
+
+type UpgradePolicy struct {
+	Level      string
+	Constraint string
+	Selection  string
 }
 
 func Default() Config {
@@ -79,6 +91,9 @@ func Default() Config {
 		},
 		Upgrade: UpgradeConfig{
 			LatestRelease: DefaultUpgradeLatestRelease,
+			Level:         DefaultUpgradeLevel,
+			Selection:     DefaultUpgradeSelection,
+			Actions:       make(map[string]UpgradePolicy),
 		},
 	}
 }

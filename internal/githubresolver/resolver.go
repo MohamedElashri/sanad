@@ -50,6 +50,14 @@ type ResolvedRef struct {
 	ReleaseTime *time.Time `json:"release_time,omitempty"`
 }
 
+type Release struct {
+	TagName     string    `json:"tag_name"`
+	Draft       bool      `json:"draft"`
+	Prerelease  bool      `json:"prerelease"`
+	PublishedAt time.Time `json:"published_at"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type ResolverError struct {
 	Kind       ErrorKind
 	Operation  string
@@ -328,6 +336,48 @@ func (c *Client) ResolveLatestRelease(ctx context.Context, owner, repo string) (
 		resolved.ReleaseTime = release.CreatedAt.GetTime()
 	}
 	return resolved, nil
+}
+
+func (c *Client) ListReleases(ctx context.Context, owner, repo string) ([]Release, error) {
+	selector := ActionSelector{Owner: owner, Repo: repo, Ref: "releases"}
+	if err := validateRepository(selector); err != nil {
+		return nil, err
+	}
+
+	options := &github.ListOptions{PerPage: 100}
+	var releases []Release
+	for {
+		page, response, err := c.github.Repositories.ListReleases(ctx, owner, repo, options)
+		if err != nil {
+			return nil, wrapGitHubError("list releases", selector, err)
+		}
+		for _, release := range page {
+			if release == nil {
+				continue
+			}
+			item := Release{
+				TagName:    release.GetTagName(),
+				Draft:      release.GetDraft(),
+				Prerelease: release.GetPrerelease(),
+			}
+			if release.PublishedAt != nil {
+				if publishedAt := release.PublishedAt.GetTime(); publishedAt != nil {
+					item.PublishedAt = *publishedAt
+				}
+			}
+			if release.CreatedAt != nil {
+				if createdAt := release.CreatedAt.GetTime(); createdAt != nil {
+					item.CreatedAt = *createdAt
+				}
+			}
+			releases = append(releases, item)
+		}
+		if response == nil || response.NextPage == 0 {
+			break
+		}
+		options.Page = response.NextPage
+	}
+	return releases, nil
 }
 
 func (c *Client) VerifyCommit(ctx context.Context, owner, repo, sha string) error {

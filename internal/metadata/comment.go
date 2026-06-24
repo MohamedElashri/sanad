@@ -13,7 +13,8 @@ import (
 )
 
 const DefaultLockfilePath = ".github/sanad.lock.json"
-const LockfileVersion = 1
+const LockfileVersion = 2
+const legacyLockfileVersion = 1
 
 type Source string
 
@@ -72,19 +73,26 @@ type Lockfile struct {
 }
 
 type LockfileEntry struct {
-	File            string `json:"file"`
-	Node            string `json:"node"`
-	Owner           string `json:"owner"`
-	Repo            string `json:"repo"`
-	Path            string `json:"path"`
-	Kind            string `json:"kind"`
-	LogicalRef      string `json:"logical_ref"`
-	PinnedSHA       string `json:"pinned_sha,omitempty"`
-	CandidateSHA    string `json:"candidate_sha,omitempty"`
-	CandidateSeenAt string `json:"candidate_seen_at,omitempty"`
-	ResolvedAt      string `json:"resolved_at,omitempty"`
-	Timestamp       string `json:"timestamp,omitempty"`
-	TimestampSource string `json:"timestamp_source,omitempty"`
+	File            string                  `json:"file"`
+	Node            string                  `json:"node"`
+	Owner           string                  `json:"owner"`
+	Repo            string                  `json:"repo"`
+	Path            string                  `json:"path"`
+	Kind            string                  `json:"kind"`
+	LogicalRef      string                  `json:"logical_ref"`
+	PinnedSHA       string                  `json:"pinned_sha,omitempty"`
+	CandidateSHA    string                  `json:"candidate_sha,omitempty"`
+	CandidateSeenAt string                  `json:"candidate_seen_at,omitempty"`
+	Candidates      []CandidateHistoryEntry `json:"candidates,omitempty"`
+	ResolvedAt      string                  `json:"resolved_at,omitempty"`
+	Timestamp       string                  `json:"timestamp,omitempty"`
+	TimestampSource string                  `json:"timestamp_source,omitempty"`
+}
+
+type CandidateHistoryEntry struct {
+	LogicalRef string `json:"logical_ref"`
+	SHA        string `json:"sha"`
+	SeenAt     string `json:"seen_at"`
 }
 
 type LockfileMetadataValue struct {
@@ -126,10 +134,42 @@ func LoadLockfile(path string) (Lockfile, bool, error) {
 	if err := json.Unmarshal(data, &lockfile); err != nil {
 		return Lockfile{}, true, fmt.Errorf("load lockfile %q: invalid JSON: %w", path, err)
 	}
+	lockfile, err = MigrateLockfile(lockfile)
+	if err != nil {
+		return Lockfile{}, true, fmt.Errorf("load lockfile %q: %w", path, err)
+	}
 	if err := ValidateLockfile(lockfile); err != nil {
 		return Lockfile{}, true, fmt.Errorf("load lockfile %q: %w", path, err)
 	}
 	return NormalizeLockfile(lockfile), true, nil
+}
+
+func MigrateLockfile(lockfile Lockfile) (Lockfile, error) {
+	if lockfile.Version != legacyLockfileVersion && lockfile.Version != LockfileVersion {
+		return lockfile, fmt.Errorf("unsupported lockfile version %d: expected %d or %d", lockfile.Version, legacyLockfileVersion, LockfileVersion)
+	}
+	if lockfile.Version == legacyLockfileVersion {
+		for i := range lockfile.Entries {
+			entry := &lockfile.Entries[i]
+			if entry.CandidateSHA != "" {
+				entry.Candidates = append(entry.Candidates, CandidateHistoryEntry{
+					LogicalRef: entry.LogicalRef,
+					SHA:        entry.CandidateSHA,
+					SeenAt:     entry.CandidateSeenAt,
+				})
+			}
+			entry.CandidateSHA = ""
+			entry.CandidateSeenAt = ""
+		}
+		lockfile.Version = LockfileVersion
+	} else {
+		for i, entry := range lockfile.Entries {
+			if entry.CandidateSHA != "" || entry.CandidateSeenAt != "" {
+				return lockfile, fmt.Errorf("entry %d uses version 1 candidate fields in a version 2 lockfile", i)
+			}
+		}
+	}
+	return NormalizeLockfile(lockfile), nil
 }
 
 func ValidateLockfile(lockfile Lockfile) error {
@@ -174,21 +214,25 @@ func validateLockfileEntry(entry LockfileEntry, i int) error {
 	if entry.PinnedSHA != "" && !actions.IsFullSHA(entry.PinnedSHA) {
 		return fmt.Errorf("entry %d pinned_sha must be a full 40-character SHA", i)
 	}
-	if entry.CandidateSHA != "" && !actions.IsFullSHA(entry.CandidateSHA) {
-		return fmt.Errorf("entry %d candidate_sha must be a full 40-character SHA", i)
+	if entry.PinnedSHA == "" && len(entry.Candidates) == 0 {
+		return fmt.Errorf("entry %d must include pinned_sha or candidates", i)
 	}
-	if entry.PinnedSHA == "" && entry.CandidateSHA == "" {
-		return fmt.Errorf("entry %d must include pinned_sha or candidate_sha", i)
-	}
-	if entry.CandidateSHA != "" {
-		if entry.CandidateSeenAt == "" {
-			return fmt.Errorf("entry %d candidate_seen_at is required when candidate_sha is set", i)
+	seenCandidates := make(map[string]struct{}, len(entry.Candidates))
+	for j, candidate := range entry.Candidates {
+		if strings.TrimSpace(candidate.LogicalRef) == "" {
+			return fmt.Errorf("entry %d candidate %d logical_ref is required", i, j)
 		}
-		if _, err := time.Parse(time.RFC3339, entry.CandidateSeenAt); err != nil {
-			return fmt.Errorf("entry %d candidate_seen_at must be RFC3339: %w", i, err)
+		if !actions.IsFullSHA(candidate.SHA) {
+			return fmt.Errorf("entry %d candidate %d sha must be a full 40-character SHA", i, j)
 		}
-	} else if entry.CandidateSeenAt != "" {
-		return fmt.Errorf("entry %d candidate_seen_at requires candidate_sha", i)
+		if _, err := time.Parse(time.RFC3339, candidate.SeenAt); err != nil {
+			return fmt.Errorf("entry %d candidate %d seen_at must be RFC3339: %w", i, j, err)
+		}
+		key := candidate.LogicalRef
+		if _, ok := seenCandidates[key]; ok {
+			return fmt.Errorf("entry %d has duplicate candidate %s", i, candidate.LogicalRef)
+		}
+		seenCandidates[key] = struct{}{}
 	}
 	return nil
 }
@@ -201,6 +245,18 @@ func NormalizeLockfile(lockfile Lockfile) Lockfile {
 		lockfile.GeneratedBy = "sanad"
 	}
 	lockfile.Entries = append([]LockfileEntry(nil), lockfile.Entries...)
+	for i := range lockfile.Entries {
+		entry := &lockfile.Entries[i]
+		entry.CandidateSHA = ""
+		entry.CandidateSeenAt = ""
+		entry.Candidates = append([]CandidateHistoryEntry(nil), entry.Candidates...)
+		sort.Slice(entry.Candidates, func(i, j int) bool {
+			if entry.Candidates[i].LogicalRef != entry.Candidates[j].LogicalRef {
+				return entry.Candidates[i].LogicalRef < entry.Candidates[j].LogicalRef
+			}
+			return entry.Candidates[i].SHA < entry.Candidates[j].SHA
+		})
+	}
 	SortLockfileEntries(lockfile.Entries)
 	return lockfile
 }

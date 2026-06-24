@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	semver "github.com/Masterminds/semver/v3"
+	"github.com/MohamedElashri/sanad/internal/actions"
 )
 
 func Load(path string) (Config, error) {
@@ -151,6 +153,22 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 		}
 		cfg.Upgrade.LatestRelease = latestRelease
 	}
+	if err := applyUpgradePolicy(&cfg.Upgrade.Level, &cfg.Upgrade.Constraint, &cfg.Upgrade.Selection, raw.Upgrade.Level, raw.Upgrade.Constraint, raw.Upgrade.Selection, meta, "upgrade"); err != nil {
+		return Config{}, fmt.Errorf("load config %q: %w", path, err)
+	}
+	if cfg.Upgrade.Actions == nil {
+		cfg.Upgrade.Actions = make(map[string]UpgradePolicy)
+	}
+	for selector, rawPolicy := range raw.Upgrade.Actions {
+		if err := validateUpgradeActionSelector(selector); err != nil {
+			return Config{}, fmt.Errorf("load config %q: upgrade.actions.%q: %w", path, selector, err)
+		}
+		policy := cfg.Upgrade.Actions[selector]
+		if err := applyUpgradePolicy(&policy.Level, &policy.Constraint, &policy.Selection, rawPolicy.Level, rawPolicy.Constraint, rawPolicy.Selection, meta, "upgrade", "actions", selector); err != nil {
+			return Config{}, fmt.Errorf("load config %q: upgrade.actions.%q: %w", path, selector, err)
+		}
+		cfg.Upgrade.Actions[selector] = policy
+	}
 
 	return cfg, nil
 }
@@ -196,7 +214,17 @@ type securityFileConfig struct {
 }
 
 type upgradeFileConfig struct {
-	LatestRelease string `toml:"latest_release"`
+	LatestRelease string                       `toml:"latest_release"`
+	Level         string                       `toml:"level"`
+	Constraint    string                       `toml:"constraint"`
+	Selection     string                       `toml:"selection"`
+	Actions       map[string]upgradePolicyFile `toml:"actions"`
+}
+
+type upgradePolicyFile struct {
+	Level      string `toml:"level"`
+	Constraint string `toml:"constraint"`
+	Selection  string `toml:"selection"`
 }
 
 func decodeConfigData(data []byte) (fileConfig, toml.MetaData, error) {
@@ -310,4 +338,73 @@ func normalizeUpgradeLatestRelease(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("upgrade.latest_release %q is not supported; expected %q", value, DefaultUpgradeLatestRelease)
 	}
+}
+
+func applyUpgradePolicy(level *string, constraint *string, selection *string, rawLevel string, rawConstraint string, rawSelection string, meta toml.MetaData, path ...string) error {
+	hasLevel := meta.IsDefined(append(path, "level")...)
+	hasConstraint := meta.IsDefined(append(path, "constraint")...)
+	if hasLevel && hasConstraint {
+		return fmt.Errorf("%s.level and %s.constraint are mutually exclusive", strings.Join(path, "."), strings.Join(path, "."))
+	}
+	if hasLevel {
+		value, err := normalizeUpgradeLevel(rawLevel)
+		if err != nil {
+			return err
+		}
+		*level, *constraint = value, ""
+	}
+	if hasConstraint {
+		value := strings.TrimSpace(rawConstraint)
+		if value == "" {
+			return fmt.Errorf("%s.constraint must not be empty", strings.Join(path, "."))
+		}
+		if _, err := semver.NewConstraint(value); err != nil {
+			return fmt.Errorf("%s.constraint %q is invalid: %w", strings.Join(path, "."), value, err)
+		}
+		*constraint, *level = value, ""
+	}
+	if meta.IsDefined(append(path, "selection")...) {
+		value, err := normalizeUpgradeSelection(rawSelection)
+		if err != nil {
+			return err
+		}
+		*selection = value
+	}
+	return nil
+}
+
+func normalizeUpgradeLevel(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "major", "minor", "patch":
+		return value, nil
+	case "":
+		return "", fmt.Errorf("upgrade level must not be empty")
+	default:
+		return "", fmt.Errorf("upgrade level %q is not supported; expected major, minor, or patch", value)
+	}
+}
+
+func normalizeUpgradeSelection(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "latest-eligible", "latest":
+		return value, nil
+	case "":
+		return "", fmt.Errorf("upgrade selection must not be empty")
+	default:
+		return "", fmt.Errorf("upgrade selection %q is not supported; expected latest-eligible or latest", value)
+	}
+}
+
+func validateUpgradeActionSelector(selector string) error {
+	selector = strings.TrimSpace(selector)
+	if selector == "" || strings.Contains(selector, "@") {
+		return fmt.Errorf("selector must be owner/repo[/path] without @ref")
+	}
+	parsed := actions.Parse(selector + "@v1.0.0")
+	if !parsed.Valid || parsed.Owner == "" || parsed.Repo == "" {
+		return fmt.Errorf("selector must be a valid owner/repo[/path]")
+	}
+	return nil
 }

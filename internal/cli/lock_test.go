@@ -117,8 +117,7 @@ func TestLockRepairWriteFixesPinDriftAndPreservesCandidateHistory(t *testing.T) 
 	seenAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
 	entry := lockTestEntry("actions", "checkout", "v4", oldSHA)
-	entry.CandidateSHA = candidateSHA
-	entry.CandidateSeenAt = seenAt
+	entry.Candidates = []metadata.CandidateHistoryEntry{{LogicalRef: "v5", SHA: candidateSHA, SeenAt: seenAt}}
 	writeTestLockfile(t, entry)
 
 	cmd := NewRootCommand()
@@ -141,8 +140,85 @@ func TestLockRepairWriteFixesPinDriftAndPreservesCandidateHistory(t *testing.T) 
 	if got.PinnedSHA != currentSHA {
 		t.Fatalf("PinnedSHA = %q, want %q", got.PinnedSHA, currentSHA)
 	}
-	if got.CandidateSHA != candidateSHA || got.CandidateSeenAt != seenAt {
+	if len(got.Candidates) != 1 || got.Candidates[0].SHA != candidateSHA || got.Candidates[0].SeenAt != seenAt {
 		t.Fatalf("candidate history was not preserved: %#v", got)
+	}
+}
+
+func TestLockRepairDoesNotRemoveMissingEntries(t *testing.T) {
+	withTempWorkingDir(t)
+	currentSHA := strings.Repeat("a", 40)
+	oldSHA := strings.Repeat("b", 40)
+	missingSHA := strings.Repeat("c", 40)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	missing := metadata.LockfileEntry{
+		File:       ".github/workflows/removed.yml",
+		Node:       "jobs.old.steps[0].uses",
+		Owner:      "actions",
+		Repo:       "setup-go",
+		Kind:       string(actions.KindGitHubAction),
+		LogicalRef: "v5",
+		PinnedSHA:  missingSHA,
+	}
+	writeTestLockfile(t, lockTestEntry("actions", "checkout", "v4", oldSHA), missing)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"lock", "repair", "--write"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	lockfile, _, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if len(lockfile.Entries) != 2 {
+		t.Fatalf("repair removed a missing entry: %#v", lockfile.Entries)
+	}
+}
+
+func TestLockRepairScopedWorkflowPreservesOutOfScopeEntries(t *testing.T) {
+	withTempWorkingDir(t)
+	currentSHA := strings.Repeat("d", 40)
+	oldSHA := strings.Repeat("e", 40)
+	otherSHA := strings.Repeat("f", 40)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+	otherPath := filepath.Join(".github", "workflows", "other.yml")
+	if err := os.WriteFile(otherPath, []byte("jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+otherSHA+" # sanad: ref=v5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	other := metadata.LockfileEntry{
+		File:       filepath.ToSlash(otherPath),
+		Node:       lockTestNode,
+		Owner:      "actions",
+		Repo:       "setup-go",
+		Kind:       string(actions.KindGitHubAction),
+		LogicalRef: "v5",
+		PinnedSHA:  otherSHA,
+	}
+	writeTestLockfile(t, lockTestEntry("actions", "checkout", "v4", oldSHA), other)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"lock", "repair", "--workflows", ".github/workflows/ci.yml", "--write"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	lockfile, _, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	if err != nil {
+		t.Fatalf("LoadLockfile returned error: %v", err)
+	}
+	if len(lockfile.Entries) != 2 {
+		t.Fatalf("scoped repair removed out-of-scope entries: %#v", lockfile.Entries)
+	}
+	for _, entry := range lockfile.Entries {
+		if entry.File == filepath.ToSlash(otherPath) && entry.PinnedSHA != otherSHA {
+			t.Fatalf("scoped repair changed out-of-scope entry: %#v", entry)
+		}
 	}
 }
 

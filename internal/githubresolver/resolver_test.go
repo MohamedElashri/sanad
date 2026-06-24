@@ -258,6 +258,34 @@ func TestResolveLatestReleaseReportsNoReleases(t *testing.T) {
 	}
 }
 
+func TestListReleasesPaginatesAndPreservesReleaseMetadata(t *testing.T) {
+	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/actions/checkout/releases" {
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("page") {
+		case "":
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/repos/actions/checkout/releases?page=2>; rel="next"`, r.Host))
+			writeJSON(t, w, []map[string]any{{"tag_name": "v6.0.0", "published_at": "2026-06-20T12:00:00Z"}})
+		case "2":
+			writeJSON(t, w, []map[string]any{{"tag_name": "v5.0.0", "created_at": "2026-05-01T12:00:00Z", "prerelease": true}})
+		default:
+			t.Fatalf("unexpected page: %s", r.URL.Query().Get("page"))
+		}
+	})
+
+	client := newTestClient(t, server)
+	releases, err := client.ListReleases(context.Background(), "actions", "checkout")
+	if err != nil {
+		t.Fatalf("ListReleases returned error: %v", err)
+	}
+	if len(releases) != 2 || releases[0].TagName != "v6.0.0" || releases[1].TagName != "v5.0.0" || !releases[1].Prerelease {
+		t.Fatalf("unexpected releases: %#v", releases)
+	}
+	assertTime(t, releases[0].PublishedAt, "2026-06-20T12:00:00Z")
+	assertTime(t, releases[1].CreatedAt, "2026-05-01T12:00:00Z")
+}
+
 func TestResolveDiscoveryReportsAPIFailure(t *testing.T) {
 	server := fakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/repos/actions/checkout" {

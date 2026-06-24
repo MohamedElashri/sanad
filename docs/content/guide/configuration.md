@@ -31,6 +31,10 @@ files = []
 write = true
 format = "sanad: ref={{ref}}"
 
+[upgrade]
+level = "major"
+selection = "latest-eligible"
+
 [security]
 require_full_sha = true
 require_commit_in_source_repo = true
@@ -53,6 +57,8 @@ deny_forks = false
 `updates.unpinned = "deny"` is the default. Set it to `default-branch` or `latest-release` only when your repository policy intentionally allows Sanad to discover a target for unpinned `owner/repo` actions.
 
 `comments.write = false` disables inline `sanad: ref=...` comments. The lockfile remains the metadata source.
+
+`upgrade.level` limits automatic release changes to `major`, `minor`, or `patch`. Use `upgrade.constraint` instead for an absolute SemVer range. `upgrade.selection = "latest-eligible"` selects the highest mature release; `latest` waits for the newest matching release. Add `[upgrade.actions."owner/repo"]` tables for action-specific overrides.
 
 ## GitHub API
 

@@ -204,6 +204,10 @@ files = []
 write = true
 format = "sanad: ref={{ref}}"
 
+[upgrade]
+level = "major"
+selection = "latest-eligible"
+
 [security]
 require_full_sha = true
 require_commit_in_source_repo = true
@@ -251,11 +255,13 @@ Legacy top-level invocations are still accepted as hidden compatibility aliases 
 
 `sanad audit check --format sarif` emits SARIF for code scanning, and `sanad audit plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 
-`sanad update upgrade` previews upgrades for all managed pins to their latest GitHub release. It is dry-run by default; add `--write` after reviewing the diff.
+`sanad update upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default; add `--write` after reviewing the diff.
+
+Use `--level minor|patch`, `--constraint '< 6'`, or matching `[upgrade]` configuration to restrict automatic upgrades. `--selection latest` restores the wait-for-the-newest behavior; the default `latest-eligible` can select an older release while a newer one is cooling down.
 
 `sanad update upgrade --action actions/checkout --to v5` intentionally moves one managed pin to a specific logical ref while keeping workflow execution pinned to a full SHA.
 
-`sanad lock status` reports stale, repairable, and blocking lockfile diagnostics. Use `sanad lock refresh --write` to rebuild active managed entries from current workflows, `sanad lock repair --write` to apply safe reconciliation fixes, and `sanad lock prune --write` to remove entries for deleted workflow nodes only.
+`sanad lock status` reports stale, repairable, and blocking lockfile diagnostics. Use `sanad lock refresh --write` to rebuild active managed entries, `sanad lock repair --write` for non-destructive reconciliation fixes, and `sanad lock prune --write` for explicit removal of entries belonging to deleted workflow nodes. Audit commands are read-only, and scoped writes preserve entries outside `--workflows`.
 
 Command-specific usage is covered in the [CLI reference](docs/content/reference/cli.md).
 
@@ -283,7 +289,7 @@ See the [security model](docs/content/advanced/security-model.md) for the full m
 
 ## Cooldown
 
-The default cooldown is `14d`, and the default `cooldown_source = "source"` uses the upstream release, tag, or commit timestamp. This keeps routine updates moving while still rejecting missing or future timestamps. Set `cooldown_source = "first-seen"` when you want the stricter mode: Sanad records when a candidate SHA was first seen locally and waits for that observation window before adopting it.
+The default cooldown is `14d`, and the default `cooldown_source = "source"` uses the upstream release, tag, or commit timestamp. Automatic upgrades select the highest matching release that has satisfied this window. Set `cooldown_source = "first-seen"` for the stricter mode: Sanad records candidate histories in the lockfile and waits for the local observation window before adopting them. Run upgrade with `--write` to persist observations even when no workflow update is yet eligible.
 
 ## CI
 

@@ -37,7 +37,11 @@ write = true
 format = "sanad: ref={{ref}}"
 
 [upgrade]
-latest_release = "github-release"
+level = "major"
+selection = "latest-eligible"
+
+[upgrade.actions."actions/checkout"]
+constraint = ">= 4, < 6"
 
 [security]
 require_full_sha = true
@@ -90,7 +94,15 @@ Patterns use path-style glob matching, with a prefix fallback for trailing `*` p
 
 ## `[upgrade]`
 
-`latest_release = "github-release"` controls `sanad update upgrade --latest-release`. `release` is accepted as an alias.
+`level` sets the maximum automatic SemVer change: `patch` stays within the current major and minor, `minor` stays within the current major, and `major` permits any newer stable release. The default is `major`.
+
+`constraint` accepts a SemVer constraint such as `">= 4, < 6"` and is mutually exclusive with `level`.
+
+`selection = "latest-eligible"` chooses the highest matching release that has satisfied cooldown. `selection = "latest"` evaluates only the highest matching release and waits if it is cooling down.
+
+`[upgrade.actions."owner/repo[/path]"]` applies `level`, `constraint`, and `selection` overrides to one action. CLI flags override per-action settings, which override global settings.
+
+The deprecated `latest_release = "github-release"` key and its `release` alias remain accepted for compatibility.
 
 ## `[security]`
 
