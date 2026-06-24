@@ -114,10 +114,16 @@ Preview policy decisions and proposed pin updates:
 GITHUB_TOKEN=$(gh auth token) sanad audit plan
 ```
 
-Show the rewrite diff without changing files:
+Preview updates without changing files:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+```
+
+Add `--diff` when you want the unified file patch:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
 ```
 
 Apply locally:
@@ -255,7 +261,7 @@ Legacy top-level invocations are still accepted as hidden compatibility aliases 
 
 `sanad audit check --format sarif` emits SARIF for code scanning, and `sanad audit plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 
-`sanad update upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default; add `--write` after reviewing the diff.
+`sanad update upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default and does not print file patches unless `--diff` is passed; add `--write` to apply the reported upgrades.
 
 Use `--level minor|patch`, `--constraint '< 6'`, or matching `[upgrade]` configuration to restrict automatic upgrades. `--selection latest` restores the wait-for-the-newest behavior; the default `latest-eligible` can select an older release while a newer one is cooling down.
 

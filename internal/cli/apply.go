@@ -23,6 +23,7 @@ import (
 
 type applyOptions struct {
 	dryRun        bool
+	diff          bool
 	interactive   bool
 	write         bool
 	yes           bool
@@ -75,6 +76,7 @@ func newApplyCommand(opts *rootOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&applyOpts.dryRun, "dry-run", false, "show proposed changes without writing files")
+	cmd.Flags().BoolVar(&applyOpts.diff, "diff", false, "show the unified workflow file diff")
 	cmd.Flags().BoolVar(&applyOpts.interactive, "interactive", false, "prompt for confirmation")
 	cmd.Flags().BoolVar(&applyOpts.write, "write", false, "write changes to workflow files")
 	cmd.Flags().BoolVarP(&applyOpts.yes, "yes", "y", false, "approve non-interactive writes")
@@ -83,6 +85,9 @@ func newApplyCommand(opts *rootOptions) *cobra.Command {
 }
 
 func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, resolver planResolver) error {
+	if applyOpts.diff && opts.format != "table" {
+		return categorizedError{code: exitConfig, err: fmt.Errorf("--diff requires --format table")}
+	}
 	cfg, err := loadConfig(opts)
 	if err != nil {
 		return err
@@ -106,12 +111,22 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 	if err != nil {
 		return err
 	}
+	if applyOpts.diff && len(rewrites) > 0 {
+		if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
+			return err
+		}
+	}
 	if applyOpts.dryRun {
 		if len(rewrites) == 0 {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
 			return nil
 		}
-		return printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd))
+		if applyOpts.diff {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed.")
+		} else {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Planned %d workflow update(s) across %d file(s); no files changed. Add --diff to show the patch.\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+		}
+		return nil
 	}
 
 	if len(rewrites) == 0 {

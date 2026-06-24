@@ -2,6 +2,14 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.6 - 2026-06-24
+
+### Changed
+
+- Made workflow file diffs opt-in for apply and upgrade commands through `--diff`; default output now stays at the summary and decision-table level.
+
+
+
 ## 0.1.5 - 2026-06-24
 
 ### Added
