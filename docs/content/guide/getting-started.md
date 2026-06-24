@@ -104,10 +104,16 @@ The table output summarizes what Sanad found and whether each action is unchange
 
 ## Apply changes
 
-Preview the exact rewrite first:
+Preview the proposed updates first:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+```
+
+Add `--diff` to inspect the exact rewrite:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
 ```
 
 Then write the workflow changes and lockfile:

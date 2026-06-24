@@ -85,11 +85,12 @@ Apply approved updates to workflow files and refresh `.github/sanad.lock.json`.
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
 GITHUB_TOKEN=$(gh auth token) sanad update apply --interactive
 GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
 ```
 
-`--dry-run` prints a unified diff and writes nothing. Non-interactive writes require `--yes --write`.
+`--dry-run` reports the number of proposed updates and writes nothing. File patches are hidden by default; pass `--diff` to print the unified diff. `--diff` also works with interactive or write mode and requires table output. Non-interactive writes require `--yes --write`.
 
 Alias: `sanad apply`.
 
@@ -101,11 +102,12 @@ Move managed full-SHA pins from one logical ref to another.
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor --dry-run --diff
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --constraint '< 6' --write
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --selection latest
 ```
 
-With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command is dry-run by default; add `--write` after reviewing the diff.
+With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command is dry-run by default and shows its decision table without a file patch. Pass `--diff` to include the unified diff or `--write` to apply the upgrades.
 
 `--level major|minor|patch` and `--constraint <range>` are mutually exclusive. `--selection latest-eligible|latest` controls cooldown fallback. `--to <ref>` bypasses automatic SemVer selection but still enforces cooldown and cannot be combined with automatic policy flags.
 

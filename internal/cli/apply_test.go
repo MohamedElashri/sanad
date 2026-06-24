@@ -36,7 +36,7 @@ func TestApplyDryRunPrintsDiffWithoutWritingFiles(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"apply", "--dry-run"})
+	cmd.SetArgs([]string{"apply", "--dry-run", "--diff"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -58,6 +58,38 @@ func TestApplyDryRunPrintsDiffWithoutWritingFiles(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("dry-run output missing %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestApplyDryRunHidesDiffByDefault(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("0", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner:      "actions",
+			Repo:       "checkout",
+			Ref:        "v4",
+			SHA:        sha,
+			Kind:       githubresolver.KindTag,
+			CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--dry-run"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if strings.Contains(out.String(), "--- .github/workflows/ci.yml") || strings.Contains(out.String(), "@@ -") {
+		t.Fatalf("default dry-run unexpectedly printed a diff:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Add --diff to show the patch") {
+		t.Fatalf("default dry-run did not advertise --diff:\n%s", out.String())
 	}
 }
 

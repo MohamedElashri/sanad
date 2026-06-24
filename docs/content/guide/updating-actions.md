@@ -50,7 +50,13 @@ Upgrade a managed action to an explicit ref:
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5
 ```
 
-`upgrade` is dry-run by default. Add `--write` after reviewing the diff:
+`upgrade` is dry-run by default and shows the decision table without a file patch. Add `--diff` to inspect the patch:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5 --diff
+```
+
+Add `--write` to apply the upgrade:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5 --write

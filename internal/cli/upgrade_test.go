@@ -35,7 +35,7 @@ func TestUpgradeDryRunExplicitTargetShowsDiffWithoutWriting(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--dry-run"})
+	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--dry-run", "--diff"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -230,12 +230,16 @@ func TestUpgradeBareCommandDefaultsToAllLatestReleaseDryRun(t *testing.T) {
 		"v5",
 		"v6",
 		"update",
-		"-      - uses: actions/checkout@" + currentSHA + " # sanad: ref=v5",
-		"+      - uses: actions/checkout@" + targetSHA + " # sanad: ref=v6",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("upgrade default output missing %q:\n%s", want, text)
 		}
+	}
+	if strings.Contains(text, "--- .github/workflows/ci.yml") || strings.Contains(text, "@@ -") {
+		t.Fatalf("default upgrade unexpectedly printed a diff:\n%s", text)
+	}
+	if !strings.Contains(text, "Add --diff to show the patch") {
+		t.Fatalf("default upgrade did not advertise --diff:\n%s", text)
 	}
 }
 

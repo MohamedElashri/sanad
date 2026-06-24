@@ -31,6 +31,7 @@ type upgradeOptions struct {
 	constraintSet     bool
 	selectionSet      bool
 	dryRun            bool
+	diff              bool
 	write             bool
 	workflowPaths     []string
 }
@@ -105,6 +106,7 @@ func newUpgradeCommand(opts *rootOptions) *cobra.Command {
 	cmd.Flags().StringVar(&upgradeOpts.constraint, "constraint", "", "automatic release SemVer constraint")
 	cmd.Flags().StringVar(&upgradeOpts.selection, "selection", "", "automatic release selection: latest-eligible or latest")
 	cmd.Flags().BoolVar(&upgradeOpts.dryRun, "dry-run", false, "show proposed changes without writing files")
+	cmd.Flags().BoolVar(&upgradeOpts.diff, "diff", false, "show the unified workflow file diff")
 	cmd.Flags().BoolVar(&upgradeOpts.write, "write", false, "write changes to workflow files and lockfile")
 	cmd.Flags().StringSliceVar(&upgradeOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
 	return cmd
@@ -118,6 +120,9 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	effectiveOpts := upgradeOptionsWithDefaults(cmd, upgradeOpts)
 	if err := validateUpgradeOptions(&effectiveOpts); err != nil {
 		return categorizedError{code: exitConfig, err: err}
+	}
+	if effectiveOpts.diff && rootOpts.format != "table" {
+		return categorizedError{code: exitConfig, err: fmt.Errorf("--diff requires --format table")}
 	}
 	if effectiveOpts.latestReleaseMode != "" {
 		latestRelease, err := normalizeUpgradeLatestReleaseForCLI(effectiveOpts.latestReleaseMode)
@@ -155,7 +160,7 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 		if err := printUpgradeTable(cmd, plan.Report); err != nil {
 			return err
 		}
-		if len(rewrites) > 0 {
+		if effectiveOpts.diff && len(rewrites) > 0 {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 			if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
 				return err
@@ -170,7 +175,11 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	}
 	if effectiveOpts.dryRun || !effectiveOpts.write {
 		if len(rewrites) > 0 && rootOpts.format == "table" {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed. Add --write to apply these upgrades.")
+			if effectiveOpts.diff {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed. Add --write to apply these upgrades.")
+			} else {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed. Add --diff to show the patch or --write to apply these upgrades.")
+			}
 		}
 		return nil
 	}
