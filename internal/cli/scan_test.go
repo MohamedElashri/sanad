@@ -23,7 +23,7 @@ func TestScanJSONOutput(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--format", "json", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--format", "json", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -83,7 +83,7 @@ func TestScanTableOutputReportsInvalidReferences(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -130,7 +130,7 @@ func TestScanReportsIgnoredReferences(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--config", configPath, "--format", "json", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--config", configPath, "--format", "json", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -160,7 +160,7 @@ func TestInvalidConfigReturnsConfigExitCode(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--config", configPath, "audit", "scan"})
+	cmd.SetArgs([]string{"--config", configPath, "scan"})
 
 	err := cmd.Execute()
 	if err == nil {

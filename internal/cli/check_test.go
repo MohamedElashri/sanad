@@ -31,7 +31,7 @@ func TestCheckPassesWhenManagedPinIsCurrent(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check"})
+	cmd.SetArgs([]string{"check"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -63,7 +63,7 @@ func TestCheckPassesWithRepairableLockfilePinDrift(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check"})
+	cmd.SetArgs([]string{"check"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -93,7 +93,7 @@ func TestCheckFailsMutableTagReference(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check"})
+	cmd.SetArgs([]string{"check"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -119,7 +119,7 @@ func TestCheckFailsShortSHAReference(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check"})
+	cmd.SetArgs([]string{"check"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -142,7 +142,7 @@ func TestCheckJSONIncludesViolations(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check", "--format", "json"})
+	cmd.SetArgs([]string{"check", "--format", "json"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -197,7 +197,7 @@ func TestCheckUsesDefaultBranchPolicyForUnpinnedActions(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check", "--format", "json"})
+	cmd.SetArgs([]string{"check", "--format", "json"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -229,7 +229,7 @@ func TestCheckSARIFIncludesViolations(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "check", "--format", "sarif"})
+	cmd.SetArgs([]string{"check", "--format", "sarif"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -308,21 +308,21 @@ func TestCheckStrictControlsManagedUpdatesAndPendingCooldown(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	err := executeCheckWithArgs("audit", "check")
+	err := executeCheckWithArgs("check")
 	if err == nil {
 		t.Fatal("default check returned nil error, want pending violation")
 	}
 	if ExitCode(err) != exitPolicy {
 		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
 	}
-	err = executeCheckWithArgs("audit", "check", "--strict")
+	err = executeCheckWithArgs("check", "--strict")
 	if err == nil {
 		t.Fatal("strict check returned nil error, want pending violation")
 	}
 	if ExitCode(err) != exitPolicy {
 		t.Fatalf("strict ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
 	}
-	if err := executeCheckWithArgs("audit", "check", "--allow-pending-cooldown"); err != nil {
+	if err := executeCheckWithArgs("check", "--allow-pending-cooldown"); err != nil {
 		t.Fatalf("check with allow-pending-cooldown returned error: %v", err)
 	}
 }
@@ -344,14 +344,14 @@ func TestCheckFailOnUpdatesControlsManagedEligibleUpdates(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	err := executeCheckWithArgs("audit", "check")
+	err := executeCheckWithArgs("check")
 	if err == nil {
 		t.Fatal("default check returned nil error, want update violation")
 	}
 	if ExitCode(err) != exitPolicy {
 		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
 	}
-	err = executeCheckWithArgs("audit", "check", "--fail-on-updates")
+	err = executeCheckWithArgs("check", "--fail-on-updates")
 	if err == nil {
 		t.Fatal("check --fail-on-updates returned nil error, want update violation")
 	}

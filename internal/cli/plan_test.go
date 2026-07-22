@@ -75,7 +75,7 @@ func TestPlanTableShowsDecisionsWithoutModifyingWorkflows(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "plan", "--workflows", workflows})
+	cmd.SetArgs([]string{"plan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -154,7 +154,7 @@ func TestPlanJSONOutputAndOutFile(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--format", "json", "audit", "plan", "--workflows", workflows, "--out", outPath})
+	cmd.SetArgs([]string{"--format", "json", "plan", "--workflows", workflows, "--out", outPath})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -309,7 +309,7 @@ func TestPlanWritesPullRequestBody(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"audit", "plan", "--workflows", workflows, "--pr-body-out", bodyPath})
+	cmd.SetArgs([]string{"plan", "--workflows", workflows, "--pr-body-out", bodyPath})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -855,7 +855,7 @@ func executePlanJSON(t *testing.T, workflows string) planReport {
 	cmd := NewRootCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--format", "json", "audit", "plan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--format", "json", "plan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)

@@ -176,7 +176,7 @@ func TestUpgradeFirstSeenWritePersistsObservationsWithoutChangingWorkflow(t *tes
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "upgrade", "--write"})
+	cmd.SetArgs([]string{"upgrade", "--write"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}

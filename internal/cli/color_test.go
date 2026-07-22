@@ -26,7 +26,7 @@ func TestColorAlwaysColorizesHumanOutput(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--color", "always", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--color", "always", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -55,7 +55,7 @@ func TestColorNeverWinsOverForcedEnvironment(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--color", "never", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--color", "never", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -79,7 +79,7 @@ func TestColorAlwaysDoesNotAffectJSONOutput(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--color", "always", "--format", "json", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--color", "always", "--format", "json", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -122,7 +122,7 @@ func TestPlanColorizesCurrentAndCandidateDifferently(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--color", "always", "audit", "plan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--color", "always", "plan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)

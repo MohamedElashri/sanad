@@ -2,6 +2,8 @@ package cli
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/MohamedElashri/sanad/internal/config"
 	"github.com/spf13/cobra"
@@ -45,6 +47,17 @@ func NewRootCommand() *cobra.Command {
 		Short:         "Pin GitHub Actions workflow dependencies to immutable commit SHAs",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Args:          cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if _, err := os.Stat(opts.configPath); os.IsNotExist(err) && opts.configPath == config.DefaultPath {
+				fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'sanad start' to initialize the project.")
+				return nil
+			}
+			checkCmd := newCheckCommand(opts)
+			checkCmd.SetOut(cmd.OutOrStdout())
+			checkCmd.SetErr(cmd.ErrOrStderr())
+			return checkCmd.Execute()
+		},
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.configPath, "config", config.DefaultPath, "path to config file")
@@ -59,46 +72,16 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		newStartCommand(opts),
-		newAuditCommand(opts),
-		newUpdateCommand(opts),
+		newScanCommand(opts),
+		newPlanCommand(opts),
+		newCheckCommand(opts),
+		newApplyCommand(opts),
+		newUpgradeCommand(opts),
 		newLockCommand(opts),
 		newCompletionCommand(),
 		newVersionCommand(),
 	)
 
-	return cmd
-}
-
-func newAuditCommand(opts *rootOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "audit",
-		Short: "Inspect workflow dependencies and policy compliance",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-	cmd.AddCommand(
-		newScanCommand(opts),
-		newPlanCommand(opts),
-		newCheckCommand(opts),
-	)
-	return cmd
-}
-
-func newUpdateCommand(opts *rootOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update",
-		Short: "Apply workflow pin and logical ref updates",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-	cmd.AddCommand(
-		newApplyCommand(opts),
-		newUpgradeCommand(opts),
-	)
 	return cmd
 }
 

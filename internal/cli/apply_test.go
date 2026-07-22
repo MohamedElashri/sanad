@@ -36,7 +36,7 @@ func TestApplyDryRunPrintsDiffWithoutWritingFiles(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--dry-run", "--diff"})
+	cmd.SetArgs([]string{"apply", "--dry-run", "--diff"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -81,7 +81,7 @@ func TestApplyDryRunHidesDiffByDefault(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--dry-run"})
+	cmd.SetArgs([]string{"apply", "--dry-run"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestApplyYesWriteRewritesWorkflowAndUpdatesLockfile(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -171,7 +171,7 @@ func TestApplyYesWritePinsUnpinnedLatestRelease(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -216,7 +216,7 @@ func TestApplyCommentsWriteFalseUsesLockfileWithoutInlineMetadata(t *testing.T) 
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -263,7 +263,7 @@ func TestApplyNonInteractiveRefusesWithoutYesWrite(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply"})
+	cmd.SetArgs([]string{"apply"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -302,7 +302,7 @@ func TestApplyYesWriteUpdatesLockfileWhenWorkflowAlreadyCurrent(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -350,7 +350,7 @@ func TestApplyYesWriteRefreshesStaleLockfilePinDrift(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -411,7 +411,7 @@ func TestApplyRetainsManagedPendingPinsInLockfile(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -463,7 +463,7 @@ func TestApplyInteractivePinsUnpinnedActionFromExplicitRef(t *testing.T) {
 	cmd.SetIn(strings.NewReader("e\nv4\ny\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--interactive"})
+	cmd.SetArgs([]string{"apply", "--interactive"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -500,7 +500,7 @@ func TestApplyInteractiveTracksLogicalRefForUnmanagedPinnedSHA(t *testing.T) {
 	cmd.SetIn(strings.NewReader("t\nv4\ny\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--interactive"})
+	cmd.SetArgs([]string{"apply", "--interactive"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -545,7 +545,7 @@ func TestApplyInteractivePinsDeniedBranchHead(t *testing.T) {
 	cmd.SetIn(strings.NewReader("p\nn\ny\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--interactive"})
+	cmd.SetArgs([]string{"apply", "--interactive"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -582,7 +582,7 @@ func TestApplyInteractivePersistsBranchTrackingWhenRequested(t *testing.T) {
 	cmd.SetIn(strings.NewReader("p\ny\ny\n"))
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--interactive"})
+	cmd.SetArgs([]string{"apply", "--interactive"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -605,7 +605,7 @@ func TestApplyInteractivePersistsBranchTrackingWhenRequested(t *testing.T) {
 	cmd = NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("non-interactive apply after persistence returned error: %v", err)
@@ -640,7 +640,7 @@ func TestApplyFirstSeenCooldownRecordsPendingCandidate(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("apply returned error: %v", err)
@@ -688,7 +688,7 @@ func TestApplyPreservesFutureUpgradeCandidateHistory(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -730,7 +730,7 @@ func TestApplyScopedWorkflowPreservesOutOfScopeLockEntries(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--workflows", ".github/workflows/ci.yml", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--workflows", ".github/workflows/ci.yml", "--yes", "--write"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -766,7 +766,7 @@ func TestAuditCommandsNeverModifyLockfile(t *testing.T) {
 	writeTestLockfile(t, metadata.LockfileEntry{File: ".github/workflows/ci.yml", Node: lockTestNode, Owner: "actions", Repo: "checkout", Kind: "github-action", LogicalRef: "v4", PinnedSHA: sha})
 	original := readFileString(t, metadata.DefaultLockfilePath)
 
-	for _, args := range [][]string{{"audit", "scan"}, {"audit", "plan"}, {"audit", "check"}} {
+	for _, args := range [][]string{{"scan"}, {"plan"}, {"check"}} {
 		cmd := NewRootCommand()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})

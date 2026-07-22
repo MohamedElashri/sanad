@@ -117,31 +117,31 @@ This command will:
 If you prefer to preview changes before applying them:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit plan
+GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
 Preview updates without changing files:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
 ```
 
 Add `--diff` when you want the unified file patch:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
 ```
 
 Apply locally:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
 Validate locally:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit check
+GITHUB_TOKEN=$(gh auth token) sanad check
 ```
 
 If Dependabot or a manual edit changes a pinned workflow entry and leaves `.github/sanad.lock.json` stale, inspect and repair the lockfile without deleting it:
@@ -152,7 +152,7 @@ sanad lock repair --dry-run
 sanad lock repair --write
 ```
 
-`sanad audit plan`, `sanad audit check`, `sanad update apply`, and `sanad update upgrade` may contact GitHub when resolution is needed. `sanad audit scan` and `sanad lock status|refresh|repair|prune` are local-only.
+`sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` may contact GitHub when resolution is needed. `sanad scan` and `sanad lock status|refresh|repair|prune` are local-only.
 
 Human-readable output uses color automatically when the terminal supports it. Use `--color never` or `NO_COLOR=1` to disable color, and `--color always` to force it for pagers or demos.
 
@@ -234,11 +234,11 @@ Interactive apply can optionally persist branch tracking by writing `[updates].b
 ## Commands
 
 ```bash
-sanad audit scan
-sanad audit plan
-sanad audit check
-sanad update apply
-sanad update upgrade
+sanad scan
+sanad plan
+sanad check
+sanad apply
+sanad upgrade
 sanad lock status
 sanad lock refresh
 sanad lock repair
@@ -256,13 +256,13 @@ All commands accept:
 ```
 
 
-`sanad audit check --format sarif` emits SARIF for code scanning, and `sanad audit plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
+`sanad check --format sarif` emits SARIF for code scanning, and `sanad plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 
-`sanad update upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default and does not print file patches unless `--diff` is passed; add `--write` to apply the reported upgrades.
+`sanad upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default and does not print file patches unless `--diff` is passed; add `--write` to apply the reported upgrades.
 
 Use `--level minor|patch`, `--constraint '< 6'`, or matching `[upgrade]` configuration to restrict automatic upgrades. `--selection latest` restores the wait-for-the-newest behavior; the default `latest-eligible` can select an older release while a newer one is cooling down.
 
-`sanad update upgrade --action actions/checkout --to v5` intentionally moves one managed pin to a specific logical ref while keeping workflow execution pinned to a full SHA.
+`sanad upgrade --action actions/checkout --to v5` intentionally moves one managed pin to a specific logical ref while keeping workflow execution pinned to a full SHA.
 
 `sanad lock status` reports stale, repairable, and blocking lockfile diagnostics. Use `sanad lock refresh --write` to rebuild active managed entries, `sanad lock repair --write` for non-destructive reconciliation fixes, and `sanad lock prune --write` for explicit removal of entries belonging to deleted workflow nodes. Audit commands are read-only, and scoped writes preserve entries outside `--workflows`.
 
@@ -280,7 +280,7 @@ Tokens are used for GitHub API requests and are never printed by the CLI. Public
 For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit plan
+GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
 
@@ -315,7 +315,7 @@ jobs:
         with:
           go-version: "1.26.x"
       - run: go install github.com/MohamedElashri/sanad/cmd/sanad@latest
-      - run: sanad audit check --format json
+      - run: sanad check --format json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```

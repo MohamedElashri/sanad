@@ -95,19 +95,19 @@ This command will:
 If you prefer to preview changes without applying them, you can use:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit plan
+GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
 Add `--diff` to inspect the exact rewrite:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
 ```
 
 Then write the workflow changes and lockfile:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
 Sanad rewrites only the relevant scalar values. It does not serialize or reformat the whole YAML document.
@@ -117,7 +117,7 @@ Sanad rewrites only the relevant scalar values. It does not serialize or reforma
 Use `check` when a repository should already comply:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit check
+GITHUB_TOKEN=$(gh auth token) sanad check
 ```
 
 Exit code `0` means the check passed. Exit code `1` means policy violations or required changes were found.
