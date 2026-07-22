@@ -40,7 +40,7 @@ In that mode, Sanad uses the time each candidate ref and SHA pair was first reco
 The default cooldown is:
 
 ```toml
-cooldown = "14d"
+cooldown = "7d"
 ```
 
 Automatic `latest-eligible` upgrades evaluate stable releases from highest SemVer downward and select the first candidate that has satisfied cooldown. Newer ineligible releases remain visible in reports and, in first-seen mode, in lockfile history. If no candidate qualifies, Sanad reports `pending-cooldown` and does not rewrite the workflow.

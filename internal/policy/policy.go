@@ -62,7 +62,7 @@ func DefaultOptions() Options {
 		Unpinned:          UnpinnedDeny,
 		ReusableWorkflows: true,
 		IgnoreActions:     []string{"./*", "docker://*"},
-		Cooldown:          14 * 24 * time.Hour,
+		Cooldown:          7 * 24 * time.Hour,
 		CooldownSource:    CooldownSourceUpstream,
 	}
 }

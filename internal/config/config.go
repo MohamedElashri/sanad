@@ -68,7 +68,7 @@ func Default() Config {
 	return Config{
 		Source:         "defaults",
 		WorkflowPaths:  []string{".github/workflows"},
-		Cooldown:       14 * 24 * time.Hour,
+		Cooldown:       7 * 24 * time.Hour,
 		CooldownSource: DefaultCooldownSource,
 		Updates: UpdatesConfig{
 			Tags:              "track",

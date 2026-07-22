@@ -1,6 +1,6 @@
 workflow_paths = [".github/workflows"]
 
-cooldown = "14d"
+cooldown = "7d"
 cooldown_source = "source"
 
 [updates]

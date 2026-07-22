@@ -13,7 +13,7 @@ If `.sanad.toml` is missing, built-in defaults are used. If a non-default config
 
 ```toml
 workflow_paths = [".github/workflows"]
-cooldown = "14d"
+cooldown = "7d"
 cooldown_source = "source"
 
 [updates]
@@ -56,7 +56,7 @@ Array of workflow files or directories. Directories are searched recursively for
 
 ## `cooldown`
 
-Minimum age before a resolved candidate SHA can be adopted. Supports Go durations such as `48h` and day values such as `14d`.
+Minimum age before a resolved candidate SHA can be adopted. Supports Go durations such as `48h` and day values such as `7d`.
 
 ## `cooldown_source`
 

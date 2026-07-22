@@ -11,7 +11,7 @@ Start with the defaults and add config only for policy choices your repository n
 
 ```toml
 workflow_paths = [".github/workflows"]
-cooldown = "14d"
+cooldown = "7d"
 cooldown_source = "source"
 
 [updates]
@@ -46,7 +46,7 @@ deny_forks = false
 
 `workflow_paths` controls which workflow files or directories are scanned. Configured paths must be relative and stay inside the repository root.
 
-`cooldown` controls how old a resolved candidate must be before Sanad can adopt it. The default is `14d`.
+`cooldown` controls how old a resolved candidate must be before Sanad can adopt it. The default is `7d`.
 
 `cooldown_source = "source"` uses upstream release, tag, or commit timestamps and is the default. Set `cooldown_source = "first-seen"` to use the time Sanad first recorded a candidate SHA locally.
 

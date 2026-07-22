@@ -21,8 +21,8 @@ func TestLoadDefaultWhenMissing(t *testing.T) {
 	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
 		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
 	}
-	if cfg.Cooldown != 14*24*time.Hour {
-		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
+	if cfg.Cooldown != 7*24*time.Hour {
+		t.Fatalf("Cooldown = %s, want 168h", cfg.Cooldown)
 	}
 	if cfg.CooldownSource != DefaultCooldownSource {
 		t.Fatalf("CooldownSource = %q, want %q", cfg.CooldownSource, DefaultCooldownSource)
@@ -233,8 +233,8 @@ func TestLoadExampleConfig(t *testing.T) {
 	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
 		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
 	}
-	if cfg.Cooldown != 14*24*time.Hour {
-		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
+	if cfg.Cooldown != 7*24*time.Hour {
+		t.Fatalf("Cooldown = %s, want 168h", cfg.Cooldown)
 	}
 	if cfg.CooldownSource != DefaultCooldownSource {
 		t.Fatalf("CooldownSource = %q, want %q", cfg.CooldownSource, DefaultCooldownSource)
@@ -283,7 +283,7 @@ func TestParseDuration(t *testing.T) {
 		value string
 		want  time.Duration
 	}{
-		{value: "14d", want: 14 * 24 * time.Hour},
+		{value: "7d", want: 7 * 24 * time.Hour},
 		{value: "48h", want: 48 * time.Hour},
 		{value: "30m", want: 30 * time.Minute},
 		{value: "0s", want: 0},
@@ -331,7 +331,7 @@ tags = "track"
 
 func TestLoadCooldownDayDuration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), DefaultPath)
-	if err := os.WriteFile(path, []byte(`cooldown = "14d"`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`cooldown = "7d"`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -339,7 +339,7 @@ func TestLoadCooldownDayDuration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if cfg.Cooldown != 14*24*time.Hour {
+	if cfg.Cooldown != 7*24*time.Hour {
 		t.Fatalf("Cooldown = %s, want 336h", cfg.Cooldown)
 	}
 }

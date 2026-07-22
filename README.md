@@ -190,7 +190,7 @@ Create `.sanad.toml` when the defaults are not enough:
 
 ```toml
 workflow_paths = [".github/workflows"]
-cooldown = "14d"
+cooldown = "7d"
 cooldown_source = "source"
 
 [updates]
@@ -295,7 +295,7 @@ See the [security model](docs/content/advanced/security-model.md) for the full m
 
 ## Cooldown
 
-The default cooldown is `14d`, and the default `cooldown_source = "source"` uses the upstream release, tag, or commit timestamp. Automatic upgrades select the highest matching release that has satisfied this window. Set `cooldown_source = "first-seen"` for the stricter mode: Sanad records candidate histories in the lockfile and waits for the local observation window before adopting them. Run upgrade with `--write` to persist observations even when no workflow update is yet eligible.
+The default cooldown is `7d`, and the default `cooldown_source = "source"` uses the upstream release, tag, or commit timestamp. Automatic upgrades select the highest matching release that has satisfied this window. Set `cooldown_source = "first-seen"` for the stricter mode: Sanad records candidate histories in the lockfile and waits for the local observation window before adopting them. Run upgrade with `--write` to persist observations even when no workflow update is yet eligible.
 
 ## CI
 

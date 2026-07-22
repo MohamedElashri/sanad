@@ -7,7 +7,7 @@ import (
 
 func TestEvaluateCooldown(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	cooldown := 14 * 24 * time.Hour
+	cooldown := 7 * 24 * time.Hour
 
 	tests := []struct {
 		name      string
@@ -23,9 +23,9 @@ func TestEvaluateCooldown(t *testing.T) {
 		},
 		{
 			name:      "newer than cooldown is pending",
-			candidate: now.Add(-13*24*time.Hour - 23*time.Hour),
+			candidate: now.Add(-6*24*time.Hour - 23*time.Hour),
 			wantKind:  DecisionPending,
-			wantAge:   13*24*time.Hour + 23*time.Hour,
+			wantAge:   6*24*time.Hour + 23*time.Hour,
 		},
 		{
 			name:      "exact boundary is eligible",
