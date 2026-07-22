@@ -22,8 +22,12 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 
 	help := out.String()
 	for _, want := range []string{
-		"\n  audit",
-		"\n  update",
+		"\n  start",
+		"\n  scan",
+		"\n  plan",
+		"\n  check",
+		"\n  apply",
+		"\n  upgrade",
 		"\n  lock",
 		"\n  completion",
 		"\n  version",
@@ -32,36 +36,19 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 			t.Fatalf("root help missing %q:\n%s", want, help)
 		}
 	}
-	for _, legacy := range []string{
-		"\n  scan",
-		"\n  plan",
-		"\n  check",
-		"\n  apply",
-		"\n  upgrade",
+	for _, removed := range []string{
+		"\n  audit",
+		"\n  update",
 	} {
-		if strings.Contains(help, legacy) {
-			t.Fatalf("root help includes legacy command %q:\n%s", legacy, help)
+		if strings.Contains(help, removed) {
+			t.Fatalf("root help includes removed namespace %q:\n%s", removed, help)
 		}
 	}
 }
 
-func TestLegacyTopLevelCommandsRemainHiddenAliases(t *testing.T) {
-	root := NewRootCommand()
-	for _, name := range []string{"scan", "plan", "check", "apply", "upgrade"} {
-		command, _, err := root.Find([]string{name})
-		if err != nil {
-			t.Fatalf("Find(%q) returned error: %v", name, err)
-		}
-		if command == nil || command.Name() != name {
-			t.Fatalf("Find(%q) = %#v, want command named %q", name, command, name)
-		}
-		if !command.Hidden {
-			t.Fatalf("legacy command %q is visible in root help", name)
-		}
-	}
-}
 
-func TestNestedAuditScanExecutes(t *testing.T) {
+
+func TestScanExecutes(t *testing.T) {
 	workflows := filepath.Join(t.TempDir(), ".github", "workflows")
 	path := filepath.Join(workflows, "ci.yml")
 	if err := os.MkdirAll(workflows, 0o755); err != nil {
@@ -75,7 +62,7 @@ func TestNestedAuditScanExecutes(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--format", "json", "audit", "scan", "--workflows", workflows})
+	cmd.SetArgs([]string{"--format", "json", "scan", "--workflows", workflows})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -90,7 +77,7 @@ func TestNestedAuditScanExecutes(t *testing.T) {
 	}
 }
 
-func TestNestedUpdateApplyExecutes(t *testing.T) {
+func TestApplyExecutes(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: ./.github/actions/local\n")
 
@@ -98,7 +85,7 @@ func TestNestedUpdateApplyExecutes(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--dry-run"})
+	cmd.SetArgs([]string{"apply", "--dry-run"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -108,30 +95,16 @@ func TestNestedUpdateApplyExecutes(t *testing.T) {
 	}
 }
 
-func TestRuntimeCompletionIncludesNestedCommands(t *testing.T) {
+func TestRuntimeCompletionIncludesFlatCommands(t *testing.T) {
 	rootCompletion := completeCommand(t, "")
-	for _, want := range []string{"audit\t", "update\t", "lock\t", "completion\t", "version\t"} {
+	for _, want := range []string{"start\t", "scan\t", "plan\t", "check\t", "apply\t", "upgrade\t", "lock\t", "completion\t", "version\t"} {
 		if !strings.Contains(rootCompletion, want) {
 			t.Fatalf("root completion missing %q:\n%s", want, rootCompletion)
 		}
 	}
-	for _, legacy := range []string{"scan\t", "plan\t", "check\t", "apply\t", "upgrade\t"} {
-		if strings.Contains(rootCompletion, legacy) {
-			t.Fatalf("root completion includes legacy command %q:\n%s", legacy, rootCompletion)
-		}
-	}
-
-	auditCompletion := completeCommand(t, "audit", "")
-	for _, want := range []string{"scan\t", "plan\t", "check\t"} {
-		if !strings.Contains(auditCompletion, want) {
-			t.Fatalf("audit completion missing %q:\n%s", want, auditCompletion)
-		}
-	}
-
-	updateCompletion := completeCommand(t, "update", "")
-	for _, want := range []string{"apply\t", "upgrade\t"} {
-		if !strings.Contains(updateCompletion, want) {
-			t.Fatalf("update completion missing %q:\n%s", want, updateCompletion)
+	for _, removed := range []string{"audit\t", "update\t"} {
+		if strings.Contains(rootCompletion, removed) {
+			t.Fatalf("root completion includes removed namespace %q:\n%s", removed, rootCompletion)
 		}
 	}
 }

@@ -5,25 +5,20 @@ weight = 10
 template = "page"
 +++
 
-Sanad exposes five top-level command groups:
+Sanad exposes six top-level command groups:
 
 ```bash
-sanad audit
-sanad update
+sanad start
+sanad scan
+sanad plan
+sanad check
+sanad apply
+sanad upgrade
 sanad lock
 sanad completion
 sanad version
 ```
 
-Legacy top-level workflow commands remain available as hidden compatibility aliases for one migration period:
-
-| Old command | New command |
-| --- | --- |
-| `sanad scan` | `sanad audit scan` |
-| `sanad plan` | `sanad audit plan` |
-| `sanad check` | `sanad audit check` |
-| `sanad apply` | `sanad update apply` |
-| `sanad upgrade` | `sanad update upgrade` |
 
 Global flags:
 
@@ -37,74 +32,66 @@ Global flags:
 
 Sanad uses standard ANSI colors that stay readable on typical dark and light terminal backgrounds. If your terminal exposes `COLORFGBG`, sanad uses it to tune warning colors; `SANAD_COLOR_THEME=dark` or `SANAD_COLOR_THEME=light` can override that detection.
 
-## `audit scan`
+## `scan`
 
 Discover and classify `uses:` entries without contacting GitHub.
 
 ```bash
-sanad audit scan
+sanad scan
 sanad --format json audit scan
-sanad audit scan --workflows .github/workflows
+sanad scan --workflows .github/workflows
 ```
 
-Alias: `sanad scan`.
-
-## `audit plan`
+## `plan`
 
 Resolve actionable refs and show decisions without writing files.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit plan
+GITHUB_TOKEN=$(gh auth token) sanad plan
 GITHUB_TOKEN=$(gh auth token) sanad --format json audit plan
-GITHUB_TOKEN=$(gh auth token) sanad audit plan --out sanad-plan.json
-GITHUB_TOKEN=$(gh auth token) sanad audit plan --pr-body-out sanad-pr-body.md
+GITHUB_TOKEN=$(gh auth token) sanad plan --out sanad-plan.json
+GITHUB_TOKEN=$(gh auth token) sanad plan --pr-body-out sanad-pr-body.md
 ```
 
 Decision values include `unchanged`, `update`, `pending-cooldown`, skip decisions, and policy errors such as `error-unpinned`, `error-short-sha`, `error-tag-denied`, `error-branch-denied`, and `error-unresolved`.
 
-Alias: `sanad plan`.
-
-## `audit check`
+## `check`
 
 Validate workflows against policy.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit check
+GITHUB_TOKEN=$(gh auth token) sanad check
 GITHUB_TOKEN=$(gh auth token) sanad --format json audit check
-GITHUB_TOKEN=$(gh auth token) sanad audit check --format sarif
-GITHUB_TOKEN=$(gh auth token) sanad audit check --allow-pending-cooldown
+GITHUB_TOKEN=$(gh auth token) sanad check --format sarif
+GITHUB_TOKEN=$(gh auth token) sanad check --allow-pending-cooldown
 ```
 
 Default behavior fails on policy violations, mutable refs that still need to be pinned, and managed pins whose resolved candidate differs from the workflow SHA. Pass `--allow-pending-cooldown` to allow cooldown-pending managed candidates while still failing eligible updates.
 
-Alias: `sanad check`.
-
-## `update apply`
+## `apply`
 
 Apply approved updates to workflow files and refresh `.github/sanad.lock.json`.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
-GITHUB_TOKEN=$(gh auth token) sanad update apply --interactive
-GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --interactive
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
 `--dry-run` reports the number of proposed updates and writes nothing. File patches are hidden by default; pass `--diff` to print the unified diff. `--diff` also works with interactive or write mode and requires table output. Non-interactive writes require `--yes --write`.
 
-Alias: `sanad apply`.
-
-## `update upgrade`
+## `upgrade`
 
 Move managed full-SHA pins from one logical ref to another.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --action actions/checkout --to v5
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor --dry-run
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --level minor --dry-run --diff
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --constraint '< 6' --write
-GITHUB_TOKEN=$(gh auth token) sanad update upgrade --all --selection latest
+GITHUB_TOKEN=$(gh auth token) sanad upgrade
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --level minor --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --level minor --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --constraint '< 6' --write
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --selection latest
 ```
 
 With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command is dry-run by default and shows its decision table without a file patch. Pass `--diff` to include the unified diff or `--write` to apply the upgrades.
@@ -112,8 +99,6 @@ With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it 
 `--level major|minor|patch` and `--constraint <range>` are mutually exclusive. `--selection latest-eligible|latest` controls cooldown fallback. `--to <ref>` bypasses automatic SemVer selection but still enforces cooldown and cannot be combined with automatic policy flags.
 
 `--latest-release` remains as a compatibility alias for `--selection latest`; `--latest-release-mode` is deprecated. Automatic selection rejects non-SemVer current refs, drafts, prereleases, and non-SemVer release tags. Use `--to` for those refs.
-
-Alias: `sanad upgrade`.
 
 ## `lock status`
 

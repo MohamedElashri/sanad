@@ -688,7 +688,7 @@ func TestApplyPreservesFutureUpgradeCandidateHistory(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--yes", "--write"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -730,7 +730,7 @@ func TestApplyScopedWorkflowPreservesOutOfScopeLockEntries(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"update", "apply", "--workflows", ".github/workflows/ci.yml", "--yes", "--write"})
+	cmd.SetArgs([]string{"apply", "--workflows", ".github/workflows/ci.yml", "--yes", "--write"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -766,7 +766,7 @@ func TestAuditCommandsNeverModifyLockfile(t *testing.T) {
 	writeTestLockfile(t, metadata.LockfileEntry{File: ".github/workflows/ci.yml", Node: lockTestNode, Owner: "actions", Repo: "checkout", Kind: "github-action", LogicalRef: "v4", PinnedSHA: sha})
 	original := readFileString(t, metadata.DefaultLockfilePath)
 
-	for _, args := range [][]string{{"audit", "scan"}, {"audit", "plan"}, {"audit", "check"}} {
+	for _, args := range [][]string{{"scan"}, {"plan"}, {"check"}} {
 		cmd := NewRootCommand()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})

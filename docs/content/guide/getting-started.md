@@ -78,48 +78,36 @@ sanad completion install powershell
 
 Use `sanad completion install --dry-run` to preview the files that would be written, or `--no-profile` to install the completion file without updating shell profile files.
 
-## Scan workflows
+## Initialize Sanad
 
-Run a local scan first. This does not contact GitHub:
+The easiest way to initialize sanad and pin your workflows is to run:
 
 ```bash
-sanad audit scan
+GITHUB_TOKEN=$(gh auth token) sanad start
 ```
 
-Use JSON when another tool will consume the result:
+This command will:
+1. Create a default `.sanad.toml` config file if one doesn't exist.
+2. Scan your workflows and securely resolve all action references.
+3. Apply the immutable SHAs to your workflows.
+4. Create the lockfile at `.github/sanad.lock.json`.
+
+If you prefer to preview changes without applying them, you can use:
 
 ```bash
-sanad --format json audit scan
-```
-
-## Preview changes
-
-Planning resolves GitHub refs and applies policy without changing files:
-
-```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit plan
-```
-
-The table output summarizes what Sanad found and whether each action is unchanged, eligible for update, pending cooldown, skipped, or blocked by policy.
-
-## Apply changes
-
-Preview the proposed updates first:
-
-```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
 Add `--diff` to inspect the exact rewrite:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
 ```
 
 Then write the workflow changes and lockfile:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
 Sanad rewrites only the relevant scalar values. It does not serialize or reformat the whole YAML document.
@@ -129,7 +117,7 @@ Sanad rewrites only the relevant scalar values. It does not serialize or reforma
 Use `check` when a repository should already comply:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad audit check
+GITHUB_TOKEN=$(gh auth token) sanad check
 ```
 
 Exit code `0` means the check passed. Exit code `1` means policy violations or required changes were found.

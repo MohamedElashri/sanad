@@ -2,6 +2,17 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.2.0 - 2026-07-22
+
+### Added
+
+- Introduced the `sanad start` command to streamline initialization. It automatically generates a default `.sanad.toml` configuration and applies default settings to your workflows in a single step.
+
+### Changed
+
+- **BREAKING CHANGE**: Simplified the CLI by flattening the command structure. The grouped namespaces (`audit scan`, `update apply`, etc.) have been removed in favor of top-level commands (`sanad scan`, `sanad apply`, etc.).
+- Improved the default behavior: Running `sanad` with no arguments now checks for `.sanad.toml`. If found, it defaults to running `sanad check`. If missing, it provides a helpful message to run `sanad start`.
+
 ## 0.1.7 - 2026-07-22
 
 ### Changed

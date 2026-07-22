@@ -255,7 +255,7 @@ func TestUpgradeJSONReportVersionTwoIncludesEffectivePolicyAndCandidates(t *test
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"--format", "json", "update", "upgrade"})
+	cmd.SetArgs([]string{"--format", "json", "upgrade"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
