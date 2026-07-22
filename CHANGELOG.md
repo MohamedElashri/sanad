@@ -2,6 +2,20 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.1.7 - 2026-07-22
+
+### Changed
+
+- Reduced the default cooldown from 14 days to 7 days in code, configuration examples, and documentation.
+
+### Dependencies
+
+- Updated `github.com/Masterminds/semver/v3` from 3.4.0 to 3.5.0.
+
+### Chores
+
+- Updated managed workflow pins: `actions/checkout` to v6.0.3 and `goreleaser/goreleaser-action` to v7.2.2.
+
 ## 0.1.6 - 2026-06-24
 
 ### Changed
