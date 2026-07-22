@@ -22,6 +22,7 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 
 	help := out.String()
 	for _, want := range []string{
+		"\n  start",
 		"\n  audit",
 		"\n  update",
 		"\n  lock",
@@ -45,21 +46,7 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 	}
 }
 
-func TestLegacyTopLevelCommandsRemainHiddenAliases(t *testing.T) {
-	root := NewRootCommand()
-	for _, name := range []string{"scan", "plan", "check", "apply", "upgrade"} {
-		command, _, err := root.Find([]string{name})
-		if err != nil {
-			t.Fatalf("Find(%q) returned error: %v", name, err)
-		}
-		if command == nil || command.Name() != name {
-			t.Fatalf("Find(%q) = %#v, want command named %q", name, command, name)
-		}
-		if !command.Hidden {
-			t.Fatalf("legacy command %q is visible in root help", name)
-		}
-	}
-}
+
 
 func TestNestedAuditScanExecutes(t *testing.T) {
 	workflows := filepath.Join(t.TempDir(), ".github", "workflows")
@@ -110,7 +97,7 @@ func TestNestedUpdateApplyExecutes(t *testing.T) {
 
 func TestRuntimeCompletionIncludesNestedCommands(t *testing.T) {
 	rootCompletion := completeCommand(t, "")
-	for _, want := range []string{"audit\t", "update\t", "lock\t", "completion\t", "version\t"} {
+	for _, want := range []string{"start\t", "audit\t", "update\t", "lock\t", "completion\t", "version\t"} {
 		if !strings.Contains(rootCompletion, want) {
 			t.Fatalf("root completion missing %q:\n%s", want, rootCompletion)
 		}

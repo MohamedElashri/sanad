@@ -2,6 +2,16 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.2.0 - 2026-07-22
+
+### Added
+
+- Introduced the `sanad start` command to streamline initialization. It automatically generates a default `.sanad.toml` configuration and applies default settings to your workflows in a single step.
+
+### Changed
+
+- **BREAKING CHANGE**: Completely removed legacy top-level compatibility aliases (`sanad scan`, `sanad plan`, `sanad check`, `sanad apply`, `sanad upgrade`). Scripts relying on these must be updated to use the canonical commands (e.g., `sanad audit scan`, `sanad update apply`).
+
 ## 0.1.7 - 2026-07-22
 
 ### Changed

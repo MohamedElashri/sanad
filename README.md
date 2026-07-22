@@ -102,13 +102,19 @@ Use `sanad completion install --dry-run` to preview the files that would be writ
 
 ## Quickstart
 
-Scan workflows without making network calls:
+The easiest way to initialize sanad and pin your workflows is to run:
 
 ```bash
-sanad audit scan
+GITHUB_TOKEN=$(gh auth token) sanad start
 ```
 
-Preview policy decisions and proposed pin updates:
+This command will:
+1. Create a default `.sanad.toml` config file if one doesn't exist.
+2. Scan your workflows and securely resolve all action references.
+3. Apply the immutable SHAs to your workflows.
+4. Create the lockfile at `.github/sanad.lock.json`.
+
+If you prefer to preview changes before applying them:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad audit plan
@@ -249,15 +255,6 @@ All commands accept:
 --format json
 ```
 
-Legacy top-level invocations are still accepted as hidden compatibility aliases for one migration period:
-
-| Old command | New command |
-| --- | --- |
-| `sanad scan` | `sanad audit scan` |
-| `sanad plan` | `sanad audit plan` |
-| `sanad check` | `sanad audit check` |
-| `sanad apply` | `sanad update apply` |
-| `sanad upgrade` | `sanad update upgrade` |
 
 `sanad audit check --format sarif` emits SARIF for code scanning, and `sanad audit plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 

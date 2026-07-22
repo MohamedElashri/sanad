@@ -10,7 +10,7 @@ func TestRunPrintsCommandErrors(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{"upgrade", "--action", "actions/checkout", "--all"}, &stdout, &stderr)
+	code := run([]string{"update", "upgrade", "--action", "actions/checkout", "--all"}, &stdout, &stderr)
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)

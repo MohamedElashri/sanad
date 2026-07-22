@@ -58,13 +58,13 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
+		newStartCommand(opts),
 		newAuditCommand(opts),
 		newUpdateCommand(opts),
 		newLockCommand(opts),
 		newCompletionCommand(),
 		newVersionCommand(),
 	)
-	cmd.AddCommand(newHiddenAliasCommands(opts)...)
 
 	return cmd
 }
@@ -100,20 +100,6 @@ func newUpdateCommand(opts *rootOptions) *cobra.Command {
 		newUpgradeCommand(opts),
 	)
 	return cmd
-}
-
-func newHiddenAliasCommands(opts *rootOptions) []*cobra.Command {
-	commands := []*cobra.Command{
-		newScanCommand(opts),
-		newPlanCommand(opts),
-		newCheckCommand(opts),
-		newApplyCommand(opts),
-		newUpgradeCommand(opts),
-	}
-	for _, command := range commands {
-		command.Hidden = true
-	}
-	return commands
 }
 
 func loadConfig(opts *rootOptions) (config.Config, error) {

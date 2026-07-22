@@ -5,9 +5,10 @@ weight = 10
 template = "page"
 +++
 
-Sanad exposes five top-level command groups:
+Sanad exposes six top-level command groups:
 
 ```bash
+sanad start
 sanad audit
 sanad update
 sanad lock
@@ -15,15 +16,6 @@ sanad completion
 sanad version
 ```
 
-Legacy top-level workflow commands remain available as hidden compatibility aliases for one migration period:
-
-| Old command | New command |
-| --- | --- |
-| `sanad scan` | `sanad audit scan` |
-| `sanad plan` | `sanad audit plan` |
-| `sanad check` | `sanad audit check` |
-| `sanad apply` | `sanad update apply` |
-| `sanad upgrade` | `sanad update upgrade` |
 
 Global flags:
 

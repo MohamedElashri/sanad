@@ -78,36 +78,24 @@ sanad completion install powershell
 
 Use `sanad completion install --dry-run` to preview the files that would be written, or `--no-profile` to install the completion file without updating shell profile files.
 
-## Scan workflows
+## Initialize Sanad
 
-Run a local scan first. This does not contact GitHub:
-
-```bash
-sanad audit scan
-```
-
-Use JSON when another tool will consume the result:
+The easiest way to initialize sanad and pin your workflows is to run:
 
 ```bash
-sanad --format json audit scan
+GITHUB_TOKEN=$(gh auth token) sanad start
 ```
 
-## Preview changes
+This command will:
+1. Create a default `.sanad.toml` config file if one doesn't exist.
+2. Scan your workflows and securely resolve all action references.
+3. Apply the immutable SHAs to your workflows.
+4. Create the lockfile at `.github/sanad.lock.json`.
 
-Planning resolves GitHub refs and applies policy without changing files:
+If you prefer to preview changes without applying them, you can use:
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad audit plan
-```
-
-The table output summarizes what Sanad found and whether each action is unchanged, eligible for update, pending cooldown, skipped, or blocked by policy.
-
-## Apply changes
-
-Preview the proposed updates first:
-
-```bash
-GITHUB_TOKEN=$(gh auth token) sanad update apply --dry-run
 ```
 
 Add `--diff` to inspect the exact rewrite:

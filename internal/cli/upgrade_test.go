@@ -35,7 +35,7 @@ func TestUpgradeDryRunExplicitTargetShowsDiffWithoutWriting(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--dry-run", "--diff"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", "v5", "--dry-run", "--diff"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -81,7 +81,7 @@ func TestUpgradeWriteUpdatesWorkflowAndLockfile(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -134,7 +134,7 @@ func TestUpgradeWriteIgnoresStaleLockfilePinDrift(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -181,7 +181,7 @@ func TestUpgradeLatestReleaseUsesConfiguredReleaseMode(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--latest-release", "--write"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--latest-release", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -215,7 +215,7 @@ func TestUpgradeBareCommandDefaultsToAllLatestReleaseDryRun(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade"})
+	cmd.SetArgs([]string{"update", "upgrade"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -294,7 +294,7 @@ func TestUpgradeNoOpWhenTargetAlreadyCurrent(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -330,7 +330,7 @@ func TestUpgradeRespectsCooldown(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", "v5", "--write"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -348,7 +348,7 @@ func TestUpgradeRejectsSHATarget(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", strings.Repeat("a", 40)})
+	cmd.SetArgs([]string{"update", "upgrade", "--action", "actions/checkout", "--to", strings.Repeat("a", 40)})
 
 	err := cmd.Execute()
 	if err == nil {
