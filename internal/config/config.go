@@ -11,6 +11,7 @@ const DefaultCooldownSource = "source"
 
 type Config struct {
 	Source         string
+	PolicySources  []string
 	WorkflowPaths  []string
 	Cooldown       time.Duration
 	CooldownSource string
@@ -59,9 +60,9 @@ type UpgradeConfig struct {
 }
 
 type UpgradePolicy struct {
-	Level      string
-	Constraint string
-	Selection  string
+	Level      string `json:"level"`
+	Constraint string `json:"constraint"`
+	Selection  string `json:"selection"`
 }
 
 func Default() Config {

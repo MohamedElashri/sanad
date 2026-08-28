@@ -174,7 +174,7 @@ func TestCheckJSONIncludesViolations(t *testing.T) {
 	}
 }
 
-func TestCheckUsesDefaultBranchPolicyForUnpinnedActions(t *testing.T) {
+func TestCheckFreshUsesDefaultBranchPolicyForUnpinnedActions(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("7", 40)
 	installPlanTestResolver(t, fakePlanResolver{
@@ -197,7 +197,7 @@ func TestCheckUsesDefaultBranchPolicyForUnpinnedActions(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"check", "--format", "json"})
+	cmd.SetArgs([]string{"check", "--fresh", "--format", "json"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -308,14 +308,13 @@ func TestCheckStrictControlsManagedUpdatesAndPendingCooldown(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	err := executeCheckWithArgs("check")
-	if err == nil {
-		t.Fatal("default check returned nil error, want pending violation")
+	if err := executeCheckWithArgs("check"); err != nil {
+		t.Fatalf("default local check returned error: %v", err)
 	}
-	if ExitCode(err) != exitPolicy {
-		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+	if err := executeCheckWithArgs("check", "--fresh"); err != nil {
+		t.Fatalf("fresh check should allow pending cooldown by default: %v", err)
 	}
-	err = executeCheckWithArgs("check", "--strict")
+	err := executeCheckWithArgs("check", "--strict")
 	if err == nil {
 		t.Fatal("strict check returned nil error, want pending violation")
 	}
@@ -344,12 +343,15 @@ func TestCheckFailOnUpdatesControlsManagedEligibleUpdates(t *testing.T) {
 	withTempWorkingDir(t)
 	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@"+currentSHA+" # sanad: ref=v5\n")
 
-	err := executeCheckWithArgs("check")
+	if err := executeCheckWithArgs("check"); err != nil {
+		t.Fatalf("default local check returned error: %v", err)
+	}
+	err := executeCheckWithArgs("check", "--fresh")
 	if err == nil {
-		t.Fatal("default check returned nil error, want update violation")
+		t.Fatal("check --fresh returned nil error, want eligible update violation")
 	}
 	if ExitCode(err) != exitPolicy {
-		t.Fatalf("default ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+		t.Fatalf("fresh ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
 	}
 	err = executeCheckWithArgs("check", "--fail-on-updates")
 	if err == nil {

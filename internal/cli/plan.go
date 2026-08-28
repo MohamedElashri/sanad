@@ -109,7 +109,7 @@ func newPlanCommand(opts *rootOptions) *cobra.Command {
 		Use:   "plan",
 		Short: "Resolve workflow dependencies and show proposed pin changes",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPlan(cmd, opts, planOpts, defaultPlanResolver)
+			return withRepositoryRoot(opts, func() error { return runPlan(cmd, opts, planOpts, defaultPlanResolver) })
 		},
 	}
 	cmd.Flags().StringVar(&planOpts.out, "out", "", "write JSON plan to a file")

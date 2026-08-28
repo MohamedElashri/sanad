@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -72,7 +73,7 @@ func newApplyCommand(opts *rootOptions) *cobra.Command {
 		Use:   "apply",
 		Short: "Apply approved workflow pin updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runApply(cmd, opts, applyOpts, defaultPlanResolver)
+			return withRepositoryRoot(opts, func() error { return runApply(cmd, opts, applyOpts, defaultPlanResolver) })
 		},
 	}
 	cmd.Flags().BoolVar(&applyOpts.dryRun, "dry-run", false, "show proposed changes without writing files")
@@ -85,6 +86,9 @@ func newApplyCommand(opts *rootOptions) *cobra.Command {
 }
 
 func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, resolver planResolver) error {
+	if applyOpts.dryRun && applyOpts.write {
+		return categorizedError{code: exitConfig, err: fmt.Errorf("--dry-run and --write cannot be used together")}
+	}
 	if applyOpts.diff && opts.format != "table" {
 		return categorizedError{code: exitConfig, err: fmt.Errorf("--diff requires --format table")}
 	}
@@ -103,7 +107,13 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		return err
 	}
 	if len(plan.Blockers) > 0 {
-		_ = printPlanTable(cmd, plan.Report)
+		if opts.format == "json" {
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			_ = encoder.Encode(plan.Report)
+		} else {
+			_ = printPlanTable(cmd, plan.Report)
+		}
 		return categorizedError{code: blockerExitCode(plan.Blockers), err: blockersError(plan.Blockers)}
 	}
 
@@ -111,22 +121,44 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 	if err != nil {
 		return err
 	}
-	if applyOpts.diff && len(rewrites) > 0 {
+	wantsWrite := applyOpts.write || applyOpts.interactive
+	if applyOpts.dryRun || !wantsWrite {
+		switch opts.format {
+		case "json":
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(plan.Report); err != nil {
+				return err
+			}
+		case "table":
+			if err := printPlanTable(cmd, plan.Report); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported format %q: expected table or json", opts.format)
+		}
+		if applyOpts.diff && len(rewrites) > 0 {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
+			if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
+				return err
+			}
+		}
+		if len(rewrites) == 0 {
+			if opts.format == "table" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
+			}
+			return nil
+		}
+		if opts.format == "table" {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nPlanned %d workflow update(s) across %d file(s); no files changed. Add --diff to show the patch or --write to apply.\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+		}
+		return nil
+	}
+
+	if applyOpts.diff && len(rewrites) > 0 && interactive == nil {
 		if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
 			return err
 		}
-	}
-	if applyOpts.dryRun {
-		if len(rewrites) == 0 {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
-			return nil
-		}
-		if applyOpts.diff {
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\nDry run only; no files changed.")
-		} else {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Planned %d workflow update(s) across %d file(s); no files changed. Add --diff to show the patch.\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
-		}
-		return nil
 	}
 
 	if len(rewrites) == 0 {
@@ -138,7 +170,7 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 			if err := authorizeApply(cmd, applyOpts, plan.Report, rewrites, interactive); err != nil {
 				return err
 			}
-			if err := saveApplyLockfile(plan.LockEntries); err != nil {
+			if err := writeWorkflowAndLockfile(nil, plan.LockEntries); err != nil {
 				return err
 			}
 			if err := saveInteractiveConfigChoices(opts, interactive); err != nil {
@@ -155,10 +187,7 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		return err
 	}
 
-	if err := writeWorkflowRewrites(rewrites); err != nil {
-		return err
-	}
-	if err := saveApplyLockfile(plan.LockEntries); err != nil {
+	if err := writeWorkflowAndLockfile(rewrites, plan.LockEntries); err != nil {
 		return err
 	}
 	if err := saveInteractiveConfigChoices(opts, interactive); err != nil {
@@ -246,10 +275,14 @@ func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []stri
 	sort.Slice(plan.Report.Files, func(i, j int) bool {
 		return plan.Report.Files[i].Path < plan.Report.Files[j].Path
 	})
+	plan.Report.Summary = summarizePlan(plan.Report)
 	return plan, nil
 }
 
 func applyInteractiveSession(cmd *cobra.Command, opts *applyOptions) *interactiveApplySession {
+	if !opts.write && !opts.interactive {
+		return nil
+	}
 	if opts.yes && opts.write {
 		return nil
 	}
@@ -562,31 +595,6 @@ func buildWorkflowRewrites(changesByFile map[string][]workflow.RewriteChange, co
 	return rewrites, nil
 }
 
-func writeWorkflowRewrites(rewrites []workflowRewrite) error {
-	for _, rewrite := range rewrites {
-		if err := workflow.AtomicWriteFile(rewrite.Path, rewrite.New, rewrite.Perm); err != nil {
-			return categorizedError{code: exitFileSystem, err: err}
-		}
-	}
-	return nil
-}
-
-func saveApplyLockfile(entries []metadata.LockfileEntry) error {
-	existing, _, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
-	if err != nil {
-		return categorizedError{code: exitConfig, err: err}
-	}
-	entries = mergeActiveLockEntries(existing.Entries, entries)
-	updated, err := metadata.UpdateLockfile(existing, entries)
-	if err != nil {
-		return categorizedError{code: exitInternal, err: err}
-	}
-	if err := metadata.SaveLockfile(metadata.DefaultLockfilePath, updated); err != nil {
-		return categorizedError{code: exitFileSystem, err: err}
-	}
-	return nil
-}
-
 func mergeActiveLockEntries(existing []metadata.LockfileEntry, active []metadata.LockfileEntry) []metadata.LockfileEntry {
 	activeKeys := make(map[string]struct{}, len(active))
 	for _, entry := range active {
@@ -603,14 +611,27 @@ func mergeActiveLockEntries(existing []metadata.LockfileEntry, active []metadata
 }
 
 func applyLockfileWouldWrite(entries []metadata.LockfileEntry) (bool, error) {
-	if len(entries) > 0 {
-		return true, nil
-	}
-	_, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
+	existing, ok, err := metadata.LoadLockfile(metadata.DefaultLockfilePath)
 	if err != nil {
 		return false, categorizedError{code: exitConfig, err: err}
 	}
-	return ok, nil
+	if !ok {
+		return len(entries) > 0, nil
+	}
+	merged := mergeActiveLockEntries(existing.Entries, entries)
+	updated, err := metadata.UpdateLockfile(existing, merged)
+	if err != nil {
+		return false, categorizedError{code: exitInternal, err: err}
+	}
+	existingData, err := metadata.MarshalLockfile(existing)
+	if err != nil {
+		return false, categorizedError{code: exitInternal, err: err}
+	}
+	updatedData, err := metadata.MarshalLockfile(updated)
+	if err != nil {
+		return false, categorizedError{code: exitInternal, err: err}
+	}
+	return !bytes.Equal(existingData, updatedData), nil
 }
 
 func promptPersistBranchTracking(session *interactiveApplySession) error {
@@ -731,6 +752,24 @@ func authorizeApply(cmd *cobra.Command, opts *applyOptions, report planReport, r
 		code: exitPolicy,
 		err:  fmt.Errorf("refusing to prompt in non-interactive mode; pass --yes --write to apply"),
 	}
+}
+
+func authorizeWrite(cmd *cobra.Command, yes bool, prompt string) error {
+	if yes {
+		return nil
+	}
+	if !isTerminal(cmd.InOrStdin()) {
+		return categorizedError{code: exitPolicy, err: fmt.Errorf("refusing to prompt in non-interactive mode; pass --yes with --write")}
+	}
+	session := &interactiveApplySession{reader: bufio.NewReader(cmd.InOrStdin()), out: cmd.OutOrStdout()}
+	ok, err := session.confirm(prompt)
+	if err != nil {
+		return categorizedError{code: exitInternal, err: err}
+	}
+	if !ok {
+		return categorizedError{code: exitPolicy, err: fmt.Errorf("write cancelled")}
+	}
+	return nil
 }
 
 func isTerminal(in io.Reader) bool {

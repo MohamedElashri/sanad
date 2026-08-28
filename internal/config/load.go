@@ -52,6 +52,7 @@ func Load(path string) (Config, error) {
 			if err != nil {
 				return Config{}, err
 			}
+			cfg.PolicySources = append(cfg.PolicySources, resolvedPath)
 		}
 	}
 
@@ -68,6 +69,13 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 	raw, meta, err := decodeConfigData([]byte(data))
 	if err != nil {
 		return Config{}, fmt.Errorf("load config %q: %w", path, err)
+	}
+	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
+		keys := make([]string, 0, len(undecoded))
+		for _, key := range undecoded {
+			keys = append(keys, key.String())
+		}
+		return Config{}, fmt.Errorf("load config %q: unsupported key(s): %s", path, strings.Join(keys, ", "))
 	}
 
 	if meta.IsDefined("workflow_paths") {
@@ -103,6 +111,9 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 	}
 	if meta.IsDefined("updates", "reusable_workflows") {
 		cfg.Updates.ReusableWorkflows = raw.Updates.ReusableWorkflows
+	}
+	if err := validateUpdatesConfig(cfg.Updates); err != nil {
+		return Config{}, fmt.Errorf("load config %q: %w", path, err)
 	}
 
 	if meta.IsDefined("ignore", "actions") {
@@ -171,6 +182,25 @@ func applyConfigData(cfg Config, path string, data string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func validateUpdatesConfig(cfg UpdatesConfig) error {
+	switch cfg.Tags {
+	case "track", "pin-current", "deny":
+	default:
+		return fmt.Errorf("updates.tags %q is not supported; expected track, pin-current, or deny", cfg.Tags)
+	}
+	switch cfg.Branches {
+	case "deny", "pin-current", "track":
+	default:
+		return fmt.Errorf("updates.branches %q is not supported; expected deny, pin-current, or track", cfg.Branches)
+	}
+	switch cfg.Unpinned {
+	case "deny", "default-branch", "latest-release":
+	default:
+		return fmt.Errorf("updates.unpinned %q is not supported; expected deny, default-branch, or latest-release", cfg.Unpinned)
+	}
+	return nil
 }
 
 type fileConfig struct {

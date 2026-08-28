@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -385,6 +387,20 @@ func TestTokenFromEnvAndAuthenticatedClient(t *testing.T) {
 	_, _, err = client.github.Git.GetRef(context.Background(), "actions", "checkout", "heads/main")
 	if err != nil {
 		t.Fatalf("GetRef returned error: %v", err)
+	}
+}
+
+func TestTokenFromEnvFallsBackToGitHubCLI(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GH_TOKEN", "")
+	bin := t.TempDir()
+	gh := filepath.Join(bin, "gh")
+	if err := os.WriteFile(gh, []byte("#!/bin/sh\nprintf '%s\\n' cli-token\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if got := TokenFromEnv(); got != "cli-token" {
+		t.Fatalf("TokenFromEnv = %q, want cli-token", got)
 	}
 }
 

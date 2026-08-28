@@ -9,6 +9,8 @@ Sanad loads `.sanad.toml` by default. Pass another path with `--config`.
 
 If `.sanad.toml` is missing, built-in defaults are used. If a non-default config path is missing or unreadable, Sanad exits with code `2`.
 
+Configuration is strict: unknown keys and unsupported enum values are rejected. Use `sanad config validate` to check a file and `sanad config show --origins` to inspect the effective merged values.
+
 ## Supported keys
 
 ```toml
@@ -34,7 +36,6 @@ policy_files = []
 
 [comments]
 write = true
-format = "sanad: ref={{ref}}"
 
 [upgrade]
 level = "major"
@@ -43,11 +44,6 @@ selection = "latest-eligible"
 [upgrade.actions."actions/checkout"]
 constraint = ">= 4, < 6"
 
-[security]
-require_full_sha = true
-require_commit_in_source_repo = true
-allow_private = true
-deny_forks = false
 ```
 
 ## `workflow_paths`
@@ -90,7 +86,7 @@ Patterns use path-style glob matching, with a prefix fallback for trailing `*` p
 
 `write = false` disables inline metadata comments when the lockfile should be the only metadata source.
 
-`format` currently accepts only `sanad: ref={{ref}}`.
+The metadata format is a Sanad invariant. The legacy `format = "sanad: ref={{ref}}"` spelling remains accepted for compatibility, but other formats are rejected.
 
 ## `[upgrade]`
 
@@ -104,8 +100,6 @@ Patterns use path-style glob matching, with a prefix fallback for trailing `*` p
 
 The deprecated `latest_release = "github-release"` key and its `release` alias remain accepted for compatibility.
 
-## `[security]`
+## Security invariants
 
-`require_full_sha = true` and `require_commit_in_source_repo = true` preserve Sanad's strict default behavior.
-
-Unsupported relaxed settings fail closed. In particular, disabling full-SHA or source-repository checks is rejected, and `allow_private = false` or `deny_forks = true` are rejected until repository visibility and fork lineage checks exist.
+Sanad always requires full SHAs and verifies resolved commits in their source repositories. Legacy `[security]` keys matching those invariants remain accepted for compatibility, but they are not policy switches; relaxed values are rejected.

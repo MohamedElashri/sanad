@@ -48,7 +48,7 @@ Entries are keyed by workflow file and YAML node path. Sanad validates schema ve
 
 `pinned_sha` records the SHA currently present in the workflow. `candidates` records newer ref and SHA pairs and their independent local observation times when `cooldown_source = "first-seen"` is configured. Version 1 lockfiles with singular `candidate_sha` and `candidate_seen_at` fields are migrated in memory and written as version 2 on the next authorized lockfile write.
 
-When `sanad update apply --yes --write` or `sanad update upgrade --write` succeeds, Sanad updates entries for the workflow nodes it evaluated and preserves all other lockfile entries. Read-only audit commands never write the lockfile. Deletion is reserved for explicit `lock refresh` or `lock prune --write` operations.
+When `sanad apply --write --yes` or `sanad upgrade --write --yes` succeeds, Sanad updates entries for the workflow nodes it evaluated and preserves all other lockfile entries. Read-only commands never write the lockfile. Deletion is reserved for explicit `lock refresh` or `lock prune --write` operations.
 
 ## Reconciliation
 
@@ -89,21 +89,21 @@ Repair safe stale entries:
 
 ```bash
 sanad lock repair --dry-run
-sanad lock repair --write
+sanad lock repair --write --yes
 ```
 
 Rebuild the active entry set from current managed workflow pins:
 
 ```bash
 sanad lock refresh --dry-run
-sanad lock refresh --write
+sanad lock refresh --write --yes
 ```
 
 Remove entries for deleted workflow nodes only:
 
 ```bash
 sanad lock prune --dry-run
-sanad lock prune --write
+sanad lock prune --write --yes
 ```
 
-`repair`, `refresh`, and `prune` are dry-run unless `--write` is present. They do not rewrite workflow YAML and do not contact GitHub.
+`repair`, `refresh`, and `prune` preview unless `--write` is present. Non-interactive writes also require `--yes`. They do not rewrite workflow YAML and do not contact GitHub.

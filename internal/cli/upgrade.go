@@ -33,6 +33,7 @@ type upgradeOptions struct {
 	dryRun            bool
 	diff              bool
 	write             bool
+	yes               bool
 	workflowPaths     []string
 }
 
@@ -94,7 +95,7 @@ func newUpgradeCommand(opts *rootOptions) *cobra.Command {
 		Use:   "upgrade",
 		Short: "Move managed workflow pins to a new logical ref",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpgrade(cmd, opts, upgradeOpts, defaultPlanResolver)
+			return withRepositoryRoot(opts, func() error { return runUpgrade(cmd, opts, upgradeOpts, defaultPlanResolver) })
 		},
 	}
 	cmd.Flags().StringVar(&upgradeOpts.action, "action", "", "managed action selector to upgrade, such as actions/checkout")
@@ -108,7 +109,9 @@ func newUpgradeCommand(opts *rootOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&upgradeOpts.dryRun, "dry-run", false, "show proposed changes without writing files")
 	cmd.Flags().BoolVar(&upgradeOpts.diff, "diff", false, "show the unified workflow file diff")
 	cmd.Flags().BoolVar(&upgradeOpts.write, "write", false, "write changes to workflow files and lockfile")
+	cmd.Flags().BoolVarP(&upgradeOpts.yes, "yes", "y", false, "approve non-interactive writes")
 	cmd.Flags().StringSliceVar(&upgradeOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
+	_ = cmd.Flags().MarkHidden("latest-release-mode")
 	return cmd
 }
 
@@ -185,7 +188,10 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	}
 	if len(rewrites) == 0 {
 		if plan.ObservationsChanged {
-			if err := saveApplyLockfile(plan.LockEntries); err != nil {
+			if err := authorizeWrite(cmd, effectiveOpts.yes, "Write updated lockfile observations? [y/N] "); err != nil {
+				return err
+			}
+			if err := writeWorkflowAndLockfile(nil, plan.LockEntries); err != nil {
 				return err
 			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile observations; no eligible upgrades to apply.")
@@ -194,11 +200,11 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No eligible upgrades to apply.")
 		return nil
 	}
-
-	if err := writeWorkflowRewrites(rewrites); err != nil {
+	if err := authorizeWrite(cmd, effectiveOpts.yes, "Apply these logical ref upgrades? [y/N] "); err != nil {
 		return err
 	}
-	if err := saveApplyLockfile(plan.LockEntries); err != nil {
+
+	if err := writeWorkflowAndLockfile(rewrites, plan.LockEntries); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d logical ref upgrade(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))

@@ -43,7 +43,7 @@ func newScanCommand(opts *rootOptions) *cobra.Command {
 		Use:   "scan",
 		Short: "Discover GitHub Actions workflow dependencies",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runScan(cmd, opts, scanOpts)
+			return withRepositoryRoot(opts, func() error { return runScan(cmd, opts, scanOpts) })
 		},
 	}
 

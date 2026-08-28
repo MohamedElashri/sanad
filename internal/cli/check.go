@@ -3,15 +3,20 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/MohamedElashri/sanad/internal/actions"
+	"github.com/MohamedElashri/sanad/internal/config"
 	"github.com/MohamedElashri/sanad/internal/policy"
+	"github.com/MohamedElashri/sanad/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
 type checkOptions struct {
-	allowPendingCooldown bool
-	workflowPaths        []string
+	fresh               bool
+	failPendingCooldown bool
+	workflowPaths       []string
 }
 
 type checkReport struct {
@@ -48,18 +53,29 @@ func newCheckCommand(opts *rootOptions) *cobra.Command {
 	checkOpts := &checkOptions{}
 	var strict bool
 	var failOnUpdates bool
+	var allowPendingCooldown bool
 
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Validate workflow dependencies against sanad policy",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCheck(cmd, opts, checkOpts, defaultPlanResolver)
+			if strict {
+				checkOpts.fresh = true
+				checkOpts.failPendingCooldown = true
+			}
+			if failOnUpdates || allowPendingCooldown {
+				checkOpts.fresh = true
+			}
+			return withRepositoryRoot(opts, func() error { return runCheck(cmd, opts, checkOpts, defaultPlanResolver) })
 		},
 	}
-	cmd.Flags().BoolVar(&strict, "strict", false, "deprecated: check now fails on managed updates by default")
-	cmd.Flags().BoolVar(&checkOpts.allowPendingCooldown, "allow-pending-cooldown", false, "do not fail on pending cooldown updates")
-	cmd.Flags().BoolVar(&failOnUpdates, "fail-on-updates", false, "deprecated: check now fails on eligible managed updates by default")
+	cmd.Flags().BoolVar(&checkOpts.fresh, "fresh", false, "resolve tracked refs and fail when eligible updates exist")
+	cmd.Flags().BoolVar(&strict, "strict", false, "with freshness checks, also fail on cooldown-pending updates")
+	cmd.Flags().BoolVar(&allowPendingCooldown, "allow-pending-cooldown", false, "deprecated compatibility alias for --fresh")
+	cmd.Flags().BoolVar(&failOnUpdates, "fail-on-updates", false, "deprecated compatibility alias for --fresh")
 	cmd.Flags().StringSliceVar(&checkOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
+	_ = cmd.Flags().MarkHidden("allow-pending-cooldown")
+	_ = cmd.Flags().MarkHidden("fail-on-updates")
 	return cmd
 }
 
@@ -68,12 +84,16 @@ func runCheck(cmd *cobra.Command, opts *rootOptions, checkOpts *checkOptions, re
 	if err != nil {
 		return err
 	}
-	resolver, err = configuredPlanResolver(cfg, resolver)
-	if err != nil {
-		return err
+	var plan planReport
+	if checkOpts.fresh {
+		resolver, err = configuredPlanResolver(cfg, resolver)
+		if err != nil {
+			return err
+		}
+		plan, err = buildPlanReport(cmd.Context(), cfg, checkOpts.workflowPaths, resolver, planNow())
+	} else {
+		plan, err = buildLocalCheckPlan(cfg, checkOpts.workflowPaths)
 	}
-
-	plan, err := buildPlanReport(cmd.Context(), cfg, checkOpts.workflowPaths, resolver, planNow())
 	if err != nil {
 		return err
 	}
@@ -105,6 +125,81 @@ func runCheck(cmd *cobra.Command, opts *rootOptions, checkOpts *checkOptions, re
 		}
 	}
 	return nil
+}
+
+func buildLocalCheckPlan(cfg config.Config, workflowPaths []string) (planReport, error) {
+	paths := cfg.WorkflowPaths
+	if len(workflowPaths) > 0 {
+		paths = workflowPaths
+	}
+	files, err := workflow.DiscoverWorkflowFiles(paths)
+	if err != nil {
+		return planReport{}, err
+	}
+	uses, err := workflow.ExtractUsesFromFiles(files)
+	if err != nil {
+		return planReport{}, err
+	}
+	reconciliation, err := reconcileWorkflowUses(uses)
+	if err != nil {
+		return planReport{}, err
+	}
+
+	actionsByFile := make(map[string][]planAction)
+	for _, use := range uses {
+		parsed := actions.Parse(use.Raw)
+		reconciled, _ := reconciliation.Use(use.File, use.NodePath)
+		logicalRef := ""
+		if reconciled.HasMetadata {
+			logicalRef = reconciled.Metadata.LogicalRef
+		}
+		decision := localCheckDecision(cfg, use, parsed, logicalRef, reconciled.Error)
+		action := planActionFromDecision(use, parsed, nil, decision)
+		if reconciled.HasMetadata && reconciled.Error == nil {
+			action.MetadataSource = string(reconciled.Metadata.Source)
+		}
+		actionsByFile[use.File] = append(actionsByFile[use.File], action)
+	}
+
+	report := planReport{Version: 1}
+	for _, file := range files {
+		if len(actionsByFile[file]) == 0 {
+			continue
+		}
+		report.Files = append(report.Files, planFile{Path: file, Actions: actionsByFile[file]})
+	}
+	sort.Slice(report.Files, func(i, j int) bool { return report.Files[i].Path < report.Files[j].Path })
+	report.Summary = summarizePlan(report)
+	return report, nil
+}
+
+func localCheckDecision(cfg config.Config, use workflow.UseNode, parsed actions.ParsedAction, logicalRef string, metadataErr error) policy.Decision {
+	if metadataErr != nil {
+		return policy.Decision{Kind: policy.DecisionErrorInvalid, Reason: metadataErr.Error(), CurrentSHA: currentPinnedSHA(parsed), LogicalRef: logicalRef}
+	}
+	opts := policyOptionsFromConfig(cfg, planNow())
+	if parsed.Kind != actions.KindLocalAction && parsed.Kind != actions.KindDockerAction {
+		ignore, err := policy.MatchIgnore(parsed, use.File, opts)
+		if err != nil {
+			return policy.Decision{Kind: policy.DecisionErrorUnsupported, Reason: err.Error(), CurrentSHA: currentPinnedSHA(parsed), LogicalRef: logicalRef}
+		}
+		if ignore.Ignored {
+			return ignoredDecision(parsed, logicalRef, ignore)
+		}
+	}
+	if parsed.Kind == actions.KindReusableWorkflow && !cfg.Updates.ReusableWorkflows {
+		return policy.Decision{Kind: policy.DecisionErrorReusable, Reason: "reusable workflows are denied by policy", CurrentSHA: currentPinnedSHA(parsed), LogicalRef: logicalRef}
+	}
+	if parsed.Valid && parsed.Pinned {
+		return policy.Decision{Kind: policy.DecisionUnchanged, Reason: "immutable full SHA pin accepted", CurrentSHA: parsed.Ref, LogicalRef: logicalRef}
+	}
+	if parsed.Valid && parsed.Ref != "" && (parsed.Kind == actions.KindGitHubAction || parsed.Kind == actions.KindReusableWorkflow) {
+		return policy.Decision{Kind: policy.DecisionUpdate, Reason: "mutable action reference must be pinned to a full SHA", LogicalRef: parsed.Ref}
+	}
+	if parsed.Valid && parsed.Ref == "" && (parsed.Kind == actions.KindGitHubAction || parsed.Kind == actions.KindReusableWorkflow) {
+		return policy.Decision{Kind: policy.DecisionErrorUnpinned, Reason: "unpinned GitHub action reference must be pinned before use"}
+	}
+	return policy.Evaluate(policy.Entry{File: use.File, Action: parsed, LogicalRef: logicalRef}, opts)
 }
 
 func buildCheckReport(plan planReport, opts *checkOptions) checkReport {
@@ -140,7 +235,7 @@ func checkActionViolates(action planAction, opts *checkOptions) bool {
 	case policy.DecisionUpdate:
 		return true
 	case policy.DecisionPending:
-		return !opts.allowPendingCooldown
+		return opts.failPendingCooldown
 	default:
 		return false
 	}

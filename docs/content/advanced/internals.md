@@ -17,7 +17,7 @@ Sanad keeps command behavior centered on one shared pipeline:
 8. Resolve GitHub refs when needed.
 9. Evaluate policy and cooldown.
 10. Report decisions.
-11. For writes, rewrite workflow bytes and update the lockfile.
+11. For writes, stage every workflow and lockfile update, then commit them together with rollback if any file cannot be replaced.
 
 ## Important packages
 

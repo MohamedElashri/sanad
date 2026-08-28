@@ -711,3 +711,27 @@ func TestLoadInvalidNestedPolicyErrors(t *testing.T) {
 		t.Fatal("Load returned nil error for invalid nested policy")
 	}
 }
+
+func TestLoadRejectsUnknownKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[updates]\nbranch = \"track\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "unsupported key(s): updates.branch") {
+		t.Fatalf("Load error = %v, want unknown-key diagnostic", err)
+	}
+}
+
+func TestLoadRejectsInvalidUpdateEnums(t *testing.T) {
+	path := filepath.Join(t.TempDir(), DefaultPath)
+	if err := os.WriteFile(path, []byte("[updates]\nbranches = \"sometimes\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "updates.branches") {
+		t.Fatalf("Load error = %v, want invalid branches diagnostic", err)
+	}
+}

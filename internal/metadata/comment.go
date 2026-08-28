@@ -285,22 +285,29 @@ func UpdateLockfile(existing Lockfile, active []LockfileEntry) (Lockfile, error)
 }
 
 func SaveLockfile(path string, lockfile Lockfile) error {
-	normalized := NormalizeLockfile(lockfile)
-	if err := ValidateLockfile(normalized); err != nil {
-		return err
-	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("write lockfile %q: %w", path, err)
 	}
-	data, err := json.MarshalIndent(normalized, "", "  ")
+	data, err := MarshalLockfile(lockfile)
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("write lockfile %q: %w", path, err)
 	}
 	return nil
+}
+
+func MarshalLockfile(lockfile Lockfile) ([]byte, error) {
+	normalized := NormalizeLockfile(lockfile)
+	if err := ValidateLockfile(normalized); err != nil {
+		return nil, err
+	}
+	data, err := json.MarshalIndent(normalized, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
 }
 
 func SortLockfileEntries(entries []LockfileEntry) {

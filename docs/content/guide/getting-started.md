@@ -83,14 +83,16 @@ Use `sanad completion install --dry-run` to preview the files that would be writ
 The easiest way to initialize sanad and pin your workflows is to run:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad start
+sanad start
 ```
 
 This command will:
-1. Create a default `.sanad.toml` config file if one doesn't exist.
+1. Use secure built-in defaults, without requiring a config file.
 2. Scan your workflows and securely resolve all action references.
-3. Apply the immutable SHAs to your workflows.
-4. Create the lockfile at `.github/sanad.lock.json`.
+3. Preview changes in automation, or confirm them interactively in a terminal.
+4. Apply immutable SHAs and create `.github/sanad.lock.json` after approval.
+
+For a non-interactive initial write, use `sanad start --write --yes`.
 
 If you prefer to preview changes without applying them, you can use:
 
@@ -101,7 +103,7 @@ GITHUB_TOKEN=$(gh auth token) sanad plan
 Add `--diff` to inspect the exact rewrite:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --diff
 ```
 
 Then write the workflow changes and lockfile:
@@ -117,7 +119,9 @@ Sanad rewrites only the relevant scalar values. It does not serialize or reforma
 Use `check` when a repository should already comply:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad check
+sanad check
 ```
 
-Exit code `0` means the check passed. Exit code `1` means policy violations or required changes were found.
+The default check is local-only and validates immutable pins, metadata, and policy. Use `sanad check --fresh` to resolve tracked refs and fail on eligible updates, or `sanad check --strict` to also fail on cooldown-pending updates.
+
+Exit code `0` means the check passed. Exit code `1` means policy violations were found.

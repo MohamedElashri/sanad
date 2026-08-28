@@ -2,6 +2,22 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.2.5 - 2026-08-29
+
+### Added
+
+- Added local, token-free policy checks by default, with `check --fresh` and `check --strict` for update freshness enforcement.
+- Added strict `config validate` and effective `config show --origins` commands.
+- Added repository-root discovery, `--root`, GitHub CLI authentication fallback, and the consolidated `doctor` health and repair workflow.
+
+### Changed
+
+- Updated the pinned Staticcheck toolchain to v0.8.1 for Go 1.27 export-data support and made the local install stamp Go-toolchain-specific.
+- Made apply, upgrade, and lockfile mutations preview by default and require `--write --yes` for non-interactive writes.
+- Made `start` use built-in defaults without generating `.sanad.toml`; terminal initialization remains interactive.
+- Made workflow and lockfile updates a coordinated transaction with rollback on commit failure.
+- Rejected unknown configuration keys and invalid update-policy values during config loading.
+
 ## 0.2.0 - 2026-07-22
 
 ### Added

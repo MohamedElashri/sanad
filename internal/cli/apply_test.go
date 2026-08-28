@@ -93,6 +93,46 @@ func TestApplyDryRunHidesDiffByDefault(t *testing.T) {
 	}
 }
 
+func TestApplyLockfileWouldWriteDetectsNoOp(t *testing.T) {
+	withTempWorkingDir(t)
+	entry := metadata.LockfileEntry{
+		File:       ".github/workflows/ci.yml",
+		Node:       lockTestNode,
+		Owner:      "actions",
+		Repo:       "checkout",
+		Kind:       "github-action",
+		LogicalRef: "v4",
+		PinnedSHA:  strings.Repeat("a", 40),
+	}
+	writeTestLockfile(t, entry)
+
+	wouldWrite, err := applyLockfileWouldWrite([]metadata.LockfileEntry{entry})
+	if err != nil {
+		t.Fatalf("applyLockfileWouldWrite returned error: %v", err)
+	}
+	if wouldWrite {
+		t.Fatal("applyLockfileWouldWrite = true for an unchanged lockfile")
+	}
+}
+
+func TestApplyPreviewJSONRemainsValidWhenNothingChanges(t *testing.T) {
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: ./.github/actions/local\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--format", "json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("apply preview returned error: %v", err)
+	}
+	var report planReport
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("apply output is not valid JSON: %v\n%s", err, out.String())
+	}
+}
+
 func TestApplyYesWriteRewritesWorkflowAndUpdatesLockfile(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("b", 40)
@@ -242,7 +282,7 @@ func TestApplyCommentsWriteFalseUsesLockfileWithoutInlineMetadata(t *testing.T) 
 	}
 }
 
-func TestApplyNonInteractiveRefusesWithoutYesWrite(t *testing.T) {
+func TestApplyDefaultsToPreviewWithoutWriting(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("c", 40)
 	installPlanTestResolver(t, fakePlanResolver{
@@ -265,18 +305,14 @@ func TestApplyNonInteractiveRefusesWithoutYesWrite(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"apply"})
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("Execute returned nil error, want non-interactive refusal")
-	}
-	if ExitCode(err) != exitPolicy {
-		t.Fatalf("ExitCode = %d, want %d; error: %v", ExitCode(err), exitPolicy, err)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("preview returned error: %v", err)
 	}
 	if got := readFileString(t, path); got != original {
-		t.Fatalf("workflow changed after refused apply\nwant:\n%s\ngot:\n%s", original, got)
+		t.Fatalf("workflow changed during preview\nwant:\n%s\ngot:\n%s", original, got)
 	}
 	if _, err := os.Stat(metadata.DefaultLockfilePath); !os.IsNotExist(err) {
-		t.Fatalf("lockfile was written after refused apply, stat err = %v", err)
+		t.Fatalf("lockfile was written during preview, stat err = %v", err)
 	}
 }
 
@@ -784,6 +820,9 @@ func withTempWorkingDir(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	previousWorkingDir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

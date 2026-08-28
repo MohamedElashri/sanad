@@ -29,6 +29,7 @@ type lockOptions struct {
 	workflowPaths []string
 	dryRun        bool
 	write         bool
+	yes           bool
 }
 
 type lockState struct {
@@ -130,7 +131,7 @@ func newLockStatusCommand(rootOpts *rootOptions) *cobra.Command {
 		Use:   "status",
 		Short: "Report lockfile reconciliation status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLockStatus(cmd, rootOpts, opts)
+			return withRepositoryRoot(rootOpts, func() error { return runLockStatus(cmd, rootOpts, opts) })
 		},
 	}
 	cmd.Flags().StringSliceVar(&opts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
@@ -143,7 +144,7 @@ func newLockRefreshCommand(rootOpts *rootOptions) *cobra.Command {
 		Use:   "refresh",
 		Short: "Regenerate lock entries for current managed workflow pins",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLockMutation(cmd, rootOpts, opts, lockModeRefresh)
+			return withRepositoryRoot(rootOpts, func() error { return runLockMutation(cmd, rootOpts, opts, lockModeRefresh) })
 		},
 	}
 	addLockMutationFlags(cmd, opts)
@@ -156,7 +157,7 @@ func newLockRepairCommand(rootOpts *rootOptions) *cobra.Command {
 		Use:   "repair",
 		Short: "Repair safe stale lockfile entries",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLockMutation(cmd, rootOpts, opts, lockModeRepair)
+			return withRepositoryRoot(rootOpts, func() error { return runLockMutation(cmd, rootOpts, opts, lockModeRepair) })
 		},
 	}
 	addLockMutationFlags(cmd, opts)
@@ -169,7 +170,7 @@ func newLockPruneCommand(rootOpts *rootOptions) *cobra.Command {
 		Use:   "prune",
 		Short: "Remove lock entries for deleted workflow nodes",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLockMutation(cmd, rootOpts, opts, lockModePrune)
+			return withRepositoryRoot(rootOpts, func() error { return runLockMutation(cmd, rootOpts, opts, lockModePrune) })
 		},
 	}
 	addLockMutationFlags(cmd, opts)
@@ -179,6 +180,7 @@ func newLockPruneCommand(rootOpts *rootOptions) *cobra.Command {
 func addLockMutationFlags(cmd *cobra.Command, opts *lockOptions) {
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "show proposed lockfile changes without writing")
 	cmd.Flags().BoolVar(&opts.write, "write", false, "write lockfile changes")
+	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "approve non-interactive writes")
 	cmd.Flags().StringSliceVar(&opts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
 }
 
@@ -216,6 +218,9 @@ func runLockMutation(cmd *cobra.Command, rootOpts *rootOptions, opts *lockOption
 		}
 	}
 	if opts.write && report.WouldWrite {
+		if err := authorizeWrite(cmd, opts.yes, "Write these lockfile changes? [y/N] "); err != nil {
+			return err
+		}
 		if err := saveLockEntries(state.lockfile, report.target); err != nil {
 			return err
 		}
@@ -830,7 +835,11 @@ func saveLockEntries(existing metadata.Lockfile, entries []metadata.LockfileEntr
 	if err != nil {
 		return categorizedError{code: exitInternal, err: err}
 	}
-	if err := metadata.SaveLockfile(metadata.DefaultLockfilePath, updated); err != nil {
+	data, err := metadata.MarshalLockfile(updated)
+	if err != nil {
+		return categorizedError{code: exitInternal, err: err}
+	}
+	if err := commitFileTransaction([]transactionFile{{path: metadata.DefaultLockfilePath, data: data, perm: 0o600}}); err != nil {
 		return categorizedError{code: exitFileSystem, err: err}
 	}
 	return nil

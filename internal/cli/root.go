@@ -2,8 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
-	"os"
 
 	"github.com/MohamedElashri/sanad/internal/config"
 	"github.com/spf13/cobra"
@@ -37,6 +35,7 @@ type rootOptions struct {
 	configPath string
 	format     string
 	color      string
+	root       string
 }
 
 func NewRootCommand() *cobra.Command {
@@ -49,20 +48,14 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := os.Stat(opts.configPath); os.IsNotExist(err) && opts.configPath == config.DefaultPath {
-				fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'sanad start' to initialize the project.")
-				return nil
-			}
-			checkCmd := newCheckCommand(opts)
-			checkCmd.SetOut(cmd.OutOrStdout())
-			checkCmd.SetErr(cmd.ErrOrStderr())
-			return checkCmd.Execute()
+			return withRepositoryRoot(opts, func() error { return runCheck(cmd, opts, &checkOptions{}, nil) })
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.configPath, "config", config.DefaultPath, "path to config file")
 	cmd.PersistentFlags().StringVar(&opts.format, "format", "table", "output format (table, json, or command-specific formats)")
 	cmd.PersistentFlags().StringVar(&opts.color, "color", colorModeAuto, "colorize human output: auto, always, or never")
+	cmd.PersistentFlags().StringVar(&opts.root, "root", "", "repository root (discovered from .git by default)")
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if _, err := colorSettingsForCommand(cmd); err != nil {
 			return categorizedError{code: exitConfig, err: err}
@@ -78,6 +71,8 @@ func NewRootCommand() *cobra.Command {
 		newApplyCommand(opts),
 		newUpgradeCommand(opts),
 		newLockCommand(opts),
+		newDoctorCommand(opts),
+		newConfigCommand(opts),
 		newCompletionCommand(),
 		newVersionCommand(),
 	)

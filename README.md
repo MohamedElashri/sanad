@@ -105,14 +105,16 @@ Use `sanad completion install --dry-run` to preview the files that would be writ
 The easiest way to initialize sanad and pin your workflows is to run:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad start
+sanad start
 ```
 
 This command will:
-1. Create a default `.sanad.toml` config file if one doesn't exist.
+1. Use secure built-in defaults, without requiring a config file.
 2. Scan your workflows and securely resolve all action references.
-3. Apply the immutable SHAs to your workflows.
-4. Create the lockfile at `.github/sanad.lock.json`.
+3. Preview changes in automation, or confirm them interactively in a terminal.
+4. Apply immutable SHAs and create `.github/sanad.lock.json` after approval.
+
+For a non-interactive initial write, use `sanad start --write --yes`.
 
 If you prefer to preview changes before applying them:
 
@@ -120,16 +122,16 @@ If you prefer to preview changes before applying them:
 GITHUB_TOKEN=$(gh auth token) sanad plan
 ```
 
-Preview updates without changing files:
+Preview updates without changing files (`apply` is read-only by default):
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
+GITHUB_TOKEN=$(gh auth token) sanad apply
 ```
 
 Add `--diff` when you want the unified file patch:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply --diff
 ```
 
 Apply locally:
@@ -141,18 +143,17 @@ GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 Validate locally:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad check
+sanad check
 ```
 
 If Dependabot or a manual edit changes a pinned workflow entry and leaves `.github/sanad.lock.json` stale, inspect and repair the lockfile without deleting it:
 
 ```bash
-sanad lock status
-sanad lock repair --dry-run
-sanad lock repair --write
+sanad doctor
+sanad doctor --write --yes
 ```
 
-`sanad plan`, `sanad check`, `sanad apply`, and `sanad upgrade` may contact GitHub when resolution is needed. `sanad scan` and `sanad lock status|refresh|repair|prune` are local-only.
+`sanad plan`, `sanad apply`, `sanad upgrade`, and `sanad check --fresh` may contact GitHub. Default `sanad check`, `sanad scan`, `sanad doctor`, and the `lock` commands are local-only.
 
 Human-readable output uses color automatically when the terminal supports it. Use `--color never` or `NO_COLOR=1` to disable color, and `--color always` to force it for pagers or demos.
 
@@ -192,39 +193,13 @@ In Arabic scholarly culture, a sanad is a chain of transmission back to a source
 
 ## Configuration
 
-Create `.sanad.toml` when the defaults are not enough:
+Create `.sanad.toml` only when the built-in defaults are not enough:
 
 ```toml
-workflow_paths = [".github/workflows"]
-cooldown = "7d"
-cooldown_source = "source"
-
-[updates]
-tags = "track"
-branches = "deny"
-unpinned = "deny"
-reusable_workflows = true
-
-[ignore]
-actions = [
-  "./*",
-  "docker://*"
-]
-files = []
-
-[comments]
-write = true
-format = "sanad: ref={{ref}}"
+cooldown = "14d"
 
 [upgrade]
-level = "major"
-selection = "latest-eligible"
-
-[security]
-require_full_sha = true
-require_commit_in_source_repo = true
-allow_private = true
-deny_forks = false
+level = "minor"
 ```
 
 Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See the [config reference](docs/content/reference/config.md) for exact supported keys.
@@ -239,10 +214,13 @@ sanad plan
 sanad check
 sanad apply
 sanad upgrade
+sanad doctor
 sanad lock status
 sanad lock refresh
 sanad lock repair
 sanad lock prune
+sanad config validate
+sanad config show --origins
 sanad completion
 sanad version
 ```
@@ -253,18 +231,19 @@ All commands accept:
 --config .sanad.toml
 --format table
 --format json
+--root /path/to/repository
 ```
 
 
 `sanad check --format sarif` emits SARIF for code scanning, and `sanad plan --pr-body-out body.md` writes a Markdown pull request summary for automation.
 
-`sanad upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It is dry-run by default and does not print file patches unless `--diff` is passed; add `--write` to apply the reported upgrades.
+`sanad upgrade` previews the highest stable SemVer release allowed by policy and cooldown for every managed pin. It does not print file patches unless `--diff` is passed; add `--write` to apply the reported upgrades and `--yes` in automation.
 
 Use `--level minor|patch`, `--constraint '< 6'`, or matching `[upgrade]` configuration to restrict automatic upgrades. `--selection latest` restores the wait-for-the-newest behavior; the default `latest-eligible` can select an older release while a newer one is cooling down.
 
 `sanad upgrade --action actions/checkout --to v5` intentionally moves one managed pin to a specific logical ref while keeping workflow execution pinned to a full SHA.
 
-`sanad lock status` reports stale, repairable, and blocking lockfile diagnostics. Use `sanad lock refresh --write` to rebuild active managed entries, `sanad lock repair --write` for non-destructive reconciliation fixes, and `sanad lock prune --write` for explicit removal of entries belonging to deleted workflow nodes. Audit commands are read-only, and scoped writes preserve entries outside `--workflows`.
+`sanad doctor` is the normal entry point for policy and lockfile health. The lower-level `lock` commands remain available for automation and explicit refresh or pruning. Non-interactive lockfile writes require `--write --yes`.
 
 Command-specific usage is covered in the [CLI reference](docs/content/reference/cli.md).
 
@@ -275,12 +254,14 @@ Command-specific usage is covered in the [CLI reference](docs/content/reference/
 1. `GITHUB_TOKEN`
 2. `GH_TOKEN`
 
+If neither variable is set, Sanad reuses `gh auth token` when the GitHub CLI is installed and authenticated.
+
 Tokens are used for GitHub API requests and are never printed by the CLI. Public repositories can work without a token, but authenticated requests are strongly recommended for CI and private repositories.
 
-For local shell usage, prefer reusing the GitHub CLI token instead of pasting a token into your terminal:
+For local shell usage with an authenticated GitHub CLI, no token prefix is needed:
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad plan
+sanad plan
 ```
 
 

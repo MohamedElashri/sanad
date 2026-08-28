@@ -5,7 +5,7 @@ weight = 10
 template = "page"
 +++
 
-Sanad exposes six top-level command groups:
+Sanad exposes these top-level commands:
 
 ```bash
 sanad start
@@ -14,7 +14,9 @@ sanad plan
 sanad check
 sanad apply
 sanad upgrade
+sanad doctor
 sanad lock
+sanad config
 sanad completion
 sanad version
 ```
@@ -26,6 +28,7 @@ Global flags:
 --config string   path to config file (default ".sanad.toml")
 --format string   output format: table, json, or command-specific formats (default "table")
 --color string    colorize human output: auto, always, or never (default "auto")
+--root string     repository root (discovered from .git by default)
 ```
 
 `--color auto` enables ANSI color only for capable terminals. `--color never`, `NO_COLOR`, `CLICOLOR=0`, or `SANAD_COLOR=never` disable color; `--color always`, `CLICOLOR_FORCE=1`, or `SANAD_COLOR=always` force it. JSON, SARIF, and generated Markdown outputs are never colorized.
@@ -38,7 +41,7 @@ Discover and classify `uses:` entries without contacting GitHub.
 
 ```bash
 sanad scan
-sanad --format json audit scan
+sanad --format json scan
 sanad scan --workflows .github/workflows
 ```
 
@@ -48,7 +51,7 @@ Resolve actionable refs and show decisions without writing files.
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) sanad plan
-GITHUB_TOKEN=$(gh auth token) sanad --format json audit plan
+GITHUB_TOKEN=$(gh auth token) sanad --format json plan
 GITHUB_TOKEN=$(gh auth token) sanad plan --out sanad-plan.json
 GITHUB_TOKEN=$(gh auth token) sanad plan --pr-body-out sanad-pr-body.md
 ```
@@ -60,26 +63,27 @@ Decision values include `unchanged`, `update`, `pending-cooldown`, skip decision
 Validate workflows against policy.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad check
-GITHUB_TOKEN=$(gh auth token) sanad --format json audit check
-GITHUB_TOKEN=$(gh auth token) sanad check --format sarif
-GITHUB_TOKEN=$(gh auth token) sanad check --allow-pending-cooldown
+sanad check
+sanad --format json check
+sanad check --format sarif
+sanad check --fresh
+sanad check --strict
 ```
 
-Default behavior fails on policy violations, mutable refs that still need to be pinned, and managed pins whose resolved candidate differs from the workflow SHA. Pass `--allow-pending-cooldown` to allow cooldown-pending managed candidates while still failing eligible updates.
+Default behavior is local-only and fails on policy violations such as mutable, unpinned, invalid, or short-SHA references. `--fresh` resolves tracked refs and also fails on eligible updates while allowing cooldown-pending candidates. `--strict` additionally fails on cooldown-pending candidates.
 
 ## `apply`
 
 Apply approved updates to workflow files and refresh `.github/sanad.lock.json`.
 
 ```bash
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run
-GITHUB_TOKEN=$(gh auth token) sanad apply --dry-run --diff
+GITHUB_TOKEN=$(gh auth token) sanad apply
+GITHUB_TOKEN=$(gh auth token) sanad apply --diff
 GITHUB_TOKEN=$(gh auth token) sanad apply --interactive
 GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
 ```
 
-`--dry-run` reports the number of proposed updates and writes nothing. File patches are hidden by default; pass `--diff` to print the unified diff. `--diff` also works with interactive or write mode and requires table output. Non-interactive writes require `--yes --write`.
+`apply` previews by default. File patches are hidden unless `--diff` is passed. `--dry-run` remains as an explicit compatibility spelling for preview mode. Terminal writes require confirmation; non-interactive writes require `--yes --write`.
 
 ## `upgrade`
 
@@ -90,11 +94,11 @@ GITHUB_TOKEN=$(gh auth token) sanad upgrade
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --action actions/checkout --to v5
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --level minor --dry-run
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --level minor --dry-run --diff
-GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --constraint '< 6' --write
+GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --constraint '< 6' --write --yes
 GITHUB_TOKEN=$(gh auth token) sanad upgrade --all --selection latest
 ```
 
-With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command is dry-run by default and shows its decision table without a file patch. Pass `--diff` to include the unified diff or `--write` to apply the upgrades.
+With no selector, `upgrade` scans all managed pins. With no explicit `--to`, it selects stable GitHub releases using the configured policy. The defaults allow major upgrades and choose the highest release that has satisfied cooldown. The command previews by default and shows its decision table without a file patch. Pass `--diff` to include the unified diff or `--write` to apply the upgrades. Non-interactive writes also require `--yes`.
 
 `--level major|minor|patch` and `--constraint <range>` are mutually exclusive. `--selection latest-eligible|latest` controls cooldown fallback. `--to <ref>` bypasses automatic SemVer selection but still enforces cooldown and cannot be combined with automatic policy flags.
 
@@ -118,7 +122,7 @@ Regenerate lock entries for current managed workflow pins without changing workf
 
 ```bash
 sanad lock refresh --dry-run
-sanad lock refresh --write
+sanad lock refresh --write --yes
 sanad --format json lock refresh --dry-run
 ```
 
@@ -130,7 +134,7 @@ Apply safe reconciliation fixes to the lockfile without changing workflow files.
 
 ```bash
 sanad lock repair --dry-run
-sanad lock repair --write
+sanad lock repair --write --yes
 sanad --format json lock repair --dry-run
 ```
 
@@ -144,10 +148,32 @@ Remove lockfile entries for deleted workflow nodes only.
 
 ```bash
 sanad lock prune --dry-run
-sanad lock prune --write
+sanad lock prune --write --yes
 ```
 
 Use prune when you explicitly want to drop entries for missing workflow nodes and leave other stale active entries untouched. With `--workflows`, only missing entries inside that scope are removed.
+
+## `doctor`
+
+Run the normal local health check for both workflow policy and lockfile reconciliation:
+
+```bash
+sanad doctor
+sanad doctor --write --yes
+```
+
+Without `--write`, doctor previews safe lockfile repairs. Blocking lockfile diagnostics still require manual correction.
+
+## `config`
+
+Validate strict TOML configuration and inspect the merged defaults, organization policies, and repository overrides:
+
+```bash
+sanad config validate
+sanad config show
+sanad config show --origins
+sanad config show --format json --origins
+```
 
 ## `version`
 

@@ -29,6 +29,8 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 		"\n  apply",
 		"\n  upgrade",
 		"\n  lock",
+		"\n  doctor",
+		"\n  config",
 		"\n  completion",
 		"\n  version",
 	} {
@@ -45,8 +47,6 @@ func TestRootHelpShowsCanonicalTopLevelCommands(t *testing.T) {
 		}
 	}
 }
-
-
 
 func TestScanExecutes(t *testing.T) {
 	workflows := filepath.Join(t.TempDir(), ".github", "workflows")
@@ -95,9 +95,25 @@ func TestApplyExecutes(t *testing.T) {
 	}
 }
 
+func TestBareCommandChecksWithoutConfig(t *testing.T) {
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: ./.github/actions/local\n")
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("bare sanad returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "comply with sanad policy") {
+		t.Fatalf("unexpected output: %s", out.String())
+	}
+}
+
 func TestRuntimeCompletionIncludesFlatCommands(t *testing.T) {
 	rootCompletion := completeCommand(t, "")
-	for _, want := range []string{"start\t", "scan\t", "plan\t", "check\t", "apply\t", "upgrade\t", "lock\t", "completion\t", "version\t"} {
+	for _, want := range []string{"start\t", "scan\t", "plan\t", "check\t", "apply\t", "upgrade\t", "lock\t", "doctor\t", "config\t", "completion\t", "version\t"} {
 		if !strings.Contains(rootCompletion, want) {
 			t.Fatalf("root completion missing %q:\n%s", want, rootCompletion)
 		}

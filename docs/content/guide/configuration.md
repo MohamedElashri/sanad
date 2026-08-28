@@ -10,37 +10,13 @@ Sanad loads `.sanad.toml` by default. If that file is missing, built-in defaults
 Start with the defaults and add config only for policy choices your repository needs:
 
 ```toml
-workflow_paths = [".github/workflows"]
-cooldown = "7d"
-cooldown_source = "source"
-
-[updates]
-tags = "track"
-branches = "deny"
-unpinned = "deny"
-reusable_workflows = true
-
-[ignore]
-actions = [
-  "./*",
-  "docker://*"
-]
-files = []
-
-[comments]
-write = true
-format = "sanad: ref={{ref}}"
+cooldown = "14d"
 
 [upgrade]
-level = "major"
-selection = "latest-eligible"
-
-[security]
-require_full_sha = true
-require_commit_in_source_repo = true
-allow_private = true
-deny_forks = false
+level = "minor"
 ```
+
+Validate and inspect the merged configuration with `sanad config validate` and `sanad config show --origins`. Unknown keys and unsupported policy values are rejected.
 
 ## Common settings
 

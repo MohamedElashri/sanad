@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -161,7 +162,16 @@ func TokenFromEnv() string {
 	if token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); token != "" {
 		return token
 	}
-	return strings.TrimSpace(os.Getenv("GH_TOKEN"))
+	if token := strings.TrimSpace(os.Getenv("GH_TOKEN")); token != "" {
+		return token
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "gh", "auth", "token").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
 }
 
 func (c *Client) Resolve(ctx context.Context, selector ActionSelector) (ResolvedRef, error) {

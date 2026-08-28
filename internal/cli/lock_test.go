@@ -87,7 +87,7 @@ func TestLockRefreshWriteCreatesLockfile(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&out)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"lock", "refresh", "--write"})
+	cmd.SetArgs([]string{"lock", "refresh", "--write", "--yes"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -123,7 +123,7 @@ func TestLockRepairWriteFixesPinDriftAndPreservesCandidateHistory(t *testing.T) 
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"lock", "repair", "--write"})
+	cmd.SetArgs([]string{"lock", "repair", "--write", "--yes"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -165,7 +165,7 @@ func TestLockRepairDoesNotRemoveMissingEntries(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"lock", "repair", "--write"})
+	cmd.SetArgs([]string{"lock", "repair", "--write", "--yes"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestLockRepairScopedWorkflowPreservesOutOfScopeEntries(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"lock", "repair", "--workflows", ".github/workflows/ci.yml", "--write"})
+	cmd.SetArgs([]string{"lock", "repair", "--workflows", ".github/workflows/ci.yml", "--write", "--yes"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestLockPruneWriteOnlyRemovesMissingNodes(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"lock", "prune", "--write"})
+	cmd.SetArgs([]string{"lock", "prune", "--write", "--yes"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)

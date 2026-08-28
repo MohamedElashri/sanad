@@ -464,6 +464,9 @@ func TestPlanUsesInlineCommentWhenLockfileRefDrifts(t *testing.T) {
 	}, now)
 
 	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	previousWorkingDir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -521,6 +524,9 @@ func TestPlanTreatsActionMismatchWithoutCommentAsUnmanaged(t *testing.T) {
 	installPlanTestResolver(t, fakePlanResolver{}, now)
 
 	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	previousWorkingDir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
