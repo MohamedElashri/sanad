@@ -1,4 +1,4 @@
-name: Sanad
+name: Sanad Dependency Guard
 description: Check, plan, and update GitHub Actions dependencies with Sanad
 author: Mohamed Elashri
 

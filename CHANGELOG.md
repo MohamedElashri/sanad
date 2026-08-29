@@ -2,6 +2,12 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.5 - Unreleased
+
+### Fixed
+
+- Use a unique Marketplace display name: `Sanad Dependency Guard`.
+
 ## 0.3.4 - Unreleased
 
 ### Fixed
