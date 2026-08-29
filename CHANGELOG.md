@@ -2,6 +2,13 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.4 - Unreleased
+
+### Fixed
+
+- Align the action package version with the release tag so release validation cannot publish a mismatched action.
+- Verify published release state without requiring GitHub artifact attestations that GoReleaser does not generate.
+
 ## 0.3.1 - Unreleased
 
 ### Fixed
