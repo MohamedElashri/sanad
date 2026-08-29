@@ -27,6 +27,8 @@ jobs:
         run: |
           test "$(node -p 'require("./action/package.json").version')" = "${GITHUB_REF_NAME#v}"
           npm ci --prefix action
+          test "$(node -p 'require("./action/node_modules/@actions/core/package.json").version')" = "1.11.1"
+          node -e 'require("./action/node_modules/@actions/core")'
           npm test --prefix action
           npm run check-dist --prefix action
       - name: Set up Go
@@ -49,8 +51,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit "$GITHUB_REF_NAME" --draft=false
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq .immutable)" = "true"
+          is_draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)"
+          if [ "$is_draft" = "true" ]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false
+          fi
+          immutable="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq .immutable)"
+          if [ "$immutable" != "true" ]; then
+            echo "::error::Release $GITHUB_REF_NAME is mutable. Enable repository release immutability before creating the next release; GitHub does not retrofit immutability onto existing releases."
+            exit 1
+          fi
           gh release verify "$GITHUB_REF_NAME"
       - name: Update Nix flake release
         run: >-

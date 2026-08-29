@@ -2,6 +2,13 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.1 - Unreleased
+
+### Fixed
+
+- Kept the Node action's CommonJS dependencies exact and verified them during CI and release builds.
+- Added explicit release-state diagnostics so mutable releases fail before the action can consume them.
+
 ## 0.3.0 - Unreleased
 
 ### Added

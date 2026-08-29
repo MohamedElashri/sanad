@@ -7,7 +7,7 @@ template = "page"
 
 Sanad uses GoReleaser for tagged releases.
 
-Repository release immutability must be enabled before publishing a tag. The action installer rejects mutable releases, and the release workflow fails if the newly published release is not reported as immutable by GitHub.
+Repository release immutability must be enabled before publishing a tag. The action installer rejects mutable releases, and the release workflow fails with an actionable error if the newly published release is not reported as immutable by GitHub. GitHub applies this setting only to future releases, so an already-published mutable release must be replaced by a new release after enabling the setting.
 
 Release publishing is triggered by tags that match `v*`:
 

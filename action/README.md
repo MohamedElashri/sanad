@@ -89,6 +89,7 @@ Outputs receive safe defaults even when setup, input validation, installation, o
 - Private cross-repository actions need a token that can read their source repositories.
 - Linux, macOS, and Windows runners on amd64 or arm64 are supported.
 - GitHub.com release installation is supported. GitHub Enterprise Server is not currently supported.
+- Release immutability must be enabled before publishing the action's release; GitHub does not retrofit that protection onto existing releases.
 - Fork pull requests should use a non-writing `check`; do not expose a write-capable token to untrusted code.
 - Arbitrary CLI arguments are intentionally unavailable. Use `mode: setup`, then invoke `sanad` in a subsequent `run:` step.
 - The action does not expand Sanad into a YAML formatter, vulnerability scanner, Docker updater, or local-action rewriter.
