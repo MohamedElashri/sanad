@@ -16,7 +16,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64, includes README, LICENSE, and `.sanad.toml.example`, and publishes SHA-256 checksums. It first uploads every asset to a draft release. The workflow publishes the completed draft, verifies GitHub's immutable release attestation, and only then continues with package updates.
+GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64, includes README, LICENSE, and `.sanad.toml.example`, and publishes SHA-256 checksums. It first uploads every asset to a draft release. The workflow publishes the completed draft, verifies that GitHub reports the release as immutable and published, and only then continues with package updates. It does not use `gh release verify`, which requires separate GitHub artifact attestations that GoReleaser does not create.
 
 The version in `action/package.json` must match the release tag without its leading `v`. The release workflow tests the action and verifies that the committed `action/dist/index.js` matches its source before building release archives.
 

@@ -60,7 +60,11 @@ jobs:
             echo "::error::Release $GITHUB_REF_NAME is mutable. Enable repository release immutability before creating the next release; GitHub does not retrofit immutability onto existing releases."
             exit 1
           fi
-          gh release verify "$GITHUB_REF_NAME"
+          is_draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)"
+          if [ "$is_draft" != "false" ]; then
+            echo "::error::Release $GITHUB_REF_NAME was not published successfully."
+            exit 1
+          fi
       - name: Update Nix flake release
         run: >-
           go run ./scripts/update-flake-release
