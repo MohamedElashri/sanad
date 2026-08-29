@@ -111,6 +111,36 @@ func TestUpgradeWriteUpdatesWorkflowAndLockfile(t *testing.T) {
 	}
 }
 
+func TestUpgradeWriteJSONRemainsValid(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	currentSHA := strings.Repeat("5", 40)
+	targetSHA := strings.Repeat("6", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v5": {
+			Owner: "actions", Repo: "checkout", Ref: "v5", SHA: targetSHA,
+			Kind: githubresolver.KindTag, CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@"+currentSHA+" # sanad: ref=v4\n")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"upgrade", "--action", "actions/checkout", "--to", "v5", "--write", "--yes", "--format", "json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	var report upgradeReport
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("upgrade write output is not valid JSON: %v\n%s", err, out.String())
+	}
+	if report.Version != upgradeReportVersion || report.Summary.Updates != 1 {
+		t.Fatalf("unexpected report: %#v", report)
+	}
+}
+
 func TestUpgradeWriteIgnoresStaleLockfilePinDrift(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	currentSHA := strings.Repeat("1", 40)

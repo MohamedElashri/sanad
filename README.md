@@ -108,7 +108,16 @@ The easiest way to initialize sanad and pin your workflows is to run:
 sanad start
 ```
 
-This command will:
+For GitHub Actions, use the bundled action after checkout and pin it to a full commit SHA:
+
+```yaml
+- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+- uses: MohamedElashri/sanad@SANAD_FULL_COMMIT_SHA
+```
+
+See the [GitHub Action README](action/README.md) for its complete input/output and local-testing reference, or the [GitHub Action guide](docs/content/guide/github-action.md) for the optional update pull request workflow.
+
+When run locally, `sanad start` will:
 1. Use secure built-in defaults, without requiring a config file.
 2. Scan your workflows and securely resolve all action references.
 3. Preview changes in automation, or confirm them interactively in a terminal.
@@ -187,7 +196,7 @@ The workflow executes immutable SHAs. The comments and lockfile tell `sanad` whi
 
 Sanad scans workflow files under `.github/workflows` by default, classifies `uses:` references, resolves GitHub tags and branches through the GitHub API, rewrites mutable action refs to full SHAs, adds `# sanad: ref=...` metadata, maintains `.github/sanad.lock.json`, applies cooldown rules, and emits table, JSON, SARIF, and Markdown helper output.
 
-It is not a general dependency updater, vulnerability scanner, workflow formatter, YAML linter, Docker image updater, local action rewriter, or dedicated GitHub Action wrapper.
+It is not a general dependency updater, vulnerability scanner, workflow formatter, YAML linter, Docker image updater, or local action rewriter. The bundled GitHub Action is a thin adapter around the same CLI and policy model.
 
 In Arabic scholarly culture, a sanad is a chain of transmission back to a source. This tool keeps that chain explicit for workflow dependencies: the workflow runs an immutable commit, while metadata records the tag or branch that commit came from.
 

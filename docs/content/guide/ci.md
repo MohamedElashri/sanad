@@ -5,7 +5,7 @@ weight = 40
 template = "page"
 +++
 
-Use `sanad check` to fail pull requests that introduce mutable or invalid action refs.
+The shortest CI setup uses the bundled [GitHub Action](github-action.md). Use `sanad check` directly when you prefer to install and invoke the CLI yourself.
 
 ```yaml
 name: Check pinned actions

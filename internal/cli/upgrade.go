@@ -194,10 +194,14 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 			if err := writeWorkflowAndLockfile(nil, plan.LockEntries); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile observations; no eligible upgrades to apply.")
+			if rootOpts.format == "table" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile observations; no eligible upgrades to apply.")
+			}
 			return nil
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No eligible upgrades to apply.")
+		if rootOpts.format == "table" {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No eligible upgrades to apply.")
+		}
 		return nil
 	}
 	if err := authorizeWrite(cmd, effectiveOpts.yes, "Apply these logical ref upgrades? [y/N] "); err != nil {
@@ -207,7 +211,9 @@ func runUpgrade(cmd *cobra.Command, rootOpts *rootOptions, upgradeOpts *upgradeO
 	if err := writeWorkflowAndLockfile(rewrites, plan.LockEntries); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d logical ref upgrade(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+	if rootOpts.format == "table" {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d logical ref upgrade(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+	}
 	return nil
 }
 
@@ -323,7 +329,7 @@ func buildUpgradePlan(ctx context.Context, cfg config.Config, opts *upgradeOptio
 	}
 
 	plan := upgradePlan{
-		Report:        upgradeReport{Version: 2},
+		Report:        upgradeReport{Version: upgradeReportVersion, Actions: []upgradeAction{}},
 		ChangesByFile: make(map[string][]workflow.RewriteChange),
 	}
 	discovery := newUpgradeDiscovery(resolver)

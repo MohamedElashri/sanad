@@ -5,7 +5,7 @@ weight = 10
 template = "page"
 +++
 
-Sanad is a normal CLI. It does not need a GitHub Action wrapper.
+Sanad is a normal CLI. You can run it directly or use the bundled GitHub Action, which installs and invokes the same CLI without introducing a second policy layer.
 
 ## Install with Homebrew
 

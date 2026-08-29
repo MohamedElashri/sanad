@@ -31,6 +31,8 @@ Global flags:
 --root string     repository root (discovered from .git by default)
 ```
 
+The JSON emitted by `check`, `plan`, `apply`, and `upgrade` follows the versioned contracts documented in [JSON reports](json-reports.md).
+
 `--color auto` enables ANSI color only for capable terminals. `--color never`, `NO_COLOR`, `CLICOLOR=0`, or `SANAD_COLOR=never` disable color; `--color always`, `CLICOLOR_FORCE=1`, or `SANAD_COLOR=always` force it. JSON, SARIF, and generated Markdown outputs are never colorized.
 
 Sanad uses standard ANSI colors that stay readable on typical dark and light terminal backgrounds. If your terminal exposes `COLORFGBG`, sanad uses it to tune warning colors; `SANAD_COLOR_THEME=dark` or `SANAD_COLOR_THEME=light` can override that detection.
@@ -81,6 +83,7 @@ GITHUB_TOKEN=$(gh auth token) sanad apply
 GITHUB_TOKEN=$(gh auth token) sanad apply --diff
 GITHUB_TOKEN=$(gh auth token) sanad apply --interactive
 GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write
+GITHUB_TOKEN=$(gh auth token) sanad apply --yes --write --pr-body-out sanad-pr-body.md
 ```
 
 `apply` previews by default. File patches are hidden unless `--diff` is passed. `--dry-run` remains as an explicit compatibility spelling for preview mode. Terminal writes require confirmation; non-interactive writes require `--yes --write`.

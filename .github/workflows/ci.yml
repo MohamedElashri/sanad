@@ -9,6 +9,115 @@ permissions:
   contents: read
 
 jobs:
+  action-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # sanad: ref=v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # sanad: ref=v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: action/package-lock.json
+      - run: npm ci --prefix action
+      - run: npm test --prefix action
+      - run: npm run check-dist --prefix action
+
+  action-integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # sanad: ref=v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # sanad: ref=v7.0.0
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # sanad: ref=v6
+        with:
+          node-version: "24"
+      - name: Read action version
+        id: action-version
+        shell: bash
+        run: echo "version=$(node -p 'require("./action/package.json").version')" >> "$GITHUB_OUTPUT"
+      - name: Build integration binary
+        shell: bash
+        env:
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+          SANAD_ACTION_VERSION: ${{ steps.action-version.outputs.version }}
+        run: >-
+          go build
+          -ldflags "-X github.com/MohamedElashri/sanad/internal/cli.version=$SANAD_ACTION_VERSION
+          -X github.com/MohamedElashri/sanad/internal/cli.commit=action-integration
+          -X github.com/MohamedElashri/sanad/internal/cli.date=ci"
+          -o "$SANAD_ACTION_BINARY" ./cmd/sanad
+      - name: Install Sanad through the action
+        uses: ./
+        with:
+          mode: setup
+        env:
+          SANAD_ACTION_TESTING: "true"
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Verify installed command
+        shell: bash
+        env:
+          SANAD_ACTION_VERSION: ${{ steps.action-version.outputs.version }}
+        run: test "$(sanad version | head -n 1)" = "sanad $SANAD_ACTION_VERSION"
+      - name: Plan fixture pins
+        id: plan
+        uses: ./
+        with:
+          mode: plan
+          working-directory: action/test/integration
+        env:
+          SANAD_ACTION_TESTING: "true"
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Verify plan outputs
+        shell: bash
+        run: |
+          test '${{ steps.plan.outputs.changed }}' = 'false'
+          test -f "${{ steps.plan.outputs['report-path'] }}"
+          test -f "${{ steps.plan.outputs['pr-body-path'] }}"
+      - name: Apply fixture pins
+        id: apply
+        uses: ./
+        with:
+          mode: apply
+          write: "true"
+          working-directory: action/test/integration
+        env:
+          SANAD_ACTION_TESTING: "true"
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Verify apply outputs
+        shell: bash
+        run: |
+          test '${{ steps.apply.outputs.changed }}' = 'true'
+          test -f "${{ steps.apply.outputs['report-path'] }}"
+          test -f "${{ steps.apply.outputs['pr-body-path'] }}"
+      - name: Exercise upgrade mode
+        id: upgrade
+        uses: ./
+        with:
+          mode: upgrade
+          write: "true"
+          working-directory: action/test/integration
+        env:
+          SANAD_ACTION_TESTING: "true"
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Verify upgrade outputs
+        shell: bash
+        run: |
+          test '${{ steps.upgrade.outputs.passed }}' = 'true'
+          test -f "${{ steps.upgrade.outputs['report-path'] }}"
+      - name: Check the updated fixture
+        uses: ./
+        with:
+          mode: check
+          working-directory: action/test/integration
+        env:
+          SANAD_ACTION_TESTING: "true"
+          SANAD_ACTION_BINARY: ${{ runner.temp }}/sanad${{ runner.os == 'Windows' && '.exe' || '' }}
+
   test:
     runs-on: ubuntu-latest
     steps:

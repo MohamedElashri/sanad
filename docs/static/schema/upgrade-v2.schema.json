@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://melashri.net/sanad/schema/upgrade-v2.schema.json",
+  "title": "Sanad upgrade report v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "summary", "actions"],
+  "properties": {
+    "version": { "const": 2 },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matched", "updates", "pending_cooldown", "unchanged", "blocked"],
+      "properties": {
+        "matched": { "type": "integer", "minimum": 0 },
+        "updates": { "type": "integer", "minimum": 0 },
+        "pending_cooldown": { "type": "integer", "minimum": 0 },
+        "unchanged": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "node_path", "line", "action", "current_logical_ref", "target_logical_ref", "current_sha", "decision", "reason_code"],
+        "properties": {
+          "file": { "type": "string" },
+          "node_path": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "action": { "type": "string" },
+          "current_logical_ref": { "type": "string" },
+          "target_logical_ref": { "type": "string" },
+          "current_sha": { "type": "string" },
+          "candidate_sha": { "type": "string" },
+          "decision": { "type": "string" },
+          "reason_code": { "type": "string" },
+          "reason": { "type": "string" },
+          "age": { "type": "string" },
+          "level": { "type": "string" },
+          "constraint": { "type": "string" },
+          "selection": { "type": "string" },
+          "selected_release": { "type": "string" },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["logical_ref", "version", "decision"],
+              "properties": {
+                "logical_ref": { "type": "string" },
+                "version": { "type": "string" },
+                "sha": { "type": "string" },
+                "decision": { "type": "string" },
+                "reason": { "type": "string" },
+                "age": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

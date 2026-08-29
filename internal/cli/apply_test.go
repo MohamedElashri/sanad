@@ -133,6 +133,44 @@ func TestApplyPreviewJSONRemainsValidWhenNothingChanges(t *testing.T) {
 	}
 }
 
+func TestApplyWriteJSONRemainsValidAndWritesPRBody(t *testing.T) {
+	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	sha := strings.Repeat("7", 40)
+	installPlanTestResolver(t, fakePlanResolver{
+		"actions/checkout@v4": {
+			Owner: "actions", Repo: "checkout", Ref: "v4", SHA: sha,
+			Kind: githubresolver.KindTag, CommitTime: now.Add(-15 * 24 * time.Hour),
+		},
+	}, now)
+	withTempWorkingDir(t)
+	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n")
+	bodyPath := filepath.Join(t.TempDir(), "sanad-pr-body.md")
+
+	var out bytes.Buffer
+	cmd := NewRootCommand()
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"apply", "--format", "json", "--write", "--yes", "--pr-body-out", bodyPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("apply write returned error: %v", err)
+	}
+
+	var report planReport
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("apply write output is not valid JSON: %v\n%s", err, out.String())
+	}
+	if report.Version != planReportVersion || report.Summary.UpdatesAvailable != 1 {
+		t.Fatalf("unexpected report: %#v", report)
+	}
+	if !strings.Contains(readFileString(t, path), "actions/checkout@"+sha) {
+		t.Fatal("apply did not rewrite the workflow")
+	}
+	body := readFileString(t, bodyPath)
+	if !strings.Contains(body, "actions/checkout") {
+		t.Fatalf("PR body does not describe the update:\n%s", body)
+	}
+}
+
 func TestApplyYesWriteRewritesWorkflowAndUpdatesLockfile(t *testing.T) {
 	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	sha := strings.Repeat("b", 40)

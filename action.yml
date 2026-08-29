@@ -1,0 +1,61 @@
+name: Sanad
+description: Check, plan, and update GitHub Actions dependencies with Sanad
+author: Mohamed Elashri
+
+inputs:
+  mode:
+    description: Operation to run (check, plan, apply, upgrade, or setup)
+    required: false
+    default: check
+  config:
+    description: Sanad configuration path, relative to working-directory
+    required: false
+    default: .sanad.toml
+  working-directory:
+    description: Repository directory, relative to the GitHub workspace
+    required: false
+    default: .
+  fresh:
+    description: Resolve tracked refs during check
+    required: false
+    default: "false"
+  strict:
+    description: Fail check on cooldown-pending candidates; implies fresh
+    required: false
+    default: "false"
+  write:
+    description: Allow apply or upgrade to write workflow and lock files
+    required: false
+    default: "false"
+  token:
+    description: GitHub token used for release download and ref resolution
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  passed:
+    description: Whether the Sanad operation passed
+  changed:
+    description: Whether the action changed managed repository files
+  changed-files:
+    description: JSON array of managed files changed by the action
+  violations:
+    description: Number of policy violations, or blocked decisions for upgrade
+  updates:
+    description: Number of available or applied updates
+  pending-cooldown:
+    description: Number of candidates pending cooldown
+  report-path:
+    description: Path to the complete JSON report, when one was produced
+  pr-body-path:
+    description: Path to a generated pull request body, when one was produced
+  sanad-version:
+    description: Exact Sanad CLI version executed by the action
+
+runs:
+  using: node24
+  main: action/dist/index.js
+
+branding:
+  icon: shield
+  color: green

@@ -89,6 +89,16 @@ func TestParseActionReferences(t *testing.T) {
 			},
 		},
 		{
+			name: "self repository action",
+			raw:  "$/action",
+			want: ParsedAction{
+				Raw:   "$/action",
+				Path:  "$/action",
+				Kind:  KindLocalAction,
+				Valid: true,
+			},
+		},
+		{
 			name: "docker action",
 			raw:  "docker://alpine:3.20",
 			want: ParsedAction{

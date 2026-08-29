@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://melashri.net/sanad/schema/check-v1.schema.json",
+  "title": "Sanad check report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "passed", "summary", "violations"],
+  "properties": {
+    "version": { "const": 1 },
+    "passed": { "type": "boolean" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "violations", "updates", "pending_cooldown", "skipped"],
+      "properties": {
+        "checked": { "type": "integer", "minimum": 0 },
+        "violations": { "type": "integer", "minimum": 0 },
+        "updates": { "type": "integer", "minimum": 0 },
+        "pending_cooldown": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "node_path", "line", "column", "raw", "action", "decision", "reason_code"],
+        "properties": {
+          "file": { "type": "string" },
+          "node_path": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "column": { "type": "integer", "minimum": 1 },
+          "raw": { "type": "string" },
+          "action": { "type": "string" },
+          "decision": { "type": "string" },
+          "reason_code": { "type": "string" },
+          "reason": { "type": "string" },
+          "current_sha": { "type": "string" },
+          "candidate_sha": { "type": "string" },
+          "logical_ref": { "type": "string" }
+        }
+      }
+    }
+  }
+}

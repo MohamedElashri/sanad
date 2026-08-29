@@ -161,7 +161,7 @@ func buildLocalCheckPlan(cfg config.Config, workflowPaths []string) (planReport,
 		actionsByFile[use.File] = append(actionsByFile[use.File], action)
 	}
 
-	report := planReport{Version: 1}
+	report := planReport{Version: planReportVersion, Files: []planFile{}}
 	for _, file := range files {
 		if len(actionsByFile[file]) == 0 {
 			continue
@@ -203,7 +203,7 @@ func localCheckDecision(cfg config.Config, use workflow.UseNode, parsed actions.
 }
 
 func buildCheckReport(plan planReport, opts *checkOptions) checkReport {
-	report := checkReport{Version: 1, Passed: true}
+	report := checkReport{Version: checkReportVersion, Passed: true, Violations: []checkViolation{}}
 	for _, file := range plan.Files {
 		for _, action := range file.Actions {
 			report.Summary.Checked++

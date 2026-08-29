@@ -2,6 +2,18 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.0 - Unreleased
+
+### Added
+
+- Added the bundled Node 24 GitHub Action with check, plan, apply, upgrade, setup, annotations, job summaries, and structured outputs.
+- Added versioned JSON Schemas and serialization compatibility tests for automation reports.
+
+### Changed
+
+- Release publishing now stages assets in a draft and verifies that the published release is immutable before continuing.
+- `apply --write --format json` now preserves machine-readable output and can write a pull request body with `--pr-body-out`.
+
 ## 0.2.5 - 2026-08-29
 
 ### Added

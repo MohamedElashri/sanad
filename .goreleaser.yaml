@@ -70,6 +70,7 @@ brews:
       assert_match version.to_s, shell_output("#{bin}/sanad version")
 
 release:
+  draft: true
   github:
     owner: MohamedElashri
     name: sanad

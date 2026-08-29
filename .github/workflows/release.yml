@@ -17,6 +17,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # sanad: ref=v7.0.1
         with:
           fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # sanad: ref=v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: action/package-lock.json
+      - name: Verify action release sources
+        run: |
+          test "$(node -p 'require("./action/package.json").version')" = "${GITHUB_REF_NAME#v}"
+          npm ci --prefix action
+          npm test --prefix action
+          npm run check-dist --prefix action
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # sanad: ref=v7.0.0
         with:
@@ -33,6 +45,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Publish and verify immutable release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq .immutable)" = "true"
+          gh release verify "$GITHUB_REF_NAME"
       - name: Update Nix flake release
         run: >-
           go run ./scripts/update-flake-release

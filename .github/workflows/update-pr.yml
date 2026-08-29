@@ -1,0 +1,112 @@
+name: Sanad update pull request
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: Sanad configuration path
+        required: false
+        type: string
+        default: .sanad.toml
+      branch:
+        description: Branch used for the update pull request
+        required: false
+        type: string
+        default: sanad/update-action-pins
+      base:
+        description: Pull request base branch; defaults to the repository default branch
+        required: false
+        type: string
+        default: ""
+      upgrade:
+        description: Also upgrade managed logical refs according to upgrade policy
+        required: false
+        type: boolean
+        default: false
+      title:
+        description: Pull request title
+        required: false
+        type: string
+        default: "ci: update pinned GitHub Actions"
+      commit-message:
+        description: Update commit message
+        required: false
+        type: string
+        default: "ci: update pinned GitHub Actions"
+    secrets:
+      token:
+        description: Optional GitHub App or PAT token; defaults to github.token
+        required: false
+    outputs:
+      pr-url:
+        description: Created or updated pull request URL, or empty when nothing changed
+        value: ${{ jobs.update.outputs.pr-url }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sanad-update-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    outputs:
+      pr-url: ${{ steps.pull-request.outputs.url }}
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # sanad: ref=v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.token || github.token }}
+
+      - name: Apply tracked ref updates
+        id: apply
+        uses: $/action
+        with:
+          mode: apply
+          config: ${{ inputs.config }}
+          write: "true"
+          token: ${{ secrets.token || github.token }}
+
+      - name: Upgrade logical refs
+        id: upgrade
+        if: inputs.upgrade
+        uses: $/action
+        with:
+          mode: upgrade
+          config: ${{ inputs.config }}
+          write: "true"
+          token: ${{ secrets.token || github.token }}
+
+      - name: Create or update pull request
+        id: pull-request
+        if: steps.apply.outputs.changed == 'true' || steps.upgrade.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.token || github.token }}
+          UPDATE_BRANCH: ${{ inputs.branch }}
+          BASE_BRANCH: ${{ inputs.base || github.event.repository.default_branch }}
+          PR_TITLE: ${{ inputs.title }}
+          COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        run: |
+          git check-ref-format --branch "$UPDATE_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$UPDATE_BRANCH"
+          git add --all -- .github/workflows
+          if test -e .github/sanad.lock.json || git ls-files --error-unmatch .github/sanad.lock.json >/dev/null 2>&1; then
+            git add --all -- .github/sanad.lock.json
+          fi
+          git commit -m "$COMMIT_MESSAGE"
+          git push --force-with-lease origin "$UPDATE_BRANCH"
+
+          body="Sanad updated GitHub Action pins according to the repository policy. Review the workflow and lockfile diff before merging."
+          if gh pr view "$UPDATE_BRANCH" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh pr edit "$UPDATE_BRANCH" --repo "$GITHUB_REPOSITORY" --title "$PR_TITLE" --body "$body" --base "$BASE_BRANCH"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --head "$UPDATE_BRANCH" --base "$BASE_BRANCH" --title "$PR_TITLE" --body "$body"
+          fi
+          gh pr view "$UPDATE_BRANCH" --repo "$GITHUB_REPOSITORY" --json url --jq '"url=" + .url' >> "$GITHUB_OUTPUT"

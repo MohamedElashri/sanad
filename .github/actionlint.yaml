@@ -1,0 +1,6 @@
+# actionlint v1.7.12 predates GitHub's $/path self-repository syntax.
+# Keep this exception scoped to the reusable workflow and exact action path.
+paths:
+  .github/workflows/update-pr.yml:
+    ignore:
+      - 'specifying action "\$/action" in invalid format because ref is missing'

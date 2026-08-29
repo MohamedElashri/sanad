@@ -28,6 +28,7 @@ type applyOptions struct {
 	interactive   bool
 	write         bool
 	yes           bool
+	prBodyOut     string
 	workflowPaths []string
 }
 
@@ -81,6 +82,7 @@ func newApplyCommand(opts *rootOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&applyOpts.interactive, "interactive", false, "prompt for confirmation")
 	cmd.Flags().BoolVar(&applyOpts.write, "write", false, "write changes to workflow files")
 	cmd.Flags().BoolVarP(&applyOpts.yes, "yes", "y", false, "approve non-interactive writes")
+	cmd.Flags().StringVar(&applyOpts.prBodyOut, "pr-body-out", "", "write a Markdown pull request body to a file")
 	cmd.Flags().StringSliceVar(&applyOpts.workflowPaths, "workflows", nil, "workflow file or directory paths to scan")
 	return cmd
 }
@@ -105,6 +107,11 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 	plan, err := buildApplyPlan(cmd.Context(), cfg, applyOpts.workflowPaths, resolver, planNow(), interactive)
 	if err != nil {
 		return err
+	}
+	if applyOpts.prBodyOut != "" {
+		if err := writePlanPRBody(applyOpts.prBodyOut, plan.Report); err != nil {
+			return err
+		}
 	}
 	if len(plan.Blockers) > 0 {
 		if opts.format == "json" {
@@ -154,6 +161,13 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		}
 		return nil
 	}
+	if opts.format == "json" {
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(plan.Report); err != nil {
+			return err
+		}
+	}
 
 	if applyOpts.diff && len(rewrites) > 0 && interactive == nil {
 		if err := printApplyDiff(cmd.OutOrStdout(), rewrites, styleForCommand(cmd)); err != nil {
@@ -176,10 +190,14 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 			if err := saveInteractiveConfigChoices(opts, interactive); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile; no workflow updates to apply.")
+			if opts.format == "table" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Updated lockfile; no workflow updates to apply.")
+			}
 			return nil
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
+		if opts.format == "table" {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No workflow updates to apply.")
+		}
 		return nil
 	}
 
@@ -194,7 +212,9 @@ func runApply(cmd *cobra.Command, opts *rootOptions, applyOpts *applyOptions, re
 		return err
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d workflow update(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+	if opts.format == "table" {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Applied %d workflow update(s) across %d file(s).\n", countWorkflowUpdates(plan.ChangesByFile), len(rewrites))
+	}
 	return nil
 }
 
@@ -205,7 +225,7 @@ func buildApplyPlan(ctx context.Context, cfg config.Config, workflowPaths []stri
 	}
 
 	plan := applyPlan{
-		Report:        planReport{Version: 1},
+		Report:        planReport{Version: planReportVersion, Files: []planFile{}},
 		ChangesByFile: make(map[string][]workflow.RewriteChange),
 	}
 	actionsByFile := make(map[string][]planAction)

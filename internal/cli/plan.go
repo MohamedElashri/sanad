@@ -178,7 +178,7 @@ func buildPlanReport(ctx context.Context, cfg config.Config, workflowPaths []str
 		actionsByFile[item.Use.File] = append(actionsByFile[item.Use.File], item.Action)
 	}
 
-	report := planReport{Version: 1}
+	report := planReport{Version: planReportVersion, Files: []planFile{}}
 	for _, file := range files {
 		if len(actionsByFile[file]) == 0 {
 			continue

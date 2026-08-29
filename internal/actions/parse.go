@@ -123,7 +123,7 @@ func splitSelectorRef(raw string) (string, string, bool) {
 }
 
 func isLocalAction(raw string) bool {
-	return raw == "." || strings.HasPrefix(raw, "./")
+	return raw == "." || strings.HasPrefix(raw, "./") || strings.HasPrefix(raw, "$/")
 }
 
 func validNameSegment(segment string) bool {

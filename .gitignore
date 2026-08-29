@@ -9,3 +9,4 @@ plan.md
 .gopath/
 .gotmp/
 .cache/
+/action/node_modules/

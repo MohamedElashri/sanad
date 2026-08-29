@@ -7,6 +7,8 @@ template = "page"
 
 Sanad uses GoReleaser for tagged releases.
 
+Repository release immutability must be enabled before publishing a tag. The action installer rejects mutable releases, and the release workflow fails if the newly published release is not reported as immutable by GitHub.
+
 Release publishing is triggered by tags that match `v*`:
 
 ```bash
@@ -14,7 +16,9 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64, includes README, LICENSE, and `.sanad.toml.example`, and publishes SHA-256 checksums.
+GoReleaser builds Linux, macOS, and Windows archives for amd64 and arm64, includes README, LICENSE, and `.sanad.toml.example`, and publishes SHA-256 checksums. It first uploads every asset to a draft release. The workflow publishes the completed draft, verifies GitHub's immutable release attestation, and only then continues with package updates.
+
+The version in `action/package.json` must match the release tag without its leading `v`. The release workflow tests the action and verifies that the committed `action/dist/index.js` matches its source before building release archives.
 
 ## Homebrew publishing
 
