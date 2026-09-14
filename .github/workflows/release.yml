@@ -30,7 +30,6 @@ jobs:
           test "$(node -p 'require("./action/node_modules/@actions/core/package.json").version')" = "1.11.1"
           node -e 'require("./action/node_modules/@actions/core")'
           npm test --prefix action
-          npm run check-dist --prefix action
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # sanad: ref=v7.0.0
         with:

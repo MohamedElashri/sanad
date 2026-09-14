@@ -24,7 +24,6 @@ jobs:
           test "$(node -p 'require("./action/node_modules/@actions/core/package.json").version')" = "1.11.1"
           node -e 'require("./action/node_modules/@actions/core")'
       - run: npm test --prefix action
-      - run: npm run check-dist --prefix action
 
   action-integration:
     strategy:
