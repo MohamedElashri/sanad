@@ -70,7 +70,7 @@ jobs:
       upgrade: false
 ```
 
-The reusable workflow applies tracked-ref updates, commits only `.github/workflows` and `.github/sanad.lock.json`, and creates or updates one branch and pull request. Set `upgrade: true` to also move logical refs according to the repository's upgrade policy.
+The reusable workflow applies tracked-ref updates, commits `.github/workflows`, nested conventional `.github/workflows` directories, and `.github/sanad.lock.json`, then creates or updates one branch and pull request. Set `upgrade: true` to also move logical refs according to the repository's upgrade policy.
 
 The repository must allow GitHub Actions to create pull requests. Pull requests created with the default `GITHUB_TOKEN` do not normally trigger another workflow run. If that behavior is required, pass a narrowly scoped GitHub App or personal access token stored as `SANAD_UPDATE_TOKEN`:
 

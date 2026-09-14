@@ -34,6 +34,10 @@ func DiscoverWorkflowFiles(paths []string) ([]string, error) {
 }
 
 func discoverWorkflowFiles(path string) ([]string, error) {
+	if path == "**/.github/workflows" {
+		return discoverNestedWorkflowFiles(".")
+	}
+
 	var files []string
 
 	err := filepath.WalkDir(path, func(current string, entry fs.DirEntry, err error) error {
@@ -61,6 +65,42 @@ func discoverWorkflowFiles(path string) ([]string, error) {
 		return nil, nil
 	}
 
+	return files, err
+}
+
+// discoverNestedWorkflowFiles finds conventional GitHub workflow directories
+// below a repository root. It deliberately matches only directories named
+// .github/workflows instead of treating every YAML file in the repository as a
+// workflow.
+func discoverNestedWorkflowFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(current string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "vendor" {
+			return filepath.SkipDir
+		}
+		if entry.Name() != "workflows" || filepath.Base(filepath.Dir(current)) != ".github" {
+			return nil
+		}
+
+		matches, err := discoverWorkflowFiles(current)
+		if err != nil {
+			return err
+		}
+		files = append(files, matches...)
+		return filepath.SkipDir
+	})
+	if err != nil && isNotExist(err) {
+		return nil, nil
+	}
 	return files, err
 }
 

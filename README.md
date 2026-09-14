@@ -194,7 +194,7 @@ The workflow executes immutable SHAs. The comments and lockfile tell `sanad` whi
 
 ## Scope
 
-Sanad scans workflow files under `.github/workflows` by default, classifies `uses:` references, resolves GitHub tags and branches through the GitHub API, rewrites mutable action refs to full SHAs, adds `# sanad: ref=...` metadata, maintains `.github/sanad.lock.json`, applies cooldown rules, and emits table, JSON, SARIF, and Markdown helper output.
+Sanad scans workflow files under `.github/workflows` and nested conventional `.github/workflows` directories by default, classifies `uses:` references, resolves GitHub tags and branches through the GitHub API, rewrites mutable action refs to full SHAs, adds `# sanad: ref=...` metadata, maintains `.github/sanad.lock.json`, applies cooldown rules, and emits table, JSON, SARIF, and Markdown helper output.
 
 It is not a general dependency updater, vulnerability scanner, workflow formatter, YAML linter, Docker image updater, or local action rewriter. The bundled GitHub Action is a thin adapter around the same CLI and policy model.
 

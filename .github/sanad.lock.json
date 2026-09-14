@@ -240,6 +240,17 @@
       "logical_ref": "v7.0.1",
       "pinned_sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
       "resolved_at": "2026-09-14T18:44:39Z"
+    },
+    {
+      "file": "action/test/integration/.github/workflows/fixture.yml",
+      "node": "jobs.test.steps[0].uses",
+      "owner": "actions",
+      "repo": "checkout",
+      "path": "",
+      "kind": "github-action",
+      "logical_ref": "v4",
+      "pinned_sha": "11bd71901bbe5b1630ceea73d27597364c9af683",
+      "resolved_at": "2026-09-14T18:44:39Z"
     }
   ]
 }

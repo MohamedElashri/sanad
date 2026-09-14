@@ -44,6 +44,31 @@ func TestDiscoverWorkflowFilesMissingDirectory(t *testing.T) {
 	}
 }
 
+func TestDiscoverWorkflowFilesFindsNestedGitHubWorkflowDirectories(t *testing.T) {
+	root := t.TempDir()
+	workflowFile := filepath.Join(root, "action", "test", "integration", ".github", "workflows", "fixture.yml")
+	writeFile(t, workflowFile)
+	writeFile(t, filepath.Join(root, "action", "node_modules", "pkg", ".travis.yml"))
+
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(old) })
+
+	got, err := DiscoverWorkflowFiles([]string{"**/.github/workflows"})
+	if err != nil {
+		t.Fatalf("DiscoverWorkflowFiles returned error: %v", err)
+	}
+	want := []string{"action/test/integration/.github/workflows/fixture.yml"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("DiscoverWorkflowFiles = %#v, want %#v", got, want)
+	}
+}
+
 func TestDiscoverWorkflowFilesDeduplicates(t *testing.T) {
 	root := t.TempDir()
 	workflows := filepath.Join(root, ".github", "workflows")

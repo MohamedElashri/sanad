@@ -18,7 +18,8 @@ func TestLoadDefaultWhenMissing(t *testing.T) {
 	if cfg.Source != "defaults" {
 		t.Fatalf("Source = %q, want defaults", cfg.Source)
 	}
-	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
+	wantWorkflowPaths := []string{".github/workflows", "**/.github/workflows"}
+	if len(cfg.WorkflowPaths) != len(wantWorkflowPaths) || cfg.WorkflowPaths[0] != wantWorkflowPaths[0] || cfg.WorkflowPaths[1] != wantWorkflowPaths[1] {
 		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
 	}
 	if cfg.Cooldown != 7*24*time.Hour {
@@ -230,7 +231,8 @@ func TestLoadExampleConfig(t *testing.T) {
 	if cfg.Source != path {
 		t.Fatalf("Source = %q, want %q", cfg.Source, path)
 	}
-	if len(cfg.WorkflowPaths) != 1 || cfg.WorkflowPaths[0] != ".github/workflows" {
+	wantWorkflowPaths := []string{".github/workflows", "**/.github/workflows"}
+	if len(cfg.WorkflowPaths) != len(wantWorkflowPaths) || cfg.WorkflowPaths[0] != wantWorkflowPaths[0] || cfg.WorkflowPaths[1] != wantWorkflowPaths[1] {
 		t.Fatalf("WorkflowPaths = %#v", cfg.WorkflowPaths)
 	}
 	if cfg.Cooldown != 7*24*time.Hour {
