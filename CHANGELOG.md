@@ -18,27 +18,27 @@ All notable changes to Sanad are documented here.
 
 - Made nested workflow discovery handle both slash and backslash path separators on Windows.
 
-## 0.3.5 - Unreleased
+## 0.3.5 - 2026-08-29
 
 ### Fixed
 
 - Use a unique Marketplace display name: `Sanad Dependency Guard`.
 
-## 0.3.4 - Unreleased
+## 0.3.4 - 2026-08-29
 
 ### Fixed
 
 - Align the action package version with the release tag so release validation cannot publish a mismatched action.
 - Verify published release state without requiring GitHub artifact attestations that GoReleaser does not generate.
 
-## 0.3.1 - Unreleased
+## 0.3.1 - 2026-08-29
 
 ### Fixed
 
 - Kept the Node action's CommonJS dependencies exact and verified them during CI and release builds.
 - Added explicit release-state diagnostics so mutable releases fail before the action can consume them.
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-08-29
 
 ### Added
 
