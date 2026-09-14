@@ -1,4 +1,4 @@
-.PHONY: help build test race lint staticcheck-install staticcheck bench fmt check docs-release-notes docs-build docs-serve clean
+.PHONY: help build test race lint staticcheck-install staticcheck bench fmt check update docs-release-notes docs-build docs-serve clean
 
 .DEFAULT_GOAL := help
 
@@ -24,6 +24,7 @@ help:
 	@printf '  %-20s %s\n' 'make bench' 'Run workflow extraction benchmark'
 	@printf '  %-20s %s\n' 'make fmt' 'Format Go sources'
 	@printf '  %-20s %s\n' 'make check' 'Format, lint, test, and build'
+	@printf '  %-20s %s\n' 'make update' 'Update all Go dependencies'
 	@printf '  %-20s %s\n' 'make docs-build' 'Generate release notes and build docs'
 	@printf '  %-20s %s\n' 'make docs-serve' 'Generate release notes and serve docs'
 	@printf '  %-20s %s\n' 'make clean' 'Remove local build, docs, and cache artifacts'
@@ -58,6 +59,10 @@ fmt:
 	gofmt -w cmd internal
 
 check: fmt lint test build
+
+update:
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go get -u ./...
+	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go mod tidy
 
 docs-release-notes:
 	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go run ./scripts/generate_release_notes.go
