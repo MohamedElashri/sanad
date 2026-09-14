@@ -2,6 +2,22 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.6 - 2026-09-15
+
+### Added
+
+- Added support for discovering conventional nested `.github/workflows` directories, allowing action repositories to scan workflow fixtures under directories such as `action/test/integration` without scanning unrelated YAML files.
+- Added `make update` to update Go dependencies and tidy the module files.
+
+### Changed
+
+- Expanded the default workflow scope to include `.github/workflows` directories nested in the repository, with matching configuration and documentation updates.
+- Updated Go dependencies, including `golang.org/x/oauth2`, `github.com/google/go-querystring`, and `github.com/spf13/pflag`.
+
+### Fixed
+
+- Made nested workflow discovery handle both slash and backslash path separators on Windows.
+
 ## 0.3.5 - Unreleased
 
 ### Fixed
