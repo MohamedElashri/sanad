@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+const nestedWorkflowPath = "**/.github/workflows"
+
 func DiscoverWorkflowFiles(paths []string) ([]string, error) {
 	seen := make(map[string]struct{})
 	var files []string
@@ -34,10 +36,13 @@ func DiscoverWorkflowFiles(paths []string) ([]string, error) {
 }
 
 func discoverWorkflowFiles(path string) ([]string, error) {
-	if path == "**/.github/workflows" {
+	// Config paths use slash-separated repository-relative paths. Normalize
+	// separators before cleaning so the conventional recursive path remains
+	// recognizable on Windows, where filepath.Clean turns it into
+	// "**\\.github\\workflows".
+	if strings.ReplaceAll(path, `\`, "/") == nestedWorkflowPath {
 		return discoverNestedWorkflowFiles(".")
 	}
-
 	var files []string
 
 	err := filepath.WalkDir(path, func(current string, entry fs.DirEntry, err error) error {

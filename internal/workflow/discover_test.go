@@ -59,13 +59,15 @@ func TestDiscoverWorkflowFilesFindsNestedGitHubWorkflowDirectories(t *testing.T)
 	}
 	t.Cleanup(func() { _ = os.Chdir(old) })
 
-	got, err := DiscoverWorkflowFiles([]string{"**/.github/workflows"})
-	if err != nil {
-		t.Fatalf("DiscoverWorkflowFiles returned error: %v", err)
-	}
 	want := []string{"action/test/integration/.github/workflows/fixture.yml"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("DiscoverWorkflowFiles = %#v, want %#v", got, want)
+	for _, configuredPath := range []string{"**/.github/workflows", `**\.github\workflows`} {
+		got, err := DiscoverWorkflowFiles([]string{configuredPath})
+		if err != nil {
+			t.Fatalf("DiscoverWorkflowFiles(%q) returned error: %v", configuredPath, err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("DiscoverWorkflowFiles(%q) = %#v, want %#v", configuredPath, got, want)
+		}
 	}
 }
 
