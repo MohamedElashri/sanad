@@ -72,7 +72,7 @@ func TestEvaluatePolicyDefaults(t *testing.T) {
 		{
 			name:  "unpinned action denied by default",
 			entry: Entry{Action: actions.Parse("owner/repo"), Now: now},
-			want:  DecisionErrorUnpinned,
+			want:  DecisionErrorUnresolved,
 		},
 		{
 			name:  "docker action skipped",

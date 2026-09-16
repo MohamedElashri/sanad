@@ -79,7 +79,7 @@ func Default() Config {
 		Updates: UpdatesConfig{
 			Tags:              "track",
 			Branches:          "deny",
-			Unpinned:          "deny",
+			Unpinned:          "latest-release",
 			ReusableWorkflows: true,
 		},
 		Ignore: IgnoreConfig{
