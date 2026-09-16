@@ -276,7 +276,7 @@ sanad plan
 
 ## Security Model
 
-The core policy is simple: workflow dependencies should run immutable full-length SHAs. Mutable tags and branches are resolved to commits, short SHAs are rejected, local and Docker actions are skipped by default, and branch or unpinned behavior must be explicitly allowed before it is managed non-interactively.
+The core policy is simple: workflow dependencies should run immutable full-length SHAs. Mutable tags and branches are automatically resolved to commits and tracked, short SHAs are rejected, local and Docker actions are skipped by default, and unpinned actions are automatically discovered and upgraded to their latest release. Strict security defaults (like denying branch tracking or unpinned actions) are available for advanced usage.
 
 See the [security model](docs/content/advanced/security-model.md) for the full model.
 

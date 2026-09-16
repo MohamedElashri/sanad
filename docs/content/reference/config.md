@@ -20,8 +20,8 @@ cooldown_source = "source"
 
 [updates]
 tags = "track"
-branches = "deny"
-unpinned = "deny"
+branches = "track"
+unpinned = "latest-release"
 reusable_workflows = true
 
 [ignore]
@@ -66,9 +66,9 @@ Controls which timestamp feeds cooldown evaluation:
 
 `tags` can be `track`, `pin-current`, or `deny`.
 
-`branches` can be `deny`, `pin-current`, or `track`.
+`branches` can be `track`, `pin-current`, or `deny`.
 
-`unpinned` can be `deny`, `default-branch`, or `latest-release`.
+`unpinned` can be `latest-release`, `default-branch`, or `deny`.
 
 `reusable_workflows` controls whether reusable workflow refs are allowed.
 

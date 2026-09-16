@@ -78,7 +78,7 @@ func Default() Config {
 		CooldownSource: DefaultCooldownSource,
 		Updates: UpdatesConfig{
 			Tags:              "track",
-			Branches:          "deny",
+			Branches:          "track",
 			Unpinned:          "latest-release",
 			ReusableWorkflows: true,
 		},

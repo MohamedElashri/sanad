@@ -617,6 +617,9 @@ func TestApplyInteractivePinsDeniedBranchHead(t *testing.T) {
 		},
 	}, now)
 	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nbranches = \"deny\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: owner/repo@main\n")
 
@@ -654,6 +657,9 @@ func TestApplyInteractivePersistsBranchTrackingWhenRequested(t *testing.T) {
 		},
 	}, now)
 	withTempWorkingDir(t)
+	if err := os.WriteFile(".sanad.toml", []byte("[updates]\nbranches = \"deny\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	path := writeApplyWorkflow(t, "jobs:\n  test:\n    steps:\n      - uses: owner/repo@main\n")
 

@@ -28,7 +28,7 @@ func TestLoadDefaultWhenMissing(t *testing.T) {
 	if cfg.CooldownSource != DefaultCooldownSource {
 		t.Fatalf("CooldownSource = %q, want %q", cfg.CooldownSource, DefaultCooldownSource)
 	}
-	if cfg.Updates.Tags != "track" || cfg.Updates.Branches != "deny" || cfg.Updates.Unpinned != "latest-release" || !cfg.Updates.ReusableWorkflows {
+	if cfg.Updates.Tags != "track" || cfg.Updates.Branches != "track" || cfg.Updates.Unpinned != "latest-release" || !cfg.Updates.ReusableWorkflows {
 		t.Fatalf("Updates = %#v", cfg.Updates)
 	}
 	wantIgnore := []string{"./*", "docker://*"}

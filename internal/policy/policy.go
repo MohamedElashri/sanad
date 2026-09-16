@@ -58,7 +58,7 @@ type Entry struct {
 func DefaultOptions() Options {
 	return Options{
 		Tags:              TagTrack,
-		Branches:          BranchDeny,
+		Branches:          BranchTrack,
 		Unpinned:          UnpinnedLatestRelease,
 		ReusableWorkflows: true,
 		IgnoreActions:     []string{"./*", "docker://*"},

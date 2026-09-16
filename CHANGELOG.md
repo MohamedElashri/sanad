@@ -2,6 +2,18 @@
 
 All notable changes to Sanad are documented here.
 
+
+## 0.3.7 - 2026-09-17
+
+### Added
+
+- Added branch tracking support, allowing you to track branches in addition to tags and unpinned actions.
+
+### Changed
+
+- Updated default branch policy from `deny` to `track`.
+- Updated default unpinned action policy from `latest` to `latest-release`.
+
 ## 0.3.6 - 2026-09-15
 
 ### Added
