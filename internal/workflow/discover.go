@@ -89,7 +89,16 @@ func discoverNestedWorkflowFiles(root string) ([]string, error) {
 		if !entry.IsDir() {
 			return nil
 		}
-		if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "vendor" {
+		name := entry.Name()
+		if name == "node_modules" || name == "vendor" {
+			return filepath.SkipDir
+		}
+		// Skip .git and all hidden directories except .github, which is where
+		// workflow files live. This avoids walking into dev-environment caches
+		// like .gomodcache, .gocache, .gopath, .cache, etc.
+		// The root of the walk (current == root) is exempt so that we do not
+		// skip the entire tree when WalkDir starts from ".".
+		if current != root && strings.HasPrefix(name, ".") && name != ".github" {
 			return filepath.SkipDir
 		}
 		if entry.Name() != "workflows" || filepath.Base(filepath.Dir(current)) != ".github" {

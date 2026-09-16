@@ -28,6 +28,7 @@ help:
 	@printf '  %-20s %s\n' 'make docs-build' 'Generate release notes and build docs'
 	@printf '  %-20s %s\n' 'make docs-serve' 'Generate release notes and serve docs'
 	@printf '  %-20s %s\n' 'make clean' 'Remove local build, docs, and cache artifacts'
+	@printf '  %-20s %s\n' 'make sync-version' 'Sync VERSION file into action/package.json and package-lock.json'
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -72,6 +73,9 @@ docs-build: docs-release-notes
 
 docs-serve: docs-release-notes
 	$(NIDA) serve --site ./docs
+
+sync-version:
+	scripts/sync-version
 
 clean:
 	$(RM) -r sanad bin dist .cache .gocache .gomodcache .gopath docs/public docs/content/release-notes.md

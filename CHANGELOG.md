@@ -3,6 +3,13 @@
 All notable changes to Sanad are documented here.
 
 
+## 0.3.8 - 2026-09-17
+
+### Fixed
+
+- Fixed nested workflow discovery (`**/.github/workflows`) scanning into hidden directories such as `.gomodcache`, `.gocache`, `.gopath`, and `.cache` that are kept at the repository root. All hidden directories except `.github` are now skipped, matching the intent of the glob.
+- Release CI now validates the `VERSION` file against the git tag in addition to `action/package.json`, ensuring all three sources stay in sync.
+
 ## 0.3.7 - 2026-09-17
 
 ### Added

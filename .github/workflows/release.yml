@@ -25,7 +25,9 @@ jobs:
           cache-dependency-path: action/package-lock.json
       - name: Verify action release sources
         run: |
-          test "$(node -p 'require("./action/package.json").version')" = "${GITHUB_REF_NAME#v}"
+          tag_version="${GITHUB_REF_NAME#v}"
+          test "$(cat VERSION)" = "$tag_version"
+          test "$(node -p 'require("./action/package.json").version')" = "$tag_version"
           npm ci --prefix action
           test "$(node -p 'require("./action/node_modules/@actions/core/package.json").version')" = "1.11.1"
           node -e 'require("./action/node_modules/@actions/core")'
