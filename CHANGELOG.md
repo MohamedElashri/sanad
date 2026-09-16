@@ -2,6 +2,10 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.9 - 2026-09-17
+
+### Fixed 
+- Fix compiled bundle that bakes package.json's version at build time.
 
 ## 0.3.8 - 2026-09-17
 

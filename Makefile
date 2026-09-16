@@ -76,6 +76,7 @@ docs-serve: docs-release-notes
 
 sync-version:
 	scripts/sync-version
+	npm run build --prefix action
 
 clean:
 	$(RM) -r sanad bin dist .cache .gocache .gomodcache .gopath docs/public docs/content/release-notes.md
