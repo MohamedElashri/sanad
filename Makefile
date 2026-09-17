@@ -28,7 +28,7 @@ help:
 	@printf '  %-20s %s\n' 'make docs-build' 'Generate release notes and build docs'
 	@printf '  %-20s %s\n' 'make docs-serve' 'Generate release notes and serve docs'
 	@printf '  %-20s %s\n' 'make clean' 'Remove local build, docs, and cache artifacts'
-	@printf '  %-20s %s\n' 'make sync-version' 'Sync VERSION file into action/package.json and package-lock.json'
+	@printf '  %-20s %s\n' 'make sync-version' 'Sync VERSION, update package manifests, rebuild bundle, and stamp README SHAs'
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -77,6 +77,7 @@ docs-serve: docs-release-notes
 sync-version:
 	scripts/sync-version
 	npm run build --prefix action
+	scripts/update-readme
 
 clean:
 	$(RM) -r sanad bin dist .cache .gocache .gomodcache .gopath docs/public docs/content/release-notes.md

@@ -2,6 +2,11 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.11 - 2026-09-17
+
+### Changed 
+- The README.md is updated to focus on the action usage (needed a new release for that)
+
 ## 0.3.10 - 2026-09-17
 
 ### Fixed
