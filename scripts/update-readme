@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# update-readme: Replace action SHA placeholders in README.md with current values.
+#
+# SANAD_FULL_COMMIT_SHA  → HEAD commit (will become the release tag commit)
+# CHECKOUT_FULL_SHA      → the actions/checkout SHA already managed by sanad
+#                          in .github/workflows/ci.yml
+#
+# This runs automatically as part of `make sync-version` so README.md is always
+# up to date before you commit and tag.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+README="$REPO_ROOT/README.md"
+CI_WORKFLOW="$REPO_ROOT/.github/workflows/ci.yml"
+
+# The sanad SHA: the commit that will carry the release tag.
+SANAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+
+# The actions/checkout SHA: read from the first occurrence in ci.yml (sanad manages it).
+CHECKOUT_SHA="$(grep -m1 'actions/checkout@' "$CI_WORKFLOW" | grep -oP '(?<=@)[a-f0-9]{40}')"
+
+if [[ -z "$CHECKOUT_SHA" ]]; then
+  echo "error: could not find a pinned actions/checkout SHA in $CI_WORKFLOW" >&2
+  exit 1
+fi
+
+# Replace placeholders (or previously-stamped SHAs) with current values.
+# We match any 40-char hex SHA that currently occupies those positions so the
+# script is idempotent — running it twice produces the same result.
+python3 - "$README" "$SANAD_SHA" "$CHECKOUT_SHA" << 'PY'
+import re, sys
+path, sanad_sha, checkout_sha = sys.argv[1], sys.argv[2], sys.argv[3]
+
+with open(path) as f:
+    content = f.read()
+
+sha_re = r'(?:[a-f0-9]{40}|SANAD_FULL_COMMIT_SHA)'
+checkout_re = r'(?:[a-f0-9]{40}|CHECKOUT_FULL_SHA)'
+
+# Replace sanad references: MohamedElashri/sanad@<sha-or-placeholder>
+content = re.sub(
+    r'(MohamedElashri/sanad(?:/.github/workflows/[^\s@]+)?)@' + sha_re,
+    lambda m: f'{m.group(1)}@{sanad_sha}',
+    content
+)
+
+# Replace checkout reference: actions/checkout@<sha-or-placeholder>
+# Only in README (the exact CHECKOUT_FULL_SHA placeholder line)
+content = re.sub(
+    r'(actions/checkout@)' + checkout_re + r'(?!\s*#)',
+    lambda m: f'{m.group(1)}{checkout_sha}',
+    content
+)
+
+with open(path, 'w') as f:
+    f.write(content)
+PY
+
+echo "  updated README.md"
+echo "    SANAD_FULL_COMMIT_SHA → ${SANAD_SHA}"
+echo "    CHECKOUT_FULL_SHA     → ${CHECKOUT_SHA}"
