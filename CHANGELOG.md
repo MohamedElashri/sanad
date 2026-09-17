@@ -2,6 +2,12 @@
 
 All notable changes to Sanad are documented here.
 
+## 0.3.10 - 2026-09-17
+
+### Fixed
+- Fix action behavior to align with the new sanad CLI workflow
+
+
 ## 0.3.9 - 2026-09-17
 
 ### Fixed 
