@@ -5,7 +5,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = "0.3.10";
+      version = "0.3.11";
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -16,19 +16,19 @@
       releaseSources = {
         x86_64-linux = {
           artifact = "sanad_${version}_Linux_x86_64.tar.gz";
-          hash = "sha256-vtRWBb7Al9HgMTDSi6OfO2+VlH4YxQa/ZtCqJWhjTuo=";
+          hash = "sha256-DaNHy9CGK3U+yqNPZMGLUaJTox1s1hVtltzZBsAaDuQ=";
         };
         aarch64-linux = {
           artifact = "sanad_${version}_Linux_arm64.tar.gz";
-          hash = "sha256-osmBuWsOaAhz/ZEi48+s1K7iKHztNk5o7Mk/tKsvq7w=";
+          hash = "sha256-USbzq/EJ99nCLZrTQSgBgoD/GAwfQvHtXJvNY0Ow+uA=";
         };
         x86_64-darwin = {
           artifact = "sanad_${version}_Darwin_x86_64.tar.gz";
-          hash = "sha256-9VRxMcAZHEPga2C1Xa4LIlZIK+ZrPaP9JuiOe4NXScY=";
+          hash = "sha256-KEvvMkPqkkWw8vbsLe/RPEqf1HtuucVXGWNYVZ5l7HA=";
         };
         aarch64-darwin = {
           artifact = "sanad_${version}_Darwin_arm64.tar.gz";
-          hash = "sha256-l0fkh25i55jhZrmYFhL6rrQAfWFoTJPOJHHK+QMAfMc=";
+          hash = "sha256-PWz3joYQomvR4cRah231qzZC1VjMkcyo0E3ERsbwxxw=";
         };
       };
     in
