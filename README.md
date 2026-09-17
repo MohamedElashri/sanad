@@ -63,7 +63,7 @@ The bundled GitHub Action is the recommended way to use sanad in CI. It installs
 Pin it to a full commit SHA (find the latest on the [releases page](https://github.com/MohamedElashri/sanad/releases)):
 
 ```yaml
-- uses: MohamedElashri/sanad@240e6162e87a0af43a9b3eee379d019d6da31a94
+- uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
 ```
 
 ### Pattern 1 — Enforce pinning on every PR
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: MohamedElashri/sanad@240e6162e87a0af43a9b3eee379d019d6da31a94
+      - uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
         with:
           mode: check
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -112,7 +112,7 @@ permissions:
 
 jobs:
   update:
-    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@240e6162e87a0af43a9b3eee379d019d6da31a94
+    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -126,7 +126,7 @@ Use the action directly when you need full control over what happens before or a
 ```yaml
 - name: Apply sanad pin updates
   id: sanad
-  uses: MohamedElashri/sanad@240e6162e87a0af43a9b3eee379d019d6da31a94
+  uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
   with:
     mode: apply
     write: "true"
@@ -142,7 +142,7 @@ Use the action directly when you need full control over what happens before or a
 ### Pattern 4 — Install sanad for use in later steps
 
 ```yaml
-- uses: MohamedElashri/sanad@240e6162e87a0af43a9b3eee379d019d6da31a94
+- uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
   with:
     mode: setup
     token: ${{ secrets.GITHUB_TOKEN }}
