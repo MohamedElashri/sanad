@@ -1,5 +1,5 @@
 {
-  description = "Pin and update GitHub Actions dependencies to immutable commit SHAs";
+  description = "Adopt and update native GitHub Actions lockfiles";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -55,6 +55,9 @@
             installPhase = ''
               runHook preInstall
               install -Dm755 sanad "$out/bin/sanad"
+              if test -f gh-actions-lock; then
+                install -Dm755 gh-actions-lock "$out/bin/gh-actions-lock"
+              fi
               "$out/bin/sanad" completion bash > sanad.bash
               "$out/bin/sanad" completion zsh > _sanad
               "$out/bin/sanad" completion fish > sanad.fish
@@ -66,7 +69,7 @@
             '';
 
             meta = with pkgs.lib; {
-              description = "Pin and update GitHub Actions dependencies to immutable commit SHAs";
+              description = "Adopt and update native GitHub Actions lockfiles";
               homepage = "https://github.com/MohamedElashri/sanad";
               license = licenses.mit;
               mainProgram = "sanad";

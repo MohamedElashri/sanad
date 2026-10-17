@@ -1,163 +1,113 @@
 "use strict";
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const core = require("@actions/core");
 const exec = require("@actions/exec");
-const { SANAD_VERSION, REPORT_VERSIONS } = require("./constants");
-const { changedManagedFiles, snapshotManagedFiles } = require("./files");
 const { installSanad } = require("./installer");
-const { parseBoolean, resolveConfigPath, resolveMode, resolveWorkingDirectory, validateInputs } = require("./inputs");
-const { annotateDecisions, parseReport, reportMetrics, summarizeReport } = require("./report");
+const { version } = require("../package.json");
 
-function setCommonOutputs(values = {}) {
-  core.setOutput("passed", String(values.passed ?? false));
-  core.setOutput("changed", String(values.changed ?? false));
-  core.setOutput("changed-files", JSON.stringify(values.changedFiles ?? []));
-  core.setOutput("violations", String(values.violations ?? 0));
-  core.setOutput("updates", String(values.updates ?? 0));
-  core.setOutput("pending-cooldown", String(values.pending ?? 0));
-  core.setOutput("report-path", values.reportPath ?? "");
-  core.setOutput("pr-body-path", values.prBodyPath ?? "");
-  core.setOutput("sanad-version", SANAD_VERSION);
+const MODES = new Set(["check", "status", "plan", "sync", "update", "setup"]);
+
+function boolean(value, name) {
+  if (value !== "true" && value !== "false") throw new Error(`${name} must be true or false`);
+  return value === "true";
 }
 
-function actionInputs() {
-  const rawMode = core.getInput("mode").trim().toLowerCase();
-  const write = parseBoolean(core.getInput("write", { required: true }), "write");
-  const mode = resolveMode(rawMode, write);
-  return validateInputs({
-    mode,
-    config: core.getInput("config", { required: true }).trim(),
-    workingDirectory: core.getInput("working-directory", { required: true }).trim(),
-    fresh: parseBoolean(core.getInput("fresh", { required: true }), "fresh"),
-    strict: parseBoolean(core.getInput("strict", { required: true }), "strict"),
-    write,
-    token: core.getInput("token"),
-  });
+function contained(root, requested) {
+  const resolved = fs.realpathSync(path.resolve(root, requested));
+  const relative = path.relative(root, resolved);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error("working-directory must stay inside GITHUB_WORKSPACE");
+  if (!fs.statSync(resolved).isDirectory()) throw new Error("working-directory must be a directory");
+  return resolved;
 }
 
-function commandArguments(inputs, reportPath, prBodyPath) {
-  const args = ["--root", inputs.root, "--config", inputs.config, "--format", "json", inputs.mode];
-  if (inputs.mode === "check") {
-    if (inputs.strict) args.push("--strict");
-    else if (inputs.fresh) args.push("--fresh");
-  } else if (inputs.mode === "plan") {
-    args.push("--out", reportPath, "--pr-body-out", prBodyPath);
-  } else if (inputs.mode === "apply") {
-    args.push("--pr-body-out", prBodyPath);
-    if (inputs.write) args.push("--write", "--yes");
-  } else if (inputs.mode === "upgrade") {
-    args.push("--all");
-    if (inputs.write) args.push("--write", "--yes");
-  }
+function inputs(get = core.getInput, env = process.env) {
+  const mode = get("mode") || "check";
+  if (!MODES.has(mode)) throw new Error(`mode must be one of ${[...MODES].join(", ")}`);
+  const write = boolean(get("write") || "false", "write");
+  if (write && mode !== "sync" && mode !== "update") throw new Error("write requires sync or update mode");
+  const workspace = fs.realpathSync(env.GITHUB_WORKSPACE || process.cwd());
+  const cwd = contained(workspace, get("working-directory") || ".");
+  const config = get("config") || ".sanad.toml";
+  if (path.isAbsolute(config) || config.split(/[\\/]/).includes("..")) throw new Error("config must stay inside working-directory");
+  const base = get("base");
+  if (base && mode !== "check") throw new Error("base requires check mode");
+  const host = new URL(env.GITHUB_SERVER_URL || "https://github.com").hostname;
+  return { mode, write, cwd, config, base, token: get("token") || "", repo: env.GITHUB_REPOSITORY ? `${host}/${env.GITHUB_REPOSITORY}` : "" };
+}
+
+function commandArguments(values) {
+  const args = [values.mode, "--root", values.cwd, "--config", values.config, "--format", "json"];
+  if (values.repo) args.push("--repo", values.repo);
+  if (values.write) args.push("--write");
+  if (values.base) args.push("--base", values.base);
   return args;
 }
 
-async function execute(binary, args, workspace, token) {
-  const environment = { ...process.env, NO_COLOR: "1", SANAD_COLOR: "never" };
-  if (token) environment.GITHUB_TOKEN = token;
-  return exec.getExecOutput(binary, args, {
-    cwd: workspace,
-    env: environment,
-    ignoreReturnCode: true,
-    silent: true,
-  });
+function parseReport(stdout, mode) {
+  const r = JSON.parse(stdout);
+  if (r.version !== 1 || r.command !== mode || typeof r.success !== "boolean" || typeof r.changed !== "boolean") throw new Error("unsupported Sanad report");
+  for (const key of ["findings", "files", "decisions", "changes"]) if (!Array.isArray(r[key])) throw new Error(`invalid report ${key}`);
+  for (const f of r.files) if (typeof f.path !== "string" || !f.path || path.isAbsolute(f.path) || f.path.includes("\\") || f.path.split("/").includes("..")) throw new Error("unsafe changed-file path");
+  return r;
 }
 
-async function verifySanadVersion(binary, workspace, token) {
-  const result = await execute(binary, ["version"], workspace, token);
-  const actual = result.stdout.split(/\r?\n/, 1)[0].trim();
-  const expected = `sanad ${SANAD_VERSION}`;
-  if (result.exitCode !== 0 || actual !== expected) {
-    throw new Error(`installed Sanad version mismatch: expected ${expected}, received ${actual || "no version output"}`);
+function markdown(r) {
+  const safe = (s) => String(s || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;").replace(/[\r\n]/g, " ");
+  const lines = [`Sanad ${safe(r.command)}: ${r.success ? "passed" : "failed"}; verification ${safe(r.verification)}.`];
+  for (const f of r.findings) lines.push(`\n- ${safe(f.severity)}: ${safe(f.message)}`);
+  if (r.decisions.length) {
+    lines.push("\n| Action | Target | Decision | Reason |", "| --- | --- | --- | --- |");
+    for (const d of r.decisions) lines.push(`| ${safe(d.action)} | ${safe(d.to)} | ${safe(d.status)} | ${safe(d.reason)} |`);
   }
+  if (r.changes.length) {
+    lines.push("\n| Dependency | Before | After | Workflows |", "| --- | --- | --- | --- |");
+    for (const c of r.changes) lines.push(`| ${safe(c.key)} | ${safe(c.before?.commit)} | ${safe(c.after?.commit)} | ${safe((c.after?.workflows || c.before?.workflows || []).join(", "))} |`);
+  }
+  return `${lines.join("\n")}\n`;
 }
 
-async function workflowPaths(binary, inputs, workspace) {
-  const args = ["--root", inputs.root, "--config", inputs.config, "--format", "json", "config", "show"];
-  const result = await execute(binary, args, workspace, inputs.token);
-  if (result.exitCode !== 0) throw new Error(`Sanad could not load configuration: ${result.stderr.trim() || "unknown error"}`);
-  const config = JSON.parse(result.stdout);
-  if (!Array.isArray(config.workflow_paths)) throw new Error("Sanad configuration did not contain workflow_paths");
-  return config.workflow_paths;
+async function run(deps = {}) {
+  const api = deps.core || core;
+  const values = inputs(api.getInput);
+  if (values.token) api.setSecret(values.token);
+  const publicToken = !process.env.GITHUB_SERVER_URL || process.env.GITHUB_SERVER_URL === "https://github.com" ? values.token : "";
+  const binary = await (deps.install || installSanad)(version, publicToken);
+  const env = { ...process.env };
+  if (values.token) { env.GH_TOKEN = values.token; env.GITHUB_TOKEN = values.token; }
+  // A tenant's token must not be used to download the public Sanad release.
+  const launch = deps.exec || exec.getExecOutput;
+  const installed = await launch(binary, ["version", "--format", "json"], { cwd: values.cwd, env, silent: true });
+  if (JSON.parse(installed.stdout).version !== version) throw new Error("installed Sanad version differs from the action version");
+  api.addPath(path.dirname(binary));
+  api.setOutput("sanad-version", version);
+  if (values.mode === "setup") {
+    await launch(binary, ["setup"], { cwd: values.cwd, env, silent: true });
+    api.setOutput("passed", "true"); return;
+  }
+  const result = await launch(binary, commandArguments(values), { cwd: values.cwd, env, silent: true, ignoreReturnCode: true });
+  let report;
+  try { report = parseReport(result.stdout, values.mode); } catch (error) { throw new Error(`Sanad returned no valid report (exit ${result.exitCode}): ${error.message}`); }
+  const dir = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "sanad-report-"));
+  const reportPath = path.join(dir, "report.json");
+  const bodyPath = path.join(dir, "review.md");
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  const body = markdown(report); fs.writeFileSync(bodyPath, body);
+  api.setOutput("passed", String(result.exitCode === 0 && report.success));
+  api.setOutput("changed", String(report.changed));
+  api.setOutput("changed-files", JSON.stringify(report.changed ? report.files.map((f) => f.path) : []));
+  api.setOutput("updates", String(report.decisions.filter((d) => d.status === "eligible").length));
+  api.setOutput("pending", String(report.decisions.filter((d) => d.status === "pending").length));
+  api.setOutput("report-path", reportPath); api.setOutput("pr-body-path", bodyPath);
+  for (const f of report.findings.slice(0, 50)) {
+    const properties = { title: `Sanad: ${f.code}` }; if (f.file) properties.file = f.file;
+    if (f.severity === "error") api.error(f.message, properties); else if (f.severity === "warning") api.warning(f.message, properties);
+  }
+  await api.summary.addRaw(body).write();
+  if (result.exitCode !== 0 || !report.success) api.setFailed(`Sanad ${values.mode} failed (exit ${result.exitCode}); see the report`);
 }
 
-function logStepSummary(mode, metrics, passed, write) {
-  const icon = passed ? "✅" : "❌";
-  const lines = [`${icon} sanad ${mode} — updates: ${metrics.updates}, pending cooldown: ${metrics.pending}, violations: ${metrics.violations}`];
-  if ((mode === "apply" || mode === "upgrade") && !write) {
-    lines.push("ℹ️  Preview only — set write: \"true\" to apply changes and commit them.");
-  }
-  core.info(lines.join("\n"));
-}
-
-async function run() {
-  const inputs = actionInputs();
-  const workspace = resolveWorkingDirectory(process.env.GITHUB_WORKSPACE, inputs.workingDirectory);
-  inputs.root = workspace;
-  inputs.config = resolveConfigPath(workspace, inputs.config);
-  const binary = await installSanad(SANAD_VERSION, inputs.token);
-  await verifySanadVersion(binary, workspace, inputs.token);
-  core.addPath(path.dirname(binary));
-
-  if (inputs.mode === "setup") {
-    setCommonOutputs({ passed: true });
-    core.info(`✅ Installed Sanad ${SANAD_VERSION}`);
-    return;
-  }
-
-  const reportRoot = process.env.RUNNER_TEMP || workspace;
-  const reportDirectory = fs.mkdtempSync(path.join(reportRoot, "sanad-"));
-  const reportPath = path.join(reportDirectory, `${inputs.mode}-report.json`);
-  const hasPRBody = inputs.mode === "plan" || inputs.mode === "apply";
-  const prBodyPath = hasPRBody ? path.join(reportDirectory, `${inputs.mode}-pr-body.md`) : "";
-
-  let paths = [];
-  let before = new Map();
-  if (inputs.write) {
-    paths = await workflowPaths(binary, inputs, workspace);
-    before = snapshotManagedFiles(workspace, paths, inputs.config);
-  }
-
-  const result = await execute(binary, commandArguments(inputs, reportPath, prBodyPath), workspace, inputs.token);
-  if (!result.stdout.trim()) {
-    setCommonOutputs({ passed: false, prBodyPath: prBodyPath && fs.existsSync(prBodyPath) ? prBodyPath : "" });
-    core.setFailed(`Sanad exited with code ${result.exitCode}: ${result.stderr.trim() || "no diagnostic output"}`);
-    return;
-  }
-
-  const report = parseReport(result.stdout, REPORT_VERSIONS[inputs.mode]);
-  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-  const after = inputs.write ? snapshotManagedFiles(workspace, paths, inputs.config) : new Map();
-  const changedFiles = inputs.write ? changedManagedFiles(before, after) : [];
-  const metrics = reportMetrics(inputs.mode, report);
-  const passed = result.exitCode === 0 && (inputs.mode !== "check" || report.passed);
-
-  annotateDecisions(inputs.mode, report);
-  logStepSummary(inputs.mode, metrics, passed, inputs.write);
-  await summarizeReport(inputs.mode, report, SANAD_VERSION, passed);
-  setCommonOutputs({
-    passed,
-    changed: changedFiles.length > 0,
-    changedFiles,
-    violations: metrics.violations,
-    updates: metrics.updates,
-    pending: metrics.pending,
-    reportPath,
-    prBodyPath: prBodyPath && fs.existsSync(prBodyPath) ? prBodyPath : "",
-  });
-
-  if (!passed) {
-    core.setFailed(result.stderr.trim() || `Sanad ${inputs.mode} failed with exit code ${result.exitCode}`);
-  }
-}
-
-if (require.main === module) {
-  run().catch((error) => {
-    setCommonOutputs();
-    core.setFailed(error instanceof Error ? error.message : String(error));
-  });
-}
-
-module.exports = { actionInputs, commandArguments, execute, run, setCommonOutputs, verifySanadVersion, workflowPaths };
+if (require.main === module) run().catch((error) => core.setFailed(error.message));
+module.exports = { inputs, commandArguments, parseReport, markdown, run };

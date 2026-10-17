@@ -1,49 +1,15 @@
-workflow_paths = [".github/workflows", "**/.github/workflows"]
+version = 1
 
-cooldown = "7d"
-cooldown_source = "source"
+# Set only after confirming GitHub native lockfile eligibility.
+[native]
+enabled = true
 
-[updates]
-tags = "track"
-branches = "deny"
-unpinned = "deny"
-reusable_workflows = true
-
-[ignore]
-actions = [
-  "./*",
-  "docker://*"
-]
-files = []
-
-[organization]
-# Optional shared policy files, resolved relative to this config file. Settings
-# in this repository config override settings loaded from these files.
-policy_files = []
-
-[comments]
-# Disable this when `.github/sanad.lock.json` is the preferred metadata source.
-write = true
-# Custom formats are intentionally unsupported because sanad must be able to
-# parse its own metadata safely.
-format = "sanad: ref={{ref}}"
-
-[upgrade]
-# Automatic upgrades use stable GitHub releases. `minor` stays within the
-# current major; `patch` stays within the current major and minor.
-level = "major"
-selection = "latest-eligible"
-# Use an absolute SemVer constraint instead of `level` when needed:
-# constraint = ">= 4, < 6"
-
-# Per-action policies override the repository defaults above.
-[upgrade.actions."actions/checkout"]
+[update]
 level = "minor"
 
-[security]
-# These strict checks are enforced by built-in policy/resolver behavior.
-require_full_sha = true
-require_commit_in_source_repo = true
-# The current CLI does not inspect repository visibility or fork lineage.
-allow_private = true
-deny_forks = false
+# Optional first-seen waiting period, including transitive dependencies.
+# [observation]
+# minimum_age = "7d"
+
+# [actions."actions/checkout"]
+# constraint = ">= 6, < 8"

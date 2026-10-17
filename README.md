@@ -1,355 +1,132 @@
 <div align="center">
-  <img src="docs/static/logo.svg" alt="Sanad logo" width="128" height="128">
+  <img src="docs/static/logo.svg" alt="Sanad" width="96">
   <h1>Sanad</h1>
-  <p><strong>Pin GitHub Actions to immutable SHAs, then keep the refs you trust moving.</strong></p>
-  <p>
-    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/MohamedElashri/sanad/actions/workflows/ci.yml/badge.svg"></a>
-    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml"><img alt="Docs" src="https://github.com/MohamedElashri/sanad/actions/workflows/pages.yml/badge.svg?label=docs"></a>
-    <a href="https://github.com/MohamedElashri/sanad/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/MohamedElashri/sanad/actions/workflows/release.yml/badge.svg"></a>
-    <a href="https://github.com/MohamedElashri/sanad/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/MohamedElashri/sanad?sort=semver&display_name=tag&logo=github"></a>
-    <a href="https://pkg.go.dev/github.com/MohamedElashri/sanad"><img alt="Go reference" src="https://pkg.go.dev/badge/github.com/MohamedElashri/sanad.svg"></a>
-    <a href="https://goreportcard.com/report/github.com/MohamedElashri/sanad"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/MohamedElashri/sanad"></a>
-    <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/MohamedElashri/sanad"></a>
-  </p>
-  <p>
-    <a href="https://melashri.net/sanad/">Documentation</a>
-    |
-    <a href="#github-action">GitHub Action</a>
-    |
-    <a href="#installation">CLI Installation</a>
-    |
-    <a href="#quickstart">Quickstart</a>
-    |
-    <a href="docs/content/reference/cli.md">CLI reference</a>
-    |
-    <a href="docs/content/advanced/security-model.md">Security model</a>
-  </p>
+  <p>Make native GitHub Actions lockfiles easy to adopt, review, and update.</p>
 </div>
 
-**sanad** pins and updates GitHub Actions dependencies to immutable commit SHAs while preserving the logical refs you want to track. Branches, tags, and completely unpinned actions are all handled automatically — no configuration file required.
+Sanad builds on GitHub's [`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
+GitHub resolves and enforces execution pins. Sanad handles onboarding, update
+selection, optional waiting periods, and readable review reports.
 
-## Example
+**This is the breaking 1.0 development branch.** Native lockfiles are currently
+in GitHub's public preview; [check repository eligibility](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
+before enabling them. Sanad does not provide an inline SHA fallback.
 
-Before:
+## Start
 
-```yaml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+Build this checkout with Go 1.26.3 or newer:
+
+```sh
+make build
+bin/sanad status
+bin/sanad init --confirm-native
+bin/sanad init --confirm-native --write
 ```
 
-After `sanad` runs:
+`--confirm-native` records your confirmation that GitHub supports native lockfile
+enforcement for this repository. It is not an entitlement check. Initial `init`
+accepts the currently referenced code as the baseline; review the preview first.
+Authenticate with `gh auth login`, `GH_TOKEN`, or `GITHUB_TOKEN`.
 
-```yaml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # sanad: ref=v4
-      - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # sanad: ref=v5
+Release archives include the exact official backend. Source installations fetch
+`gh-actions-lock v0.2.0` with pinned SHA-256 checksums on first online use.
+Use `sanad setup` to preinstall it, or set `SANAD_BACKEND` to a verified official
+binary. Linux, macOS, and Windows on amd64/arm64 are supported.
+
+## Daily use
+
+```sh
+sanad sync                  # preview lockfile reconciliation after workflow edits
+sanad sync --write           # preserve existing pins; add/remove dependency coverage
+sanad plan                  # explain available stable version updates
+sanad update --write         # apply eligible updates
+sanad check                  # online frozen verification
+sanad check --offline        # local coverage only; cached backend required
+sanad check --base origin/main
 ```
 
-The workflow executes immutable SHAs. The comments and lockfile tell `sanad` which logical refs to resolve on future runs — so the next time a new `v4` patch is tagged, sanad updates the SHA automatically.
+Every repository write requires `--write`. Previews generate candidates in an
+isolated copy. Branch and partial-version refs stay frozen; explicit version changes use:
 
----
-
-## GitHub Action
-
-The bundled GitHub Action is the recommended way to use sanad in CI. It installs the exact matching sanad binary, verifies it, and translates sanad's output into annotations, job summaries, and step outputs.
-
-Pin it to a full commit SHA (find the latest on the [releases page](https://github.com/MohamedElashri/sanad/releases)):
-
-```yaml
-- uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
+```sh
+sanad update --action actions/checkout --to v7.0.1 --write
+sanad plan --level major
 ```
 
-### Pattern 1 — Enforce pinning on every PR
+Scoped mutable-ref refresh is intentionally unavailable: the upstream CLI's
+broad relock operation can move unrelated dependencies.
 
-Fail the build if any action is unpinned or stale. Add this as a required status check.
+## Policy
 
-```yaml
-name: Check pinned actions
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-
-jobs:
-  sanad:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
-        with:
-          mode: check
-          token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-`check` is the default when `write` is not set, so `mode: check` can be omitted entirely.
-
-### Pattern 2 — Automatic weekly update PR
-
-Run on a schedule, apply pin updates, and open a pull request when anything changed. Uses the built-in reusable workflow — no extra scripting required.
-
-```yaml
-name: Update pinned actions
-
-on:
-  schedule:
-    - cron: "0 3 * * 1"   # every Monday at 03:00 UTC
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-
-jobs:
-  update:
-    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-The reusable workflow checks out your repository, runs `sanad apply --write`, optionally runs `sanad upgrade`, commits to a dedicated branch, and opens or updates a pull request. See [`update-pr.yml`](.github/workflows/update-pr.yml) for all available inputs (`branch`, `base`, `title`, `commit-message`, `upgrade`).
-
-### Pattern 3 — Apply updates inside a custom workflow step
-
-Use the action directly when you need full control over what happens before or after pinning.
-
-```yaml
-- name: Apply sanad pin updates
-  id: sanad
-  uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
-  with:
-    mode: apply
-    write: "true"
-    token: ${{ secrets.GITHUB_TOKEN }}
-
-- name: Show changed files
-  if: steps.sanad.outputs.changed == 'true'
-  run: echo "${{ steps.sanad.outputs.changed-files }}"
-```
-
-`mode: apply` with `write: "true"` is also the smart default when you supply `write: "true"` and omit `mode`, so the above is equivalent to just setting `write: "true"`.
-
-### Pattern 4 — Install sanad for use in later steps
-
-```yaml
-- uses: MohamedElashri/sanad@58cdb34ef4470b656c2e7bfe91d7fd5ff56cb9ec
-  with:
-    mode: setup
-    token: ${{ secrets.GITHUB_TOKEN }}
-
-- run: sanad plan --format json | jq '.files[].actions[]'
-```
-
-`setup` adds the `sanad` binary to `PATH` so you can invoke it freely in subsequent `run:` steps.
-
-### Action inputs
-
-| Input | Default | Description |
-| --- | --- | --- |
-| `mode` | `check` (or `apply` when `write: "true"`) | `check`, `plan`, `apply`, `upgrade`, or `setup` |
-| `config` | `.sanad.toml` | Config path relative to `working-directory`. May be absent — built-in defaults handle branches and unpinned actions automatically. |
-| `working-directory` | `.` | Repository directory relative to `GITHUB_WORKSPACE` |
-| `fresh` | `false` | Resolve tracked refs during `check` and fail on eligible updates |
-| `strict` | `false` | Also fail cooldown-pending candidates; implies `fresh` |
-| `write` | `false` | Permit `apply` or `upgrade` to modify managed files |
-| `token` | `github.token` | Token for release download and GitHub ref resolution |
-
-### Action outputs
-
-| Output | Description |
-| --- | --- |
-| `passed` | `"true"` when the command succeeded and policy passed |
-| `changed` | `"true"` when a write changed a managed file |
-| `changed-files` | JSON array of changed managed paths |
-| `updates` | Number of available or applied updates |
-| `violations` | Policy violation count |
-| `pending-cooldown` | Candidates still inside cooldown |
-| `report-path` | Temporary path to the complete JSON report |
-| `pr-body-path` | Temporary Markdown PR body path (plan and apply) |
-| `sanad-version` | Exact CLI version validated and executed |
-
-See the [GitHub Action README](action/README.md) for the full permissions, boundaries, and local development reference.
-
----
-
-## Installation
-
-### Homebrew
-
-On macOS or Linux with Homebrew:
-
-```bash
-brew tap MohamedElashri/sanad && brew install sanad
-```
-
-Verify:
-
-```bash
-sanad version
-```
-
-Homebrew installs shell completions for bash, zsh, fish, and PowerShell automatically.
-
-### Nix
-
-Run the packaged release directly:
-
-```bash
-nix run github:MohamedElashri/sanad -- version
-```
-
-Or install it into your profile:
-
-```bash
-nix profile install github:MohamedElashri/sanad
-```
-
-The flake installs the published release archive for your platform and verifies it with the release checksum. The Nix package installs bash, zsh, and fish completions automatically.
-
-### Go
-
-Install the latest tagged release with Go:
-
-```bash
-go install github.com/MohamedElashri/sanad/cmd/sanad@latest
-```
-
-### Prebuilt archives
-
-Tagged releases publish Linux, macOS, and Windows archives on GitHub Releases. Download the archive for your platform, place the `sanad` binary on your `PATH`, and verify it against the published `sanad_<version>_checksums.txt` file.
-
-For manual archive or `go install` usage, install completions for your current shell with:
-
-```bash
-sanad completion install
-```
-
----
-
-## Quickstart
-
-The easiest way to initialize sanad and pin your workflows is to run:
-
-```bash
-sanad start
-```
-
-This is equivalent to running `sanad` with no arguments — both launch the interactive wizard that scans your workflows, resolves all action references, and applies immutable SHAs.
-
-For a non-interactive initial write:
-
-```bash
-sanad start --write --yes
-```
-
-### Common local commands
-
-```bash
-# Preview what would change
-GITHUB_TOKEN=$(gh auth token) sanad plan
-
-# Preview with a file diff
-GITHUB_TOKEN=$(gh auth token) sanad apply --diff
-
-# Apply locally
-GITHUB_TOKEN=$(gh auth token) sanad apply --write --yes
-
-# Validate current state (local, no API calls)
-sanad check
-
-# Diagnose and repair stale lockfile entries
-sanad doctor
-sanad doctor --write --yes
-```
-
-`sanad plan`, `sanad apply`, `sanad upgrade`, and `sanad check --fresh` contact GitHub. `sanad check`, `sanad scan`, `sanad doctor`, and the `lock` commands are local-only.
-
----
-
-## Scope
-
-Sanad scans workflow files under `.github/workflows` and nested conventional `.github/workflows` directories by default, classifies `uses:` references, resolves GitHub tags and branches through the GitHub API, rewrites mutable action refs to full SHAs, adds `# sanad: ref=...` metadata, maintains `.github/sanad.lock.json`, applies cooldown rules, and emits table, JSON, SARIF, and Markdown helper output.
-
-It is not a general dependency updater, vulnerability scanner, workflow formatter, YAML linter, Docker image updater, or local action rewriter.
-
-In Arabic scholarly culture, a sanad is a chain of transmission back to a source. This tool keeps that chain explicit for workflow dependencies: the workflow runs an immutable commit, while metadata records the tag or branch that commit came from.
-
-## Configuration
-
-Create `.sanad.toml` only when the built-in defaults are not enough:
+`.sanad.toml` is optional except for the native-support confirmation:
 
 ```toml
-cooldown = "14d"
+version = 1
 
-[upgrade]
+[native]
+enabled = true
+
+[update]
 level = "minor"
+
+# Optional: wait after each identity/ref/commit is first observed.
+[observation]
+minimum_age = "7d"
+
+[actions."actions/checkout"]
+constraint = ">= 6, < 8"
 ```
 
-By default branches are tracked (`[updates].branches = "track"`) and completely unpinned actions are resolved to their latest release (`[updates].unpinned = "latest-release"`). Set `[comments].write = false` to rely on `.github/sanad.lock.json` without inline `sanad` comments. See the [config reference](docs/content/reference/config.md) for all supported keys.
+Updates select the highest eligible stable release. Per-action constraints replace
+the global version limit. Dependabot's `github-actions.cooldown.default-days`
+also applies; unsupported cooldown keys produce an error.
 
-## Commands
+First-seen policy covers changed transitive dependencies too. Pending candidates
+are recorded in `.github/sanad/state.json` by `update --write`, even when no
+versions change. Commit those observations to the trusted base before expecting
+a later update to pass `check --base`. A PR cannot supply its own maturity.
+Observation-only PRs need merging, just like dependency update PRs.
 
-```bash
-sanad scan
-sanad plan
-sanad check
-sanad apply
-sanad upgrade
-sanad doctor
-sanad lock status
-sanad lock refresh
-sanad lock repair
-sanad lock prune
-sanad config validate
-sanad config show --origins
-sanad completion
-sanad version
+## CI
+
+After publishing a 1.x release, generate checking and scheduled-update workflows:
+
+```sh
+sanad init --automation --action-ref <SANAD_1_X_COMMIT> --write
 ```
 
-All commands accept `--config`, `--format`, and `--root`. `sanad check --format sarif` emits SARIF for code scanning. `sanad upgrade --action actions/checkout --to v5` moves one managed pin to a specific logical ref.
+Or run the Action directly, pinned to the full commit of that release:
 
-Command-specific usage is covered in the [CLI reference](docs/content/reference/cli.md).
+```yaml
+- uses: MohamedElashri/sanad@<SANAD_1_X_COMMIT>
+  with:
+    mode: check
+    base: ${{ github.event.pull_request.base.sha }}
+```
 
-## GitHub Authentication
+Check out the repository with `fetch-depth: 0` for base comparisons. Make the check
+required in repository settings. Choose Dependabot or Sanad's scheduled updater
+for version updates. See [CI](docs/content/guide/ci.md) and the
+[Action reference](action/README.md).
 
-`sanad` reads tokens from environment variables:
+## Reset from 0.x
 
-1. `GITHUB_TOKEN`
-2. `GH_TOKEN`
-
-If neither is set, sanad reuses `gh auth token` when the GitHub CLI is installed and authenticated. Tokens are used for GitHub API requests and are never printed. Public repositories can work without a token, but authenticated requests are strongly recommended for CI and private repositories.
-
-## Security Model
-
-Workflow dependencies run immutable full-length SHAs. Mutable tags and branches are automatically resolved to commits and tracked; short SHAs are rejected; local and Docker actions are skipped by default. Unpinned actions are automatically resolved to their latest release. Strict policies (denying branch tracking, requiring manual approval for unpinned actions) are available via `.sanad.toml` for advanced use cases.
-
-See the [security model](docs/content/advanced/security-model.md) for the full model.
-
-## Cooldown
-
-The default cooldown is `7d`. Automatic upgrades select the highest matching release that has satisfied this window. Set `cooldown_source = "first-seen"` for the stricter mode: sanad records candidate histories in the lockfile and waits for the local observation window before adopting them.
+Remove `.github/sanad.lock.json` and the old `.sanad.toml`. Remove `# sanad:`
+comments, choose the readable `uses:` refs you want, then run `sanad init`.
+Review all newly resolved commits. There is no migration command or legacy mode.
 
 ## Development
 
-```bash
-make build
-make test
-make lint
+```sh
+make check                  # tests, vet, staticcheck, build
+make race
+make test-native            # download and test the official backend
+npm ci --prefix action
+npm test --prefix action
+npm run build --prefix action
 make docs-build
 ```
 
-The documentation site is built with Nida from `docs/`. User docs live under `docs/content/guide`, exact lookup pages under `docs/content/reference`, and contributor/internal docs under `docs/content/advanced`.
-
-## LICENCE
-
-This project is released under the [MIT LICENCE](./LICENSE)
+Code lives in `internal/sanad` (native integration and policy) and `internal/cli`
+(commands). [CLI reference](docs/content/reference/cli.md) ·
+[Security and design](docs/content/advanced/security-model.md) · [MIT license](LICENSE).

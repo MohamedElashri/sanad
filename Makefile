@@ -1,83 +1,49 @@
-.PHONY: help build test race lint staticcheck-install staticcheck bench fmt check update docs-release-notes docs-build docs-serve clean
+.PHONY: build test race lint check fmt docs-build docs-serve sync-version package-backend test-native
 
-.DEFAULT_GOAL := help
-
-GOCACHE ?= $(CURDIR)/.gocache
-GOMODCACHE ?= $(CURDIR)/.gomodcache
-GO_TOOL_GOPATH ?= $(CURDIR)/.gopath
-XDG_CACHE_HOME ?= $(CURDIR)/.cache
-BIN_DIR ?= $(CURDIR)/bin
-STATICCHECK ?= $(BIN_DIR)/staticcheck
-STATICCHECK_VERSION ?= v0.8.1
-GO_TOOLCHAIN_VERSION ?= $(shell go env GOVERSION)
-STATICCHECK_STAMP ?= $(BIN_DIR)/.staticcheck-$(STATICCHECK_VERSION)-$(GO_TOOLCHAIN_VERSION)
-NIDA ?= nida
-
-help:
-	@printf '%s\n' 'Sanad development targets:'
-	@printf '  %-20s %s\n' 'make build' 'Build the sanad binary into ./bin'
-	@printf '  %-20s %s\n' 'make test' 'Run the test suite'
-	@printf '  %-20s %s\n' 'make race' 'Run tests with the race detector'
-	@printf '  %-20s %s\n' 'make lint' 'Run go vet'
-	@printf '  %-20s %s\n' 'make staticcheck-install' 'Install Staticcheck into ./bin'
-	@printf '  %-20s %s\n' 'make staticcheck' 'Run Staticcheck'
-	@printf '  %-20s %s\n' 'make bench' 'Run workflow extraction benchmark'
-	@printf '  %-20s %s\n' 'make fmt' 'Format Go sources'
-	@printf '  %-20s %s\n' 'make check' 'Format, lint, test, and build'
-	@printf '  %-20s %s\n' 'make update' 'Update all Go dependencies'
-	@printf '  %-20s %s\n' 'make docs-build' 'Generate release notes and build docs'
-	@printf '  %-20s %s\n' 'make docs-serve' 'Generate release notes and serve docs'
-	@printf '  %-20s %s\n' 'make clean' 'Remove local build, docs, and cache artifacts'
-	@printf '  %-20s %s\n' 'make sync-version' 'Sync VERSION, update package manifests, rebuild bundle, and stamp README SHAs'
+export GOCACHE ?= $(CURDIR)/.gocache
+export XDG_CACHE_HOME ?= $(CURDIR)/.cache
+VERSION := $(shell cat VERSION)
+COMMIT := $(shell git rev-parse HEAD)
+STATICCHECK ?= $(CURDIR)/bin/staticcheck
+STATICCHECK_VERSION := v0.8.2
+STATICCHECK_STAMP := $(CURDIR)/bin/.staticcheck-$(STATICCHECK_VERSION)-$(shell go env GOVERSION)
+LDFLAGS := -X github.com/MohamedElashri/sanad/internal/cli.version=$(VERSION) -X github.com/MohamedElashri/sanad/internal/cli.commit=$(COMMIT)
 
 build:
-	mkdir -p $(BIN_DIR)
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go build -o $(BIN_DIR)/sanad ./cmd/sanad
+	go build -ldflags '$(LDFLAGS)' -o bin/sanad ./cmd/sanad
 
 test:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test ./...
+	go test ./...
+
+test-native:
+	go run ./scripts/package-backend --native --output .release-tools/native-backend
+	SANAD_TEST_BACKEND=$(CURDIR)/.release-tools/native-backend go test ./internal/sanad -run TestNativeBackendContract -v
 
 race:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test -race ./...
+	go test -race ./...
 
-lint:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go vet ./...
-
-staticcheck-install: $(STATICCHECK_STAMP)
+lint: $(STATICCHECK_STAMP)
+	go vet ./...
+	$(STATICCHECK) ./...
 
 $(STATICCHECK_STAMP):
-	mkdir -p $(BIN_DIR)
-	GOBIN=$(BIN_DIR) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) GOPATH=$(GO_TOOL_GOPATH) go install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
-	touch $(STATICCHECK_STAMP)
-
-staticcheck: staticcheck-install
-	XDG_CACHE_HOME=$(XDG_CACHE_HOME) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) GOPATH=$(GO_TOOL_GOPATH) $(STATICCHECK) ./...
-
-bench:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go test -run '^$$' -bench BenchmarkExtractUsesFromLargeWorkflow ./internal/workflow
+	GOBIN=$(CURDIR)/bin go install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
+	touch $@
 
 fmt:
-	gofmt -w cmd internal
+	gofmt -w cmd internal scripts
 
-check: fmt lint test build
+check: test lint build
 
-update:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go get -u ./...
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go mod tidy
+package-backend:
+	go run ./scripts/package-backend
 
-docs-release-notes:
-	GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) go run ./scripts/generate_release_notes.go
+docs-build:
+	nida build --site ./docs
 
-docs-build: docs-release-notes
-	$(NIDA) build --site ./docs
-
-docs-serve: docs-release-notes
-	$(NIDA) serve --site ./docs
+docs-serve:
+	nida serve --site ./docs
 
 sync-version:
 	scripts/sync-version
 	npm run build --prefix action
-	scripts/update-readme
-
-clean:
-	$(RM) -r sanad bin dist .cache .gocache .gomodcache .gopath docs/public docs/content/release-notes.md

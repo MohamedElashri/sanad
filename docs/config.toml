@@ -1,7 +1,7 @@
 config_version = "0.4"
 base_url = "https://melashri.net/sanad/"
 title = "Sanad Docs"
-description = "Pin and update GitHub Actions dependencies to immutable commit SHAs."
+description = "Adopt, review, and update native GitHub Actions lockfiles."
 language = "en"
 author = "Mohamed Elashri"
 

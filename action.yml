@@ -1,63 +1,45 @@
-name: Sanad Dependency Guard
-description: Check, plan, and update GitHub Actions dependencies with Sanad
+name: Sanad
+description: Adopt, verify, and update native GitHub Actions lockfiles
 author: Mohamed Elashri
-
 inputs:
   mode:
-    description: |
-      Operation to run: check, plan, apply, upgrade, or setup.
-      Defaults to apply when write is true (produces a PR-ready write), otherwise check.
-    required: false
-    default: ""
+    description: check, status, plan, sync, update, or setup
+    default: check
   config:
-    description: Sanad configuration path, relative to working-directory. The file may be absent to use built-in defaults (branches and unpinned actions are automatically tracked).
-    required: false
+    description: Repository-relative Sanad policy file
     default: .sanad.toml
   working-directory:
-    description: Repository directory, relative to the GitHub workspace
-    required: false
+    description: Repository directory inside the workspace
     default: .
-  fresh:
-    description: Resolve tracked refs during check (ignored for other modes)
-    required: false
-    default: "false"
-  strict:
-    description: Fail check on cooldown-pending candidates; implies fresh (ignored for other modes)
-    required: false
-    default: "false"
   write:
-    description: Allow apply or upgrade to write workflow and lock files
-    required: false
-    default: "false"
+    description: Apply changes in sync or update mode
+    default: 'false'
+  base:
+    description: Trusted base commit for checking adoption policy on a pull request
+    default: ''
   token:
-    description: GitHub token used for release download and ref resolution
-    required: false
+    description: Token for the repository's GitHub host
     default: ${{ github.token }}
-
 outputs:
   passed:
-    description: Whether the Sanad operation passed
+    description: Whether verification and policy passed
   changed:
-    description: Whether the action changed managed repository files
+    description: Whether repository files changed
   changed-files:
-    description: JSON array of managed files changed by the action
-  violations:
-    description: Number of policy violations, or blocked decisions for upgrade
+    description: JSON array of files changed by this run
   updates:
-    description: Number of available or applied updates
-  pending-cooldown:
-    description: Number of candidates pending cooldown
+    description: Number of eligible updates
+  pending:
+    description: Number of waiting candidates
   report-path:
-    description: Path to the complete JSON report, when one was produced
+    description: Complete JSON report
   pr-body-path:
-    description: Path to a generated pull request body, when one was produced
+    description: Markdown review summary
   sanad-version:
-    description: Exact Sanad CLI version executed by the action
-
+    description: Exact Sanad CLI version
 runs:
   using: node24
   main: action/dist/index.js
-
 branding:
   icon: shield
   color: green

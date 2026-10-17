@@ -5,6 +5,7 @@ project_name: sanad
 before:
   hooks:
     - go mod download
+    - go run ./scripts/package-backend
 
 builds:
   - id: sanad
@@ -42,19 +43,23 @@ archives:
       - README.md
       - LICENSE
       - .sanad.toml.example
+      - src: .release-tools/{{ .Os }}_{{ .Arch }}/gh-actions-lock{{ if eq .Os "windows" }}.exe{{ end }}
+        strip_parent: true
+      - src: licenses/gh-actions-lock.txt
+        dst: licenses
+        strip_parent: true
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
   algorithm: sha256
 
-brews:
+homebrew_casks:
   - name: sanad
     ids:
       - sanad
-    directory: Formula
+    directory: Casks
     homepage: https://github.com/MohamedElashri/sanad
-    description: Pin and update GitHub Actions dependencies to immutable commit SHAs
-    license: MIT
+    description: Adopt and update native GitHub Actions lockfiles
     repository:
       owner: MohamedElashri
       name: homebrew-sanad
@@ -63,11 +68,14 @@ brews:
     commit_author:
       name: goreleaserbot
       email: goreleaserbot@users.noreply.github.com
-    install: |
-      bin.install "sanad"
-      generate_completions_from_executable(bin/"sanad", "completion", shells: [:bash, :zsh, :fish, :pwsh])
-    test: |
-      assert_match version.to_s, shell_output("#{bin}/sanad version")
+    binaries:
+      - sanad
+      - gh-actions-lock
+    generate_completions_from_executable:
+      executable: sanad
+      args: [completion]
+      shell_parameter_format: arg
+      shells: [bash, zsh, fish]
 
 release:
   draft: true

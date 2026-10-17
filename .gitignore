@@ -2,11 +2,11 @@
 /bin/
 /dist/
 /sanad
-plan.md
 .gomodcache/
 /docs/public/
-/docs/content/release-notes.md
 .gopath/
 .gotmp/
 .cache/
 /action/node_modules/
+.release-tools/
+plans

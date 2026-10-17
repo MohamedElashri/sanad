@@ -2,6 +2,15 @@
 
 All notable changes to Sanad are documented here.
 
+## 1.0.0 - Unreleased
+
+- Replace inline SHA management with GitHub's native Actions lockfile.
+- Add isolated onboarding, sticky synchronization, controlled updates, and frozen verification.
+- Apply optional first-seen waiting periods to direct and transitive changes, using trusted base state in CI.
+- Replace the old internals, commands, reports, Action inputs, and documentation.
+- Reset 0.x projects by removing legacy metadata and configuration, then initialize again.
+- Bundle the checksum-verified official backend in release archives.
+
 ## 0.3.11 - 2026-09-17
 
 ### Changed 

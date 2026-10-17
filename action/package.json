@@ -1,14 +1,13 @@
 {
   "name": "sanad-action",
-  "version": "0.3.11",
+  "version": "1.0.0",
   "private": true,
   "description": "GitHub Action wrapper for Sanad",
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/index.js -o dist --minify --license licenses.txt",
     "test": "node --test test/*.test.js",
-    "test:integration": "npm run build && node test/run-local-integration.js",
-    "test:local": "npm test && npm run test:integration && npm run check-dist",
+    "test:integration": "node test/integration.js",
     "check-dist": "npm run build && git diff --exit-code -- dist"
   },
   "license": "MIT",
