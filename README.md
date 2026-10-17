@@ -87,7 +87,10 @@ transitive dependencies; see [CLI and policy](docs/content/reference/cli.md).
 
 ## Development
 
-Build with Go 1.26.3 or newer using `make build`. Run `make check`, `make race`,
-and `make test-native` for Go checks. For the Action, run `npm ci --prefix action`,
-`npm test --prefix action`, and `npm run build --prefix action`.
-`make docs-build` builds the documentation.
+Requires Go 1.26.3+ and Node.js 24+.
+
+```sh
+make check
+npm ci --prefix action
+npm test --prefix action
+```
