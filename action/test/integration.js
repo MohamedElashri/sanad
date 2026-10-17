@@ -30,7 +30,7 @@ async function main() {
       env: { ...process.env, ...files, INPUT_MODE: "check", INPUT_TOKEN: "native-contract-test", INPUT_WRITE: "false", "INPUT_WORKING-DIRECTORY": "." },
       stdio: "pipe",
     });
-    assert.match(fs.readFileSync(files.GITHUB_OUTPUT, "utf8"), /passed<<[^\n]+\ntrue\n/);
+    assert.match(fs.readFileSync(files.GITHUB_OUTPUT, "utf8"), /passed<<[^\r\n]+\r?\ntrue\r?\n/);
     assert.ok(fs.statSync(files.GITHUB_STEP_SUMMARY).size > 0);
     console.log("Action integration passed for all native modes and the distribution bundle");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
