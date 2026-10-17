@@ -60,6 +60,7 @@ homebrew_casks:
     directory: Casks
     homepage: https://github.com/MohamedElashri/sanad
     description: Adopt and update native GitHub Actions lockfiles
+    caveats: Sanad 1.0 replaces the old formula. Uninstall it before installing this cask.
     repository:
       owner: MohamedElashri
       name: homebrew-sanad

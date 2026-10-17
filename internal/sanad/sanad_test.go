@@ -395,7 +395,11 @@ func TestCheckUsesTrustedBaseObservations(t *testing.T) {
 	if err != nil || !r.Blocked() {
 		t.Fatalf("PR supplied its own maturity: %+v %v", r, err)
 	}
-	if r.Findings[len(r.Findings)-1].Code != "observation-pending" {
+	pending := false
+	for _, finding := range r.Findings {
+		pending = pending || finding.Code == "observation-pending"
+	}
+	if !pending {
 		t.Fatalf("wrong finding: %+v", r.Findings)
 	}
 	opts.Base = ""

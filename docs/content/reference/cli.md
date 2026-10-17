@@ -13,7 +13,7 @@ template = "page"
 | `sync` | Reconcile edits without advancing existing pins |
 | `plan` / `update` | Select and explain newer versions |
 | `check [--base REV]` | Online frozen verification and change policy |
-| `check --offline` | Local coverage only |
+| `check --offline` | Local coverage and graph integrity |
 | `recover --write` | Restore an interrupted transaction |
 | `config` | Effective policy as JSON |
 | `version` / `completion SHELL` | Tool versions and shell completion |

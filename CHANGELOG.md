@@ -2,7 +2,7 @@
 
 All notable changes to Sanad are documented here.
 
-## 1.0.0 - Unreleased
+## 1.0.0 - 2026-10-17
 
 - Replace inline SHA management with GitHub's native Actions lockfile.
 - Add isolated onboarding, sticky synchronization, controlled updates, and frozen verification.
@@ -10,6 +10,9 @@ All notable changes to Sanad are documented here.
 - Replace the old internals, commands, reports, Action inputs, and documentation.
 - Reset 0.x projects by removing legacy metadata and configuration, then initialize again.
 - Bundle the checksum-verified official backend in release archives.
+- Replace the Homebrew formula with a cask; uninstall the old formula before installing.
+- Reject incomplete native dependency graphs locally, including during offline checks.
+- Known limitation: the native producer rejects actions with generated local sub-actions, including `pypa/gh-action-pypi-publish@v1.14.2`.
 
 ## 0.3.11 - 2026-09-17
 

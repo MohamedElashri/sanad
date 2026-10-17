@@ -1,14 +1,20 @@
 +++
 title = "Release notes"
-description = "The 1.0 breaking redesign."
+description = "Sanad 1.0.0."
 template = "page"
 +++
 
-1.0 replaces inline SHA management with GitHub’s native lockfile. New commands
-are `init`, `sync`, `plan`, `update`, and `check`. Optional first-seen policy covers
-transitive changes. Reports share one schema; exit codes are 0/1/2.
+Sanad 1.0 manages GitHub's native Actions lockfile. Use `init` to onboard, `sync`
+to reconcile workflow edits, `plan` and `update` for stable version changes, and
+`check` for frozen verification. Optional first-seen policy covers transitive
+changes and uses trusted base observations in CI.
 
-The old lockfile, comments, configuration schema, Action inputs, and commands are
-removed. Reset old projects and initialize again. See the [quickstart](../guide/getting-started/).
+Release archives bundle the verified official backend for Linux, macOS, and
+Windows on amd64/arm64. Homebrew installs a cask. The Action installs its matching
+immutable release and provides one structured report format.
 
-[Historical changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md).
+For older installations, see [resetting from 0.x](../guide/migration/).
+The native producer rejects actions with generated local sub-actions, including
+`pypa/gh-action-pypi-publish@v1.14.2`; see [limitations](../advanced/security-model/).
+
+[Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md).

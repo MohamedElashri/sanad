@@ -4,129 +4,90 @@
   <p>Make native GitHub Actions lockfiles easy to adopt, review, and update.</p>
 </div>
 
-Sanad builds on GitHub's [`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
-GitHub resolves and enforces execution pins. Sanad handles onboarding, update
-selection, optional waiting periods, and readable review reports.
+Sanad manages GitHub's native [`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
+It generates lockfiles, explains dependency changes, applies update policies, and
+verifies them in CI. GitHub enforces the locked commits when workflows run.
 
-**This is the breaking 1.0 development branch.** Native lockfiles are currently
-in GitHub's public preview; [check repository eligibility](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
-before enabling them. Sanad does not provide an inline SHA fallback.
+Requires [native lockfile support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
+for your repository. Native lockfiles are in GitHub's public preview.
 
-## Start
+## CLI quickstart
 
-Build this checkout with Go 1.26.3 or newer:
-
-```sh
-make build
-bin/sanad status
-bin/sanad init --confirm-native
-bin/sanad init --confirm-native --write
-```
-
-`--confirm-native` records your confirmation that GitHub supports native lockfile
-enforcement for this repository. It is not an entitlement check. Initial `init`
-accepts the currently referenced code as the baseline; review the preview first.
-Authenticate with `gh auth login`, `GH_TOKEN`, or `GITHUB_TOKEN`.
-
-Release archives include the exact official backend. Source installations fetch
-`gh-actions-lock v0.2.0` with pinned SHA-256 checksums on first online use.
-Use `sanad setup` to preinstall it, or set `SANAD_BACKEND` to a verified official
-binary. Linux, macOS, and Windows on amd64/arm64 are supported.
-
-## Daily use
+Install with Homebrew:
 
 ```sh
-sanad sync                  # preview lockfile reconciliation after workflow edits
-sanad sync --write           # preserve existing pins; add/remove dependency coverage
-sanad plan                  # explain available stable version updates
-sanad update --write         # apply eligible updates
-sanad check                  # online frozen verification
-sanad check --offline        # local coverage only; cached backend required
-sanad check --base origin/main
+brew install --cask MohamedElashri/sanad/sanad
 ```
 
-Every repository write requires `--write`. Previews generate candidates in an
-isolated copy. Branch and partial-version refs stay frozen; explicit version changes use:
+Or download a [v1.0.0 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.0)
+for Linux, macOS, or Windows on amd64/arm64. Keep the included `sanad` and
+`gh-actions-lock` executables together on your `PATH`.
+
+In your repository, authenticate and review the initial lockfile:
 
 ```sh
-sanad update --action actions/checkout --to v7.0.1 --write
-sanad plan --level major
+gh auth login
+sanad init --confirm-native
+sanad init --confirm-native --write
+sanad check
 ```
 
-Scoped mutable-ref refresh is intentionally unavailable: the upstream CLI's
-broad relock operation can move unrelated dependencies.
+`--confirm-native` records that you verified GitHub supports enforcement for this
+repository. Review the preview before writing, then commit
+`.github/workflows/actions.lock` and `.sanad.toml`. Authentication also accepts
+`GH_TOKEN` or `GITHUB_TOKEN`.
 
-## Policy
+## Action quickstart
 
-`.sanad.toml` is optional except for the native-support confirmation:
-
-```toml
-version = 1
-
-[native]
-enabled = true
-
-[update]
-level = "minor"
-
-# Optional: wait after each identity/ref/commit is first observed.
-[observation]
-minimum_age = "7d"
-
-[actions."actions/checkout"]
-constraint = ">= 6, < 8"
-```
-
-Updates select the highest eligible stable release. Per-action constraints replace
-the global version limit. Dependabot's `github-actions.cooldown.default-days`
-also applies; unsupported cooldown keys produce an error.
-
-First-seen policy covers changed transitive dependencies too. Pending candidates
-are recorded in `.github/sanad/state.json` by `update --write`, even when no
-versions change. Commit those observations to the trusted base before expecting
-a later update to pass `check --base`. A PR cannot supply its own maturity.
-Observation-only PRs need merging, just like dependency update PRs.
-
-## CI
-
-After publishing a 1.x release, generate checking and scheduled-update workflows:
-
-```sh
-sanad init --automation --action-ref <SANAD_1_X_COMMIT> --write
-```
-
-Or run the Action directly, pinned to the full commit of that release:
+Add `.github/workflows/sanad.yml` to check pull requests:
 
 ```yaml
-- uses: MohamedElashri/sanad@<SANAD_1_X_COMMIT>
-  with:
-    mode: check
-    base: ${{ github.event.pull_request.base.sha }}
+name: Sanad
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: MohamedElashri/sanad@v1.0.0
+        with:
+          mode: check
+          base: ${{ github.event.pull_request.base.sha }}
 ```
 
-Check out the repository with `fetch-depth: 0` for base comparisons. Make the check
-required in repository settings. Choose Dependabot or Sanad's scheduled updater
-for version updates. See [CI](docs/content/guide/ci.md) and the
-[Action reference](action/README.md).
+Run `sanad sync --write` after adding the workflow and commit the updated lockfile.
+Make the Sanad check required in repository settings. The Action installs its
+matching CLI release and verifies its checksum and immutability.
 
-## Reset from 0.x
+See [CI setup](docs/content/guide/ci.md) for generated workflows and scheduled
+update PRs, or the [Action reference](action/README.md) for inputs and outputs.
 
-Remove `.github/sanad.lock.json` and the old `.sanad.toml`. Remove `# sanad:`
-comments, choose the readable `uses:` refs you want, then run `sanad init`.
-Review all newly resolved commits. There is no migration command or legacy mode.
+## Everyday use
+
+```sh
+sanad sync                  # preview reconciliation after workflow edits
+sanad sync --write           # apply it without advancing existing pins
+sanad plan                  # review available stable version updates
+sanad update --write         # apply eligible updates
+sanad check                  # online frozen verification
+sanad check --offline        # local coverage and graph checks only
+```
+
+Repository changes require `--write`. Updates stay within the current major
+version by default. Optional constraints and waiting periods cover direct and
+transitive dependencies; see [CLI and policy](docs/content/reference/cli.md).
+
+[Documentation](https://melashri.net/sanad/) ·
+[Security and limitations](docs/content/advanced/security-model.md) ·
+[Release notes](docs/content/release-notes.md) · [MIT license](LICENSE)
 
 ## Development
 
-```sh
-make check                  # tests, vet, staticcheck, build
-make race
-make test-native            # download and test the official backend
-npm ci --prefix action
-npm test --prefix action
-npm run build --prefix action
-make docs-build
-```
-
-Code lives in `internal/sanad` (native integration and policy) and `internal/cli`
-(commands). [CLI reference](docs/content/reference/cli.md) ·
-[Security and design](docs/content/advanced/security-model.md) · [MIT license](LICENSE).
+Build with Go 1.26.3 or newer using `make build`. Run `make check`, `make race`,
+and `make test-native` for Go checks. For the Action, run `npm ci --prefix action`,
+`npm test --prefix action`, and `npm run build --prefix action`.
+`make docs-build` builds the documentation.

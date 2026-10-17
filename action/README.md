@@ -1,7 +1,21 @@
 # Sanad Action
 
-Pin the Action to a full commit of a published 1.x release. Check out the repository
-first. For observation-policy checks, fetch the base commit (`fetch-depth: 0`).
+Initialize the repository with `sanad init --confirm-native --write`, then add a
+check to your pull-request workflow:
+
+```yaml
+- uses: actions/checkout@v7.0.1
+  with:
+    fetch-depth: 0
+- uses: MohamedElashri/sanad@v1.0.0
+  with:
+    mode: check
+    base: ${{ github.event.pull_request.base.sha }}
+```
+
+Run `sanad sync --write` and commit the updated lockfile after adding the workflow.
+You can also pin the Action to the release's full commit. The trusted `base` and
+full checkout history are required when enforcing observation policy.
 
 | Input | Default | Purpose |
 | --- | --- | --- |
@@ -20,8 +34,8 @@ The Action verifies an immutable Sanad release asset and checks the CLI version
 matches its own. The native backend is bundled or checksum-pinned. Tokens are
 masked; tenant tokens are not sent to the public release API.
 
-Use `.github/workflows/update-pr.yml` for scheduled PRs, including observation-only
-changes. PR checks need read permissions; the scheduled workflow needs contents
+Generate scheduled PR workflows with `sanad init --automation --write`, including
+observation-only changes. PR checks need read permissions; the scheduled workflow needs contents
 and pull-request writes. The CLI itself does not commit, push, or open PRs.
 
 Development: `npm ci`, `npm test`, `npm run build`. `npm run test:integration`
