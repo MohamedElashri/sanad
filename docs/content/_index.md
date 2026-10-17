@@ -1,31 +1,25 @@
 +++
-title = "Sanad"
-description = "Native Actions lockfiles, with clear updates."
+title = "Sanad documentation"
+description = "Set up native GitHub Actions lockfiles, review dependency updates, and verify changes in CI."
 +++
 
-Sanad generates GitHub Actions lockfiles, explains dependency changes, and applies
-update policies. GitHub enforces the locked commits when workflows run.
+Sanad builds on GitHub's native `actions.lock`. GitHub enforces the execution pins; Sanad makes onboarding, controlled updates, and review easier.
 
-## CLI quickstart
+## Start with the CLI
 
-[Verify native lockfile support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
-for your repository, then install and initialize:
+Install Sanad, authenticate, and preview your first lockfile from a repository checkout:
 
 ```sh
 brew install --cask MohamedElashri/sanad/sanad
 gh auth login
 sanad init --confirm-native
-sanad init --confirm-native --write
-sanad check
 ```
 
-Review the preview before writing. Commit `actions.lock` and `.sanad.toml`.
-[Other installation options and daily commands](guide/getting-started/).
+[Confirm native support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies) for your repository, review the proposed pins, then apply them with `sanad init --confirm-native --write`. The [installation guide](guide/getting-started/) covers archives, Nix, authentication, and the files to commit.
 
-## Action quickstart
+## Verify pull requests with the Action
 
-After checking out your repository with `fetch-depth: 0`, add this step to a
-pull-request workflow:
+After checking out your repository with `fetch-depth: 0`, add this step to a pull-request workflow:
 
 ```yaml
 - uses: MohamedElashri/sanad@v1.0.0
@@ -34,5 +28,15 @@ pull-request workflow:
     base: ${{ github.event.pull_request.base.sha }}
 ```
 
-Run `sanad sync --write` to cover the new workflow and commit the updated lockfile.
-[Complete workflow and scheduled updates](guide/ci/).
+Run `sanad sync --write` after adding the workflow and commit the updated lockfile. Follow the [CI guide](guide/ci/) for a complete workflow and scheduled update PRs.
+
+## Understand the workflow
+
+| Task | Command | What to review |
+| --- | --- | --- |
+| Reconcile workflow edits | `sanad sync` | Added or removed coverage; existing pins stay fixed. |
+| Inspect newer versions | `sanad plan` | Candidate versions, transitive changes, and policy decisions. |
+| Apply eligible updates | `sanad update --write` | Reported file changes and any observation records. |
+| Verify a pull request | `sanad check --base REV` | Native verification and trusted-base policy results. |
+
+Commands preview repository edits unless you add `--write`. Continue with [updating dependencies](guide/updating/) or look up a specific option in the [CLI reference](reference/cli/).

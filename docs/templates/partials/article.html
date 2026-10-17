@@ -1,0 +1,25 @@
+{{- define "docs-article" -}}
+<div class="docs-layout">
+  <aside class="side-nav">{{ template "docs-nav" . }}</aside>
+  <article id="content" tabindex="-1" class="article-shell">
+    <header class="article-header">
+      <p class="section-label">{{ default .Section.Title "Documentation" }}</p>
+      <h1>{{ .Page.Title }}</h1>
+      {{ if .Page.Description }}<p class="lede">{{ .Page.Description }}</p>{{ end }}
+    </header>
+    <details class="inline-toc" data-inline-toc hidden>
+      <summary>On this page</summary>
+      <nav data-table-of-contents aria-label="On this page"></nav>
+    </details>
+    <div class="prose" data-page-content>{{ safeHTML .Page.BodyHTML }}</div>
+    <footer class="article-footer">
+      <a href="{{ index .Config.Extra "repo_url" }}/blob/main/docs/content/{{ .Page.RelativePath }}">View this page on GitHub <span aria-hidden="true">↗</span></a>
+      <a href="#content">Back to top ↑</a>
+    </footer>
+  </article>
+  <aside class="page-toc" data-page-toc hidden>
+    <p class="toc-title">On this page</p>
+    <nav data-table-of-contents aria-label="On this page"></nav>
+  </aside>
+</div>
+{{- end }}

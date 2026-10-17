@@ -1,6 +1,6 @@
 config_version = "0.4"
 base_url = "https://melashri.net/sanad/"
-title = "Sanad Docs"
+title = "Sanad documentation"
 description = "Adopt, review, and update native GitHub Actions lockfiles."
 language = "en"
 author = "Mohamed Elashri"
@@ -54,4 +54,5 @@ minify_css = false
 minify_js = false
 
 [extra]
+version = "1.0.0"
 repo_url = "https://github.com/MohamedElashri/sanad"

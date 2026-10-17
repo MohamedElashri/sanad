@@ -1,21 +1,23 @@
 {{- define "index" -}}{{ template "base" . }}{{- end }}
 {{- define "content" -}}
 <div class="docs-layout docs-layout-home">
-  <aside class="side-nav" aria-label="Documentation navigation">
-    {{ template "docs-nav" . }}
-  </aside>
-  <article class="article-shell home-article">
-    <p class="section-label">Documentation</p>
-    <h1>{{ .Config.Title }}</h1>
-    <p class="lede">{{ .Config.Description }}</p>
+  <aside class="side-nav">{{ template "docs-nav" . }}</aside>
+  <article id="content" tabindex="-1" class="article-shell home-article">
+    <header class="article-header">
+      <p class="section-label">Documentation · v{{ index .Config.Extra "version" }}</p>
+      <h1>Sanad documentation</h1>
+      <p class="lede">{{ .Section.Description }}</p>
+      <div class="quick-actions">
+        <a class="button primary" href="{{ .BasePath }}/guide/getting-started/">Install and initialize <span aria-hidden="true">→</span></a>
+        <a class="button secondary" href="{{ .BasePath }}/guide/ci/">Set up the Action</a>
+      </div>
+    </header>
     <div class="prose">{{ safeHTML .Section.BodyHTML }}</div>
-
-    <div class="quick-actions">
-      <a class="button primary" href="{{ .BasePath }}/guide/getting-started/">Get started</a>
-      <a class="button secondary" href="{{ .BasePath }}/guide/ci/">Action setup</a>
+    <div class="doc-card-grid">
+      <a class="doc-card" href="{{ .BasePath }}/guide/updating/"><span>Maintain</span><strong>Review dependency updates</strong><p>Reconcile workflow edits and select eligible versions.</p><small>Read the guide →</small></a>
+      <a class="doc-card" href="{{ .BasePath }}/reference/configuration/"><span>Configure</span><strong>Set your update policy</strong><p>Choose version limits, constraints, and waiting periods.</p><small>Explore configuration →</small></a>
+      <a class="doc-card" href="{{ .BasePath }}/advanced/security-model/"><span>Understand</span><strong>Know the trust boundaries</strong><p>Learn what native verification establishes and where it stops.</p><small>Read the security model →</small></a>
     </div>
-
-
   </article>
 </div>
 {{- end }}

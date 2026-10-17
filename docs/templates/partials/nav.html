@@ -1,9 +1,24 @@
 {{- define "docs-nav" -}}
-<nav>
-  <a href="{{ .BasePath }}/guide/getting-started/">Getting started</a>
-  <a href="{{ .BasePath }}/guide/ci/">CI</a>
-  <a href="{{ .BasePath }}/reference/cli/">CLI and policy</a>
-  <a href="{{ .BasePath }}/advanced/security-model/">Security and design</a>
-  <a href="{{ .BasePath }}/release-notes/">Release notes</a>
-</nav>
+<details class="side-nav-details" data-docs-menu open>
+  <summary>Browse documentation</summary>
+  <nav aria-label="Documentation">
+    <p class="nav-group-title">Start here</p>
+    <a href="{{ .BasePath }}/"{{ if eq .CurrentURL "/" }} aria-current="page"{{ end }}>Overview</a>
+    <a href="{{ .BasePath }}/guide/getting-started/"{{ if eq .CurrentURL "/guide/getting-started/" }} aria-current="page"{{ end }}>Getting started</a>
+    <p class="nav-group-title">Guides</p>
+    <a href="{{ .BasePath }}/guide/updating/"{{ if eq .CurrentURL "/guide/updating/" }} aria-current="page"{{ end }}>Updating dependencies</a>
+    <a href="{{ .BasePath }}/guide/ci/"{{ if eq .CurrentURL "/guide/ci/" }} aria-current="page"{{ end }}>CI and automation</a>
+    <a href="{{ .BasePath }}/guide/policy/"{{ if eq .CurrentURL "/guide/policy/" }} aria-current="page"{{ end }}>Waiting periods</a>
+    <p class="nav-group-title">Reference</p>
+    <a href="{{ .BasePath }}/reference/cli/"{{ if eq .CurrentURL "/reference/cli/" }} aria-current="page"{{ end }}>CLI commands</a>
+    <a href="{{ .BasePath }}/reference/configuration/"{{ if eq .CurrentURL "/reference/configuration/" }} aria-current="page"{{ end }}>Configuration</a>
+    <a href="{{ .BasePath }}/reference/action/"{{ if eq .CurrentURL "/reference/action/" }} aria-current="page"{{ end }}>GitHub Action</a>
+    <a href="{{ .BasePath }}/reference/reports/"{{ if eq .CurrentURL "/reference/reports/" }} aria-current="page"{{ end }}>Reports and exit codes</a>
+    <p class="nav-group-title">Resources</p>
+    <a href="{{ .BasePath }}/advanced/security-model/"{{ if eq .CurrentURL "/advanced/security-model/" }} aria-current="page"{{ end }}>Security and design</a>
+    <a href="{{ .BasePath }}/advanced/troubleshooting/"{{ if eq .CurrentURL "/advanced/troubleshooting/" }} aria-current="page"{{ end }}>Troubleshooting</a>
+    <a href="{{ .BasePath }}/release-notes/"{{ if eq .CurrentURL "/release-notes/" }} aria-current="page"{{ end }}>Release notes</a>
+    {{ if eq .CurrentURL "/guide/migration/" }}<a href="{{ .BasePath }}/guide/migration/" aria-current="page">Reset from 0.x</a>{{ end }}
+  </nav>
+</details>
 {{- end }}

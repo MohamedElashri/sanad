@@ -1,11 +1,15 @@
 +++
-title = "CI"
-description = "Verify pull requests and automate updates."
+title = "CI and automation"
+description = "Check pull requests and maintain dependency update PRs."
+weight = 30
 template = "page"
 +++
 
-Initialize the repository with the [CLI](../getting-started/), then add
-`.github/workflows/sanad.yml`:
+The Sanad Action installs the CLI version matching its release, verifies the immutable release asset, and publishes a structured report and job summary. Initialize your repository with the [CLI quickstart](../getting-started/) before enabling checks.
+
+## Add a pull-request workflow
+
+Create `.github/workflows/sanad.yml`:
 
 ```yaml
 name: Sanad
@@ -25,32 +29,55 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
 ```
 
-Run `sanad sync --write` and commit the workflow and updated lockfile. Make the
-Sanad check required in repository settings. The Action installs its matching
-immutable CLI release. You can also pin the Action to that release's full commit.
+`fetch-depth: 0` makes the trusted base commit available locally. `base` is required when enforcing first-seen policy and also lets Sanad compare changes with the existing baseline.
 
-## Scheduled updates
-
-Generate checking and update workflows with the installed CLI:
+Run the following locally and commit both the workflow and the resulting lockfile:
 
 ```sh
+sanad sync --write
+sanad check
+```
+
+After the workflow succeeds, make the Sanad check required in repository settings. The version tag shown above belongs to an immutable release; you can also pin the Action to that release's full commit.
+
+## Generate workflows automatically
+
+An installed release can generate a checking workflow and a scheduled update workflow:
+
+```sh
+sanad init --automation
 sanad init --automation --write
 ```
 
-Released builds use their full release commit for generated Action references.
-For source builds, pass `--action-ref <FULL_RELEASE_COMMIT>`.
-The scheduled workflow maintains one update PR using `contents: write` and
-`pull-requests: write`; it does not merge automatically. A GitHub App or PAT can
-be supplied when bot-created PRs must trigger additional workflows.
+Generated Action references use the release's full commit. Source builds require an explicit `--action-ref <FULL_RELEASE_COMMIT>`. Sanad refuses to overwrite independently maintained workflow files with different contents.
 
-Choose Dependabot or Sanad for scheduled version bumps. Both can use Sanad
-verification. With optional first-seen policy, merge observation-only PRs before
-expecting later dependency changes to pass. CI uses the trusted `base` revision;
-observations introduced only by the PR cannot establish maturity.
+The generated updater runs on Mondays at 03:00 UTC and also supports manual dispatch. Review the generated schedule and permissions before committing it.
 
-The first native lockfile establishes an explicitly reported baseline; review it
-before merging. Waiting periods apply to subsequent dependency changes.
+## Scheduled update pull requests
 
-The Action supports `check`, `status`, `plan`, `sync`, `update`, and `setup`.
-`write: 'true'` is required for `sync` or `update` writes. See the
-[Action reference](https://github.com/MohamedElashri/sanad/blob/main/action/README.md).
+The updater calls Sanad's reusable update workflow. It maintains one PR containing eligible dependency updates or newly recorded observations. It stages only the files reported by Sanad and never enables automatic merging.
+
+| Workflow | Required permissions | Purpose |
+| --- | --- | --- |
+| Pull-request check | `contents: read` | Verify the proposed dependency graph and policy. |
+| Scheduled updater | `contents: write`, `pull-requests: write` | Push the managed update branch and create or update a PR. |
+
+The repository must allow GitHub Actions to create pull requests. The default token may not trigger additional workflows when it creates a PR. Supply an appropriately scoped GitHub App or personal access token when those follow-up checks are required.
+
+## Choose one updater
+
+Use either Dependabot or Sanad for scheduled version changes to avoid competing PRs. Both can use the Sanad verification workflow. A supported Dependabot `cooldown.default-days` setting also applies to Sanad's adoption decisions; see [Configuration](../../reference/configuration/#dependabot-release-age-policy).
+
+## Enforce waiting periods
+
+With optional first-seen policy, the updater can open a PR that changes only `.github/sanad/state.json`. Merge that observation record before expecting a later version update to pass its waiting period.
+
+CI reads observations from the trusted base commit. Records introduced only by the proposed PR do not establish maturity. The initial native lockfile is an explicitly reported baseline and needs review; subsequent dependency changes are subject to the policy.
+
+See [Waiting periods](../policy/) for a worked example.
+
+## Read results
+
+Each check produces annotations for findings, a job summary, and paths to the JSON report and Markdown review body. Failed commands preserve operational reports when a valid report is available.
+
+See the [Action reference](../../reference/action/) for all modes, inputs, outputs, and write controls, or [Reports](../../reference/reports/) to consume results in other automation.

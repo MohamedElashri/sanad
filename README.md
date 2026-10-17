@@ -64,7 +64,7 @@ Make the Sanad check required in repository settings. The Action installs its
 matching CLI release and verifies its checksum and immutability.
 
 See [CI setup](docs/content/guide/ci.md) for generated workflows and scheduled
-update PRs, or the [Action reference](action/README.md) for inputs and outputs.
+update PRs, or the [Action reference](docs/content/reference/action.md) for inputs and outputs.
 
 ## Everyday use
 
@@ -79,7 +79,7 @@ sanad check --offline        # local coverage and graph checks only
 
 Repository changes require `--write`. Updates stay within the current major
 version by default. Optional constraints and waiting periods cover direct and
-transitive dependencies; see [CLI and policy](docs/content/reference/cli.md).
+transitive dependencies; see [configuration reference](docs/content/reference/configuration.md).
 
 [Documentation](https://melashri.net/sanad/) ·
 [Security and limitations](docs/content/advanced/security-model.md) ·

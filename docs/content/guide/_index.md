@@ -1,6 +1,6 @@
 +++
-title = "Guide"
-description = "Install, onboard, and automate."
+title = "Guides"
+description = "From initial setup to routine dependency updates."
 +++
 
-[Start](getting-started/) · [CI](ci/) · [Reset from 0.x](migration/)
+Follow these guides in order for a new repository, or go directly to the task you need.
