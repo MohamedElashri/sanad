@@ -40,3 +40,10 @@ Run `sanad sync --write` after adding the workflow and commit the updated lockfi
 | Verify a pull request | `sanad check --base REV` | Native verification and trusted-base policy results. |
 
 Commands preview repository edits unless you add `--write`. Continue with [updating dependencies](guide/updating/) or look up a specific option in the [CLI reference](reference/cli/).
+
+## Use Sanad with a coding agent
+
+Install the reusable Sanad skill to give your coding agent the same review and
+verification workflow. The [agent guide](guide/agents/) covers Codex, Claude Code,
+Cursor, GitHub Copilot, Antigravity, and OpenCode, with installation commands and
+example requests.
