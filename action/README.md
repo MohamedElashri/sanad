@@ -40,5 +40,7 @@ and pull-request writes. The CLI itself does not commit, push, or open PRs.
 
 Development: `npm ci`, `npm test`, `npm run build`. `npm run test:integration`
 requires `SANAD_ACTION_BINARY` and `SANAD_BACKEND` pointing to built/official tools.
+The build uses esbuild and writes the standalone bundle and bundled dependency
+licenses to `dist/`.
 
 [Full Action reference](https://melashri.net/sanad/reference/action/) · [CI setup](https://melashri.net/sanad/guide/ci/)

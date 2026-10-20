@@ -5,7 +5,7 @@
   "description": "GitHub Action wrapper for Sanad",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/index.js -o dist --minify --license licenses.txt",
+    "build": "node build.js",
     "test": "node --test test/*.test.js",
     "test:integration": "node test/integration.js",
     "check-dist": "npm run build && git diff --exit-code -- dist"
@@ -17,7 +17,7 @@
     "@actions/tool-cache": "2.0.2"
   },
   "devDependencies": {
-    "@vercel/ncc": "0.38.4"
+    "esbuild": "0.28.2"
   },
   "engines": {
     "node": ">=24"

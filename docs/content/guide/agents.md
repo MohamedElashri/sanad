@@ -14,36 +14,12 @@ configuration, CI automation, host/authentication setup, and troubleshooting.
 
 ## Install the skill
 
-With Node.js 22.20 or later, run the optional
-[Skills CLI](https://github.com/vercel-labs/skills) from the repository where you
-want to use Sanad:
-
-```sh
-npx skills add MohamedElashri/sanad --skill sanad
-```
-
-Choose your coding agents when prompted. Installation defaults to the current
-project; add `-g` for a personal installation shared across projects. The skill
-provides instructions; install [Sanad 1.x](../getting-started/) separately and
-make it available on the agent's `PATH`.
-
-To select Antigravity CLI directly:
-
-```sh
-npx skills add MohamedElashri/sanad --skill sanad --agent antigravity-cli
-```
-
-To install from a local Sanad checkout before publishing your changes:
-
-```sh
-npx skills add /path/to/sanad --skill sanad
-```
-
-## Install without Node.js
-
 Copy the entire `skills/sanad` directory, including `references/`, from a Sanad
 source checkout into a skill directory your agent discovers. Paths in the project
 column are relative to the repository where you want to use Sanad.
+
+The skill provides instructions; install [Sanad 1.x](../getting-started/)
+separately and make it available on the agent's `PATH`.
 
 | Agent | Project directory | Personal directory | Documentation |
 | --- | --- | --- | --- |
@@ -63,24 +39,19 @@ cp -R /path/to/sanad/skills/sanad .agents/skills/
 ```
 
 Replace `/path/to/sanad` with your Sanad source checkout. For Claude Code, use
-`.claude/skills` instead. For a personal Codex installation, use
-`"$HOME/.agents/skills"` as the destination. The installed file should be
-`SKILL_DIRECTORY/sanad/SKILL.md`. Start a new agent session after installation
-if the skill does not appear. Commit project skills to share them with your team.
+`.claude/skills` instead. Commit project skills to share them with your team.
 
-### Migrating from Gemini CLI
+For a personal installation available across projects, choose the personal path
+from the table. For example, from a Sanad checkout, install for Codex:
 
-Google ended Gemini CLI consumer access on June 18, 2026 and directs those users
-to Antigravity. See [Google's deprecation notice](https://developers.google.com/gemini-code-assist/docs/deprecations/code-assist-individuals)
-for the affected accounts and separate enterprise schedule. This guide uses
-Antigravity for new installations.
+```sh
+mkdir -p "$HOME/.agents/skills"
+cp -R skills/sanad "$HOME/.agents/skills/"
+```
 
-For existing skills, copy the `sanad` folder from `.gemini/skills/` to
-`.agents/skills/` in your project. Antigravity CLI's personal skill directory is
-`~/.gemini/antigravity-cli/skills/`; the App and IDE use
-`~/.gemini/config/skills/`. These are distinct from Gemini CLI's old
-`~/.gemini/skills/` location. See Google's
-[migration guide](https://antigravity.google/docs/cli/gcli-migration/).
+The installed file should be `SKILL_DIRECTORY/sanad/SKILL.md`, with `references/`
+beside it. Start a new agent session after installation if the skill does not
+appear.
 
 ## Ask the agent to use Sanad
 

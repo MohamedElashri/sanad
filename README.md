@@ -84,16 +84,18 @@ transitive dependencies; see [configuration reference](docs/content/reference/co
 ## Coding agents
 
 Install the reusable Sanad skill for Codex, Claude Code, Cursor, GitHub Copilot,
-Antigravity, or OpenCode with the optional [Skills CLI](https://github.com/vercel-labs/skills):
+Antigravity, or OpenCode by copying the skill directory into your agent's skill
+location. For example, from a Sanad checkout, install it for your user in Codex:
 
 ```sh
-npx skills add MohamedElashri/sanad --skill sanad
+mkdir -p "$HOME/.agents/skills"
+cp -R skills/sanad "$HOME/.agents/skills/"
 ```
 
 The skill covers onboarding, workflow reconciliation, scoped updates, and
 verification. It requires Sanad 1.x on the agent's `PATH`. See the
-[agent guide](docs/content/guide/agents.md) for manual installation and example
-requests, or read [SKILL.md](skills/sanad/SKILL.md).
+[agent guide](docs/content/guide/agents.md) for each agent's installation paths
+and example requests, or read [SKILL.md](skills/sanad/SKILL.md).
 
 [Documentation](https://melashri.net/sanad/) ·
 [Security and limitations](docs/content/advanced/security-model.md) ·
