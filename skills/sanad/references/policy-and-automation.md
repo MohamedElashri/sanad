@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: MohamedElashri/sanad@v1.0.0
+      - uses: MohamedElashri/sanad@v1.0.1
         with:
           mode: check
           base: ${{ github.event.pull_request.base.sha }}

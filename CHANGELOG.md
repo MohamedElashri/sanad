@@ -2,6 +2,11 @@
 
 All notable changes to Sanad are documented here.
 
+## 1.0.1 - 2026-10-25
+
+### Fixed
+- Graph should not require transitive composite action deps in workflow direct pins
+
 ## 1.0.0 - 2026-10-17
 
 - Replace inline SHA management with GitHub's native Actions lockfile.

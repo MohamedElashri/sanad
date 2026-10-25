@@ -5,7 +5,7 @@ weight = 30
 template = "page"
 +++
 
-Use `MohamedElashri/sanad@v1.0.0` after checking out the repository. The Action verifies the immutable release asset and checks that the installed CLI version matches its own version.
+Use `MohamedElashri/sanad@v1.0.1` after checking out the repository. The Action verifies the immutable release asset and checks that the installed CLI version matches its own version.
 
 ## Minimal check
 
@@ -13,7 +13,7 @@ Use `MohamedElashri/sanad@v1.0.0` after checking out the repository. The Action 
 - uses: actions/checkout@v7.0.1
   with:
     fetch-depth: 0
-- uses: MohamedElashri/sanad@v1.0.0
+- uses: MohamedElashri/sanad@v1.0.1
   id: sanad
   with:
     mode: check
@@ -51,7 +51,7 @@ Initial onboarding uses the CLI's `init` command. The Action does not expose an 
 For a repository nested in the checkout:
 
 ```yaml
-- uses: MohamedElashri/sanad@v1.0.0
+- uses: MohamedElashri/sanad@v1.0.1
   with:
     mode: check
     working-directory: services/example
@@ -81,7 +81,7 @@ Report paths refer to runner files. They do not upload artifacts by themselves. 
 Preview version updates:
 
 ```yaml
-- uses: MohamedElashri/sanad@v1.0.0
+- uses: MohamedElashri/sanad@v1.0.1
   with:
     mode: plan
 ```
@@ -89,7 +89,7 @@ Preview version updates:
 Apply eligible changes to the checkout:
 
 ```yaml
-- uses: MohamedElashri/sanad@v1.0.0
+- uses: MohamedElashri/sanad@v1.0.1
   id: update
   with:
     mode: update

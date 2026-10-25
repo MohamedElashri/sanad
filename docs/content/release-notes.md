@@ -1,6 +1,6 @@
 +++
 title = "Release notes"
-description = "Sanad 1.0.0 · October 17, 2026"
+description = "Sanad 1.0.1 · October 25, 2026"
 template = "page"
 +++
 
@@ -24,4 +24,4 @@ The commands, configuration, inline comments, and metadata from 0.x are removed.
 
 The native producer rejects actions with generated local sub-actions, including `pypa/gh-action-pypi-publish@v1.14.2`. See [Security and design](../advanced/security-model/) for the supported boundaries.
 
-[Download v1.0.0](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.0) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
+[Download v1.0.1](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.1) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
