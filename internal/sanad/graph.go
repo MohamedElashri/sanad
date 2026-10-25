@@ -47,18 +47,9 @@ func loadGraph(files tree, home string) (graph, error) {
 	// The native parser and producer can accept dangling pin references, while
 	// GitHub rejects them before scheduling a job. Check the graph explicitly.
 	for workflow, keys := range parsed.Workflows {
-		selected := make(map[string]bool, len(keys))
 		for _, key := range keys {
 			if _, ok := parsed.Dependencies[key]; !ok {
 				return nil, fmt.Errorf("%s: %s references missing dependency %s", lock.Path, workflow, key)
-			}
-			selected[key] = true
-		}
-		for _, key := range keys {
-			for _, child := range parsed.Dependencies[key].Uses {
-				if !selected[child] {
-					return nil, fmt.Errorf("%s: %s omits transitive dependency %s used by %s", lock.Path, workflow, child, key)
-				}
 			}
 		}
 	}

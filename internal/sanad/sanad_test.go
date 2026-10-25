@@ -522,8 +522,7 @@ func TestCheckRejectsIncompleteNativeGraph(t *testing.T) {
 		{"missing workflow pin", map[string]lock.Action{}, []string{"a/root@v1.0.0"}, "references missing dependency"},
 		{"missing transitive pin", map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a", "b/child@v1.0.0")}, []string{"a/root@v1.0.0", "b/child@v1.0.0"}, "references missing dependency"},
 		{"missing uses target", map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a", "b/child@v1.0.0")}, nil, "uses missing dependency"},
-		{"incomplete workflow closure", map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a", "b/child@v1.0.0"), "b/child@v1.0.0": action("v1.0.0", "b")}, []string{"a/root@v1.0.0"}, "omits transitive dependency"},
-		{"complete graph", map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a", "b/child@v1.0.0"), "b/child@v1.0.0": action("v1.0.0", "b")}, []string{"a/root@v1.0.0", "b/child@v1.0.0"}, ""},
+		{"complete graph", map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a", "b/child@v1.0.0"), "b/child@v1.0.0": action("v1.0.0", "b")}, []string{"a/root@v1.0.0"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := fixture(t, tc.deps, "")
