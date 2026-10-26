@@ -10,10 +10,10 @@ Use `MohamedElashri/sanad@v1.0.1` after checking out the repository. The Action 
 ## Minimal check
 
 ```yaml
-- uses: actions/checkout@v7.0.1
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
   with:
     fetch-depth: 0
-- uses: MohamedElashri/sanad@v1.0.1
+- uses: MohamedElashri/sanad@a73376eda34400ec92e51fcefec6ee287871da38 # v1.0.1
   id: sanad
   with:
     mode: check
