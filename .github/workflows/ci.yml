@@ -1,10 +1,12 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "!dependabot/**"
   pull_request:
 permissions:
-  contents: read
+  contents: write
 jobs:
   test:
     strategy:
@@ -13,11 +15,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
           cache: npm
@@ -45,11 +47,13 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.actor == 'dependabot[bot]' && github.head_ref || '' }}
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
       - run: go test -race ./...
@@ -57,4 +61,17 @@ jobs:
       - run: staticcheck ./...
       - run: test -z "$(gofmt -l cmd internal scripts)"
       - run: npm ci --prefix action
+      - name: Build action bundle for Dependabot
+        if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build --prefix action
+          git add action/dist
+          if ! git diff --staged --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "build(action): update dist bundle for dependabot [dependabot skip]"
+            git push origin "HEAD:${{ github.head_ref }}"
+          fi
       - run: npm run check-dist --prefix action
