@@ -19,7 +19,7 @@ Install with Homebrew:
 brew install --cask MohamedElashri/sanad/sanad
 ```
 
-Or download a [v1.0.1 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.1)
+Or download a [v1.0.2 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.2)
 for Linux, macOS, or Windows on amd64/arm64. Keep the included `sanad` and
 `gh-actions-lock` executables together on your `PATH`.
 

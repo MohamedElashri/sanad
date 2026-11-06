@@ -2,6 +2,13 @@
 
 All notable changes to Sanad are documented here.
 
+## 1.0.2 - 2026-11-07
+
+### Fixed
+
+- Render default CLI reports with aligned, wrapping terminal tables and a stacked layout for narrow terminals. Preserve literal report values and detect color support from the report destination.
+- Add semantic colors for headings, results, coverage, findings, decision states, and diffs. Preserve raw Markdown and JSON formats, and honor plain output for redirection, `NO_COLOR`, and dumb terminals.
+
 ## 1.0.1 - 2026-10-25
 
 ### Fixed

@@ -1,10 +1,16 @@
 +++
 title = "Release notes"
-description = "Sanad 1.0.1 · October 25, 2026"
+description = "Sanad 1.0.2 · November 7, 2026"
 template = "page"
 +++
 
 Sanad 1.0 manages GitHub's native Actions lockfile. GitHub enforces the pins at runtime; Sanad adds onboarding, controlled updates, policy, and review reports.
+
+## New in 1.0.2
+
+Default CLI reports now show aligned terminal tables with colored headings, results, coverage, findings, and update decisions. Tables wrap to the terminal width and switch to labeled fields when full headers cannot fit. File diffs highlight additions, deletions, and hunks while preserving indentation and line breaks.
+
+Report values stay literal, including Markdown punctuation in refs, paths, and messages. Color detection follows the output destination and respects `NO_COLOR`, dumb terminals, and redirection. Raw Markdown, JSON reports, and exit codes retain their existing behavior.
 
 ## Workflow and commands
 
@@ -24,4 +30,4 @@ The commands, configuration, inline comments, and metadata from 0.x are removed.
 
 The native producer rejects actions with generated local sub-actions, including `pypa/gh-action-pypi-publish@v1.14.2`. See [Security and design](../advanced/security-model/) for the supported boundaries.
 
-[Download v1.0.1](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.1) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
+[Download v1.0.2](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.2) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
