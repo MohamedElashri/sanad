@@ -15,7 +15,15 @@ sanad plan --format markdown
 sanad plan --format json > sanad-plan.json
 ```
 
-The default `table` format includes the review summary and proposed file diffs. `markdown` produces a review summary. JSON carries the complete structured result, including file diffs.
+The default `table` format shows a styled terminal report with headings, command results, native support, verification, workflow coverage, findings, and dependency tables. Cyan identifies headings and paths, green successful or eligible results, yellow warnings and pending or frozen updates, and red failures and errors. Labels remain visible when color is disabled. A successful command does not establish that native enforcement is enabled; read the separate native support and verification fields.
+
+Tables wrap cells to the terminal width. When a table cannot fit its full column labels, Sanad shows each row as labeled fields instead. Report values appear literally, including Markdown punctuation in refs, paths, and messages. Control characters appear as visible escapes.
+
+Proposed file diffs follow the report, with additions in green, deletions in red, and headers and hunks in cyan. Diff indentation, tabs, and line breaks are preserved; terminal control characters are shown as visible escapes. Diffs are not wrapped.
+
+Redirected output uses plain tables without ANSI styling and an 80-column layout. Set `NO_COLOR=1` to disable styling in a terminal; `TERM=dumb` also disables it. `CLICOLOR=0` disables color unless overridden by `CLICOLOR_FORCE`. Redirection stays plain even when `CLICOLOR_FORCE` is set.
+
+`markdown` produces the raw Markdown review summary for saving or publishing. JSON carries the complete structured result, including file diffs.
 
 `config` and `version` have their own small outputs; they are not repository reports. See [CLI commands](../cli/) for their behavior.
 

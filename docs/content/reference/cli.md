@@ -33,7 +33,7 @@ Run Sanad from a repository checkout, or pass `--root` to select one. Running `s
 | `--config PATH` | `.sanad.toml` | Select a repository-relative policy file. |
 | `--format FORMAT` | `table` | `table`, `json`, or `markdown` for report-producing commands. |
 
-`table` shows the readable review and proposed file diffs. `markdown` produces a review summary. JSON includes the full structured report and proposed file diffs. `config` always prints JSON.
+`table` shows colored headings, results, coverage, findings, update decisions, and file diffs. Tables wrap to the terminal width and switch to labeled fields when full headers cannot fit. Diffs preserve indentation and line breaks without wrapping. Pipes and redirected output receive plain text without ANSI styling. `NO_COLOR=1` or `TERM=dumb` disables terminal styling. `markdown` produces a raw Markdown review summary. JSON includes the full structured report and proposed file diffs. `config` always prints JSON.
 
 Configuration paths must remain inside the repository. Commands do not change the invoking process's working directory.
 

@@ -44,17 +44,8 @@ func NewRootCommand() *cobra.Command {
 				return fmt.Errorf("unsupported format %q", format)
 			}
 			r, err := sanad.Run(cmd.Context(), name, opts)
-			if format == "json" {
-				if e := json.NewEncoder(cmd.OutOrStdout()).Encode(r); e != nil {
-					return e
-				}
-			} else {
-				fmt.Fprint(cmd.OutOrStdout(), r.Markdown())
-				if format == "table" {
-					for _, f := range r.Files {
-						fmt.Fprint(cmd.OutOrStdout(), "\n"+f.Diff)
-					}
-				}
+			if e := writeReport(cmd.OutOrStdout(), r, format); e != nil {
+				return e
 			}
 			if err != nil {
 				return commandError{2, err}
