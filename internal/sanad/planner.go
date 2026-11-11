@@ -104,8 +104,12 @@ func closure(g graph, key string, set map[string]bool) {
 
 func validateScope(before, after graph, oldKey, newKey string) error {
 	allowed := map[string]bool{}
+	next := map[string]bool{}
 	closure(before, oldKey, allowed)
-	closure(after, newKey, allowed)
+	closure(after, newKey, next)
+	for key := range next {
+		allowed[key] = true
+	}
 	for _, change := range graphDiff(before, after) {
 		if !allowed[change.Key] {
 			return fmt.Errorf("native producer changed unrelated dependency %s; update refused", change.Key)
