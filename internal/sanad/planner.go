@@ -31,6 +31,10 @@ func targets(releases []Release, current string, p UpdatePolicy, explicit string
 	list := []candidate{}
 	seen := map[string]bool{}
 	for _, r := range releases {
+		parsed, full := lock.ParseSemVer(r.Ref)
+		if !full || !parsed.IsFull() || !parsed.IsStable() {
+			continue
+		}
 		v, err := semver.NewVersion(r.Ref)
 		if err != nil || r.Draft || r.Prerelease || v.Prerelease() != "" || !v.GreaterThan(from) || seen[r.Ref] {
 			continue
