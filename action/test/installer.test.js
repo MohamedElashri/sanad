@@ -80,3 +80,58 @@ test("binary override requires explicit test mode", async () => {
     else process.env.SANAD_ACTION_TESTING = oldTesting;
   }
 });
+
+async function cachedInstallFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sanad-install-cache-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const target = releaseTarget();
+  const cached = path.join(root, "cache");
+  fs.mkdirSync(cached);
+  const download = path.join(root, "download");
+  fs.writeFileSync(download, "verified archive bytes");
+  const digest = await sha256(download);
+  const archiveName = target.archive.replace("VERSION", "1.0.2");
+  const fetchImplementation = async () => ({ ok: true, json: async () => ({
+    tag_name: "v1.0.2", immutable: true,
+    assets: [{ name: archiveName, digest: `sha256:${digest}`, browser_download_url: `https://github.com/MohamedElashri/sanad/releases/download/v1.0.2/${archiveName}` }],
+  }) });
+  let downloads = 0;
+  const extract = async () => {
+    const dir = fs.mkdtempSync(path.join(root, "fresh-"));
+    fs.writeFileSync(path.join(dir, target.executable), "trusted CLI");
+    fs.writeFileSync(path.join(dir, process.platform === "win32" ? "gh-actions-lock.exe" : "gh-actions-lock"), "trusted backend");
+    return dir;
+  };
+  const toolCache = {
+    find: () => cached,
+    downloadTool: async () => { downloads++; return download; },
+    extractTar: extract, extractZip: extract,
+    cacheDir: async (from) => { fs.cpSync(from, cached, { recursive: true, force: true }); return cached; },
+  };
+  return { root, cached, download, target, deps: { toolCache, fetchImplementation }, downloads: () => downloads };
+}
+
+test("cache hits verify archives and ignore replaced executables", async (t) => {
+  const f = await cachedInstallFixture(t);
+  fs.copyFileSync(f.download, path.join(f.cached, `.sanad-release.${f.target.extension}`));
+  fs.writeFileSync(path.join(f.cached, f.target.executable), "tampered CLI");
+  const installed = await installSanad("1.0.2", "", f.deps);
+  assert.notEqual(path.dirname(installed), f.cached);
+  assert.equal(fs.readFileSync(installed, "utf8"), "trusted CLI");
+  assert.equal(f.downloads(), 0);
+});
+
+test("tampered cached archives fail their release digest check", async (t) => {
+  const f = await cachedInstallFixture(t);
+  fs.writeFileSync(path.join(f.cached, `.sanad-release.${f.target.extension}`), "tampered archive");
+  await assert.rejects(() => installSanad("1.0.2", "", f.deps), /digest mismatch/);
+});
+
+test("legacy caches are refreshed from verified release archives", async (t) => {
+  const f = await cachedInstallFixture(t);
+  fs.writeFileSync(path.join(f.cached, f.target.executable), "legacy unverified CLI");
+  const installed = await installSanad("1.0.2", "", f.deps);
+  assert.equal(fs.readFileSync(installed, "utf8"), "trusted CLI");
+  assert.equal(f.downloads(), 1);
+  assert.equal(await sha256(path.join(f.cached, `.sanad-release.${f.target.extension}`)), await sha256(f.download));
+});

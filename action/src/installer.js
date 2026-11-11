@@ -2,6 +2,7 @@
 
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const tc = require("@actions/tool-cache");
 
@@ -55,7 +56,7 @@ async function releaseAsset(version, archiveName, token = "", fetchImplementatio
   return { digest: digest[1].toLowerCase(), url: asset.browser_download_url };
 }
 
-async function installSanad(version, token = "") {
+async function installSanad(version, token = "", deps = {}) {
   if (process.env.SANAD_ACTION_BINARY) {
     if (process.env.SANAD_ACTION_TESTING !== "true") {
       throw new Error("SANAD_ACTION_BINARY is restricted to the local test harness");
@@ -66,27 +67,42 @@ async function installSanad(version, token = "") {
   }
   const normalizedVersion = String(version).replace(/^v/, "");
   const target = releaseTarget();
-  const cached = tc.find("sanad", normalizedVersion, process.arch);
-  if (cached) {
-    const executable = path.join(cached, target.executable);
-    if (!fs.existsSync(executable) || !fs.statSync(executable).isFile()) {
-      throw new Error(`cached Sanad ${normalizedVersion} does not contain ${target.executable}`);
-    }
-    return executable;
-  }
-
+  const cache = deps.toolCache || tc;
   const archiveName = target.archive.replace("VERSION", normalizedVersion);
-  const asset = await releaseAsset(normalizedVersion, archiveName, token);
-  const archivePath = await tc.downloadTool(asset.url);
-  const actual = await sha256(archivePath);
-  if (actual !== asset.digest) throw new Error(`GitHub release digest mismatch for ${archiveName}`);
+  const asset = await releaseAsset(normalizedVersion, archiveName, token, deps.fetchImplementation);
+  const cached = cache.find("sanad", normalizedVersion, process.arch);
+  const storedArchive = `.sanad-release.${target.extension}`;
+  let archivePath = cached ? path.join(cached, storedArchive) : "";
+  const cacheHit = archivePath && fs.existsSync(archivePath) && fs.lstatSync(archivePath).isFile();
+  let privateCopy = "";
+  try {
+    if (cacheHit) {
+      privateCopy = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "sanad-archive-"));
+      const copy = path.join(privateCopy, archiveName);
+      fs.copyFileSync(archivePath, copy);
+      archivePath = copy;
+    } else {
+      archivePath = await cache.downloadTool(asset.url);
+    }
+    const actual = await sha256(archivePath);
+    if (actual !== asset.digest) throw new Error(`GitHub release digest mismatch for ${archiveName}`);
 
-  const extracted = target.extension === "zip" ? await tc.extractZip(archivePath) : await tc.extractTar(archivePath);
-  const cachedDir = await tc.cacheDir(extracted, "sanad", normalizedVersion, process.arch);
-  const executable = path.join(cachedDir, target.executable);
-  if (!fs.existsSync(executable)) throw new Error(`release archive did not contain ${target.executable}`);
-  if (process.platform !== "win32") fs.chmodSync(executable, 0o755);
-  return executable;
+    // Execute a fresh extraction of verified bytes, never writable cached binaries.
+    const extracted = target.extension === "zip" ? await cache.extractZip(archivePath) : await cache.extractTar(archivePath);
+    const backend = process.platform === "win32" ? "gh-actions-lock.exe" : "gh-actions-lock";
+    for (const name of [target.executable, backend]) {
+      const file = path.join(extracted, name);
+      if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) throw new Error(`release archive did not contain ${name}`);
+      if (process.platform !== "win32") fs.chmodSync(file, 0o755);
+    }
+    if (!cacheHit) {
+      fs.copyFileSync(archivePath, path.join(extracted, storedArchive));
+      await cache.cacheDir(extracted, "sanad", normalizedVersion, process.arch);
+    }
+    return path.join(extracted, target.executable);
+  } finally {
+    if (privateCopy) fs.rmSync(privateCopy, { recursive: true, force: true });
+  }
 }
 
 module.exports = { installSanad, releaseAsset, releaseTarget, sha256 };
