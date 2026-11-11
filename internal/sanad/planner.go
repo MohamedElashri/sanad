@@ -110,6 +110,60 @@ func validateScope(before, after graph, oldKey, newKey string) error {
 	return nil
 }
 
+func effectivePolicy(cfg Config, opts Options, name, nwo string) UpdatePolicy {
+	if opts.Level != "" || opts.Constraint != "" {
+		return UpdatePolicy{Level: opts.Level, Constraint: opts.Constraint}
+	}
+	for _, key := range []string{name, nwo} {
+		if p, ok := cfg.Actions[key]; ok && (p.Level != "" || p.Constraint != "") {
+			return p
+		}
+	}
+	return cfg.Update
+}
+
+func validateTransitivePolicies(before, after graph, selected string, cfg Config, opts Options) error {
+	for _, c := range graphDiff(before, after) {
+		if c.After == nil || c.Key == selected || c.Before != nil && c.Before.Commit == c.After.Commit {
+			continue
+		}
+		nwo, ref, _ := strings.Cut(c.Key, "@")
+		policy := effectivePolicy(cfg, opts, nwo, nwo)
+		version, err := semver.NewVersion(ref)
+		if policy.Constraint != "" {
+			constraint, _ := semver.NewConstraint(policy.Constraint)
+			if err != nil || !constraint.Check(version) {
+				return fmt.Errorf("%s violates constraint %s", c.Key, policy.Constraint)
+			}
+		}
+		if err != nil || policy.Level == "" || policy.Level == "major" {
+			continue
+		}
+		previous := []string{}
+		allowed := false
+		for key, old := range before {
+			oldNWO, oldRef, _ := strings.Cut(key, "@")
+			if oldNWO != nwo || old.Host != c.After.Host {
+				continue
+			}
+			v, err := semver.NewVersion(oldRef)
+			if err != nil {
+				continue
+			}
+			previous = append(previous, oldRef)
+			if version.Major() == v.Major() && (policy.Level != "patch" || version.Minor() == v.Minor()) {
+				allowed = true
+				break
+			}
+		}
+		if len(previous) > 0 && !allowed {
+			sort.Strings(previous)
+			return fmt.Errorf("%s exceeds %s update policy from %s", c.Key, policy.Level, strings.Join(previous, ", "))
+		}
+	}
+	return nil
+}
+
 func copyTree(files tree) tree {
 	out := tree{}
 	for k, v := range files {
@@ -287,6 +341,10 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			newKey := strings.ToLower(ref.NWO) + "@" + target
 			if err := validateScope(before, after, key, newKey); err != nil {
 				return err
+			}
+			if err := validateTransitivePolicies(before, after, newKey, cfg, opts); err != nil {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "blocked", Reason: err.Error()})
+				continue
 			}
 			ready, until, err := assess(before, after, state, observed, minimum, opts.Now)
 			if err != nil {
