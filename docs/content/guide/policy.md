@@ -11,7 +11,7 @@ Sanad can delay adoption of changed commits in two ways: upstream release age an
 
 | Policy | Clock starts from | Configuration | Persistent state |
 | --- | --- | --- | --- |
-| Release age | The upstream release, tag, or commit timestamp used for the dependency. | Dependabot `github-actions` cooldown. | No observation file required. |
+| Release age | The later of the release publication and the locked commit's committer timestamp; the commit timestamp alone when no release exists. | Dependabot `github-actions` cooldown. | No observation file required. |
 | First seen | Sanad's recorded observation of an identity, ref, and commit. | `.sanad.toml` observation policy. | Commit `.github/sanad/state.json`. |
 
 If both are enabled, every changed dependency must satisfy both. Neither policy is a vulnerability assessment or a guarantee about upstream code quality.
@@ -83,6 +83,8 @@ updates:
 ```
 
 Sanad uses this age when evaluating changed dependency commits. Unsupported cooldown keys or ambiguous multiple `github-actions` entries produce an error. See [Configuration](../../reference/configuration/) for the supported shape.
+
+An old release cannot make a commit with a newer committer timestamp mature. However, Git commit timestamps are supplied by upstream authors, and GitHub's release publication time does not record later tag retargeting. Release-age policy therefore cannot prove how long a particular ref has pointed to a commit. Enable first-seen policy when adoption must wait after Sanad first observes that exact identity, ref, and commit.
 
 ## Protect the history
 

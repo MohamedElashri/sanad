@@ -86,3 +86,37 @@ func TestAutomaticTargetsRequireFullStableVersions(t *testing.T) {
 		t.Fatal("explicit partial ref should remain available", got)
 	}
 }
+
+func TestReleaseAgeIncludesTheLockedCommit(t *testing.T) {
+	for _, tc := range []struct {
+		published, committed, want string
+	}{
+		{"2026-01-01T00:00:00Z", "2026-10-16T00:00:00Z", "2026-10-16T00:00:00Z"},
+		{"2026-10-10T00:00:00Z", "2026-09-01T00:00:00Z", "2026-10-10T00:00:00Z"},
+	} {
+		api := newAPI("github.com")
+		api.tokens["github.com"] = "test-token"
+		commitRequests := 0
+		api.client = &http.Client{Transport: transportFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/releases/tags/") {
+				return response(200, fmt.Sprintf(`{"tag_name":"v1.1.0","published_at":%q}`, tc.published)), nil
+			}
+			commitRequests++
+			if !strings.HasSuffix(req.URL.Path, strings.Repeat("b", 40)) {
+				t.Fatalf("age query did not use locked commit: %s", req.URL.Path)
+			}
+			return response(200, fmt.Sprintf(`{"commit":{"committer":{"date":%q}}}`, tc.committed)), nil
+		})}
+		d := Dependency{Host: "github.com", Key: "a/root@v1.1.0", Commit: "sha1-" + strings.Repeat("b", 40)}
+		at, err := api.Timestamp(context.Background(), d)
+		if err != nil || at.Format(time.RFC3339) != tc.want || commitRequests != 1 {
+			t.Fatalf("incorrect locked-commit age: %s %v", at, err)
+		}
+		if tc.published < tc.committed {
+			ready, _, err := assessReleaseAge(context.Background(), graph{}, graph{d.Key: d}, 7*24*time.Hour, testNow, api)
+			if err != nil || ready {
+				t.Fatal("old release made a new commit mature", ready, err)
+			}
+		}
+	}
+}
