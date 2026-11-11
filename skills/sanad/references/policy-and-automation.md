@@ -129,16 +129,13 @@ maintained workflows deliberately rather than deleting them to make generation
 succeed.
 
 Review the scheduled updater's Monday 03:00 UTC schedule and manual dispatch
-trigger. It requires `contents: write`, `pull-requests: write`, and repository
-settings allowing Actions to create PRs. It maintains one update PR, stages the
+trigger. It declares `contents: write` and `pull-requests: write`. It maintains one update PR, stages the
 reported changed files, and does not enable automatic merging. An observation-only
 PR must reach the trusted base before those observations can establish maturity.
 Choose the scheduled updater consistently with the user's existing Dependabot or
 Sanad setup to avoid competing version-update PRs.
 
-PRs created with the default `GITHUB_TOKEN` may not trigger follow-up workflows.
-When follow-up checks are required, configure an appropriately scoped GitHub App
-or personal access token through the repository's normal secret-management process.
+Generated automation expects a `SANAD_TOKEN` repository secret containing a fine-grained personal access token with Contents, Workflows, and Pull requests write permissions, limited to the target repository. A caller may instead generate and pass a GitHub App installation token with those permissions. The reusable updater requires this credential and rejects the built-in `GITHUB_TOKEN`, which cannot push workflow edits.
 
 ## Action modes and reports
 
