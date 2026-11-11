@@ -65,3 +65,41 @@ func TestReadTreeFollowsLocalActionsInAnyDirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestRecoveryRefusesActiveWriter(t *testing.T) {
+	root := t.TempDir()
+	name := ".github/workflows/ci.yml"
+	before := tree{name: workflow("a/root@v1")}
+	after := tree{name: workflow("a/root@v2")}
+	if err := putFile(root, name, after[name]); err != nil {
+		t.Fatal(err)
+	}
+	path, _ := safePath(root, transactionPath)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	record, err := openJournal(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer record.Close()
+	if err := lockJournal(record); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(journal{Before: before, After: after, Paths: []string{name}})
+	if _, err := record.Write(b); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverTransaction(root, ConfigPath); err == nil {
+		t.Fatal("recovery overlapped an active writer")
+	}
+	if err := applyTree(root, ConfigPath, after, before); err == nil {
+		t.Fatal("second writer overlapped the transaction")
+	}
+	if err := record.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverTransaction(root, ConfigPath); err != nil {
+		t.Fatal("closed transaction could not recover", err)
+	}
+}
