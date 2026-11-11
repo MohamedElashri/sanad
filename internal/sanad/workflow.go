@@ -136,11 +136,25 @@ func references(files tree) ([]reference, error) {
 	return out, nil
 }
 
-// Only edit metadata reachable from this repository's actual workflows. Action
-// fixtures and unused action definitions are copied for the producer, not updated.
+// Only inspect metadata reachable from this repository's actual workflows.
 func activeMetadata(files tree) (map[string]bool, error) {
+	return collectMetadata(files, nil)
+}
+
+func collectMetadata(files tree, load func(string) (bool, error)) (map[string]bool, error) {
 	active := map[string]bool{}
 	queue := []string{}
+	var loadErr error
+	enqueue := func(name string) bool {
+		_, exists := files[name]
+		if !exists && load != nil && loadErr == nil {
+			exists, loadErr = load(name)
+		}
+		if exists {
+			queue = append(queue, name)
+		}
+		return exists
+	}
 	for name := range files {
 		if strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml")) && !strings.Contains(strings.TrimPrefix(name, ".github/workflows/"), "/") {
 			queue = append(queue, name)
@@ -188,7 +202,7 @@ func activeMetadata(files tree) (map[string]bool, error) {
 						continue
 					}
 					if strings.HasPrefix(path, ".github/workflows/") {
-						queue = append(queue, path)
+						enqueue(path)
 						continue
 					}
 					path = strings.TrimSuffix(path, "/")
@@ -199,8 +213,7 @@ func activeMetadata(files tree) (map[string]bool, error) {
 						path += "/"
 					}
 					for _, suffix := range []string{"action.yml", "action.yaml"} {
-						if _, ok := files[path+suffix]; ok {
-							queue = append(queue, path+suffix)
+						if enqueue(path + suffix) {
 							break
 						}
 					}
@@ -211,6 +224,9 @@ func activeMetadata(files tree) (map[string]bool, error) {
 			}
 		}
 		walk(&doc)
+		if loadErr != nil {
+			return nil, loadErr
+		}
 	}
 	return active, nil
 }
