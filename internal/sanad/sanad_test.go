@@ -347,7 +347,7 @@ func TestRecoveryProtectsLaterChanges(t *testing.T) {
 	_ = putFile(root, ".github/workflows/ci.yml", after[".github/workflows/ci.yml"])
 	b, _ := json.Marshal(journal{Before: before, After: after, Paths: []string{".github/workflows/ci.yml"}})
 	_ = putFile(root, transactionPath, file{Data: b, Mode: 0o600})
-	if err := recoverTransaction(root); err != nil {
+	if err := recoverTransaction(root, ConfigPath); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(filepath.Join(root, ".github/workflows/ci.yml"))
@@ -356,7 +356,7 @@ func TestRecoveryProtectsLaterChanges(t *testing.T) {
 	}
 	_ = putFile(root, transactionPath, file{Data: b, Mode: 0o600})
 	_ = putFile(root, ".github/workflows/ci.yml", workflow("a/root@manual"))
-	if err := recoverTransaction(root); err == nil {
+	if err := recoverTransaction(root, ConfigPath); err == nil {
 		t.Fatal("recovery overwrote a later edit")
 	}
 }

@@ -50,7 +50,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			report.finding("recovery", "warning", "run sanad recover --write to restore files from the interrupted transaction")
 			return report, nil
 		}
-		return report, recoverTransaction(root)
+		return report, recoverTransaction(root, opts.Config)
 	}
 	if _, err := os.Stat(filepath.Join(root, transactionPath)); err == nil {
 		report.finding("interrupted-transaction", "error", "run sanad recover --write before continuing")
