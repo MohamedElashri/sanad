@@ -75,3 +75,46 @@ func TestTransitiveLevelsUseAnyCompatibleInstalledBaseline(t *testing.T) {
 		}
 	}
 }
+
+func TestSiblingPoliciesApplyRegardlessOfOrderAndRepositoryCase(t *testing.T) {
+	for _, names := range [][]string{{"a/root/loose", "a/root/strict"}, {"a/root/strict", "a/root/loose"}} {
+		root := fixture(t, map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a")}, "")
+		f := workflow(names[0] + "@v1.0.0")
+		f.Data = append(f.Data, []byte("      - uses: "+names[1]+"@v1.0.0\n")...)
+		if err := putFile(root, ".github/workflows/ci.yml", f); err != nil {
+			t.Fatal(err)
+		}
+		if err := putFile(root, ConfigPath, file{Data: []byte("version=1\n[native]\nenabled=true\n[actions.\"A/Root/strict\"]\nlevel='patch'\n"), Mode: 0o644}); err != nil {
+			t.Fatal(err)
+		}
+		opts := options(root, &fakeBackend{t: t, definitions: map[string]lock.Action{"a/root@v1.0.1": action("v1.0.1", "b")}})
+		opts.Releases = fakeReleases{refs: []Release{{Ref: "v1.2.0"}, {Ref: "v1.0.1"}}}
+		r, err := Run(context.Background(), "plan", opts)
+		if err != nil || !r.Success || len(r.Decisions) != 1 || r.Decisions[0].To != "v1.0.1" {
+			t.Fatalf("sibling policy ignored: %+v %v", r, err)
+		}
+	}
+}
+
+func TestScopedUpdatesPreserveSubpathCase(t *testing.T) {
+	root := fixture(t, map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a")}, "")
+	f := workflow("a/root/Build@v1.0.0")
+	f.Data = append(f.Data, []byte("      - uses: a/root/build@v1.0.0\n")...)
+	if err := putFile(root, ".github/workflows/ci.yml", f); err != nil {
+		t.Fatal(err)
+	}
+	opts := options(root, &fakeBackend{t: t, definitions: map[string]lock.Action{"a/root@v1.1.0": action("v1.1.0", "b")}})
+	opts.Action, opts.To, opts.Write = "A/Root/Build", "v1.1.0", true
+	r, err := Run(context.Background(), "update", opts)
+	if err != nil || !r.Success {
+		t.Fatal(r, err)
+	}
+	files, err := readTree(root, ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(files[".github/workflows/ci.yml"].Data)
+	if !strings.Contains(got, "a/root/Build@v1.1.0") || !strings.Contains(got, "a/root/build@v1.0.0") {
+		t.Fatalf("wrong subpath updated: %s", got)
+	}
+}

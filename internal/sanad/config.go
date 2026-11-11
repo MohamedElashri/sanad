@@ -86,18 +86,39 @@ func loadConfig(root, name string) (Config, error) {
 	if err := validatePolicy(raw.Update); err != nil {
 		return c, err
 	}
+	policies := map[string]UpdatePolicy{}
 	for action, policy := range raw.Actions {
-		if len(strings.Split(action, "/")) < 2 || strings.ContainsAny(action, "@\n\r") {
+		parts := strings.Split(action, "/")
+		if len(parts) < 2 {
 			return c, fmt.Errorf("invalid action policy %q", action)
+		}
+		for _, part := range parts {
+			if !validSegment(part) {
+				return c, fmt.Errorf("invalid action policy %q", action)
+			}
 		}
 		if err := validatePolicy(policy); err != nil {
 			return c, fmt.Errorf("%s: %w", action, err)
 		}
+		key := canonicalActionName(action)
+		if _, exists := policies[key]; exists {
+			return c, fmt.Errorf("duplicate action policy %q", action)
+		}
+		policies[key] = policy
 	}
+	raw.Actions = policies
 	if _, err := duration(raw.Observation.MinimumAge); err != nil {
 		return c, err
 	}
 	return raw, nil
+}
+
+func canonicalActionName(name string) string {
+	parts := strings.SplitN(name, "/", 3)
+	for i := 0; i < len(parts) && i < 2; i++ {
+		parts[i] = strings.ToLower(parts[i])
+	}
+	return strings.Join(parts, "/")
 }
 
 func validatePolicy(p UpdatePolicy) error {
