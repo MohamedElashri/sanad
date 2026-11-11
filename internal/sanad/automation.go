@@ -39,7 +39,7 @@ jobs:
   update:
     uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@ACTION_REF
     secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
+      token: ${{ secrets.SANAD_TOKEN }}
 `
 	for name, content := range map[string]string{".github/workflows/sanad-check.yml": check, ".github/workflows/sanad-update.yml": update} {
 		// Never overwrite an independently maintained workflow.

@@ -36,7 +36,7 @@ masked; tenant tokens are not sent to the public release API.
 
 Generate scheduled PR workflows with `sanad init --automation --write`, including
 observation-only changes. PR checks need read permissions; the scheduled workflow needs contents
-and pull-request writes. The CLI itself does not commit, push, or open PRs.
+and pull-request writes. Configure `SANAD_TOKEN` with Contents, Workflows, and Pull requests write permissions; the built-in `GITHUB_TOKEN` cannot push workflow edits. The CLI itself does not commit, push, or open PRs.
 
 Development: `npm ci`, `npm test`, `npm run build`. `npm run test:integration`
 requires `SANAD_ACTION_BINARY` and `SANAD_BACKEND` pointing to built/official tools.

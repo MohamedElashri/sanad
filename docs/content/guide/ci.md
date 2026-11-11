@@ -53,6 +53,8 @@ Generated Action references use the release's full commit. Source builds require
 
 The generated updater runs on Mondays at 03:00 UTC and also supports manual dispatch. Review the generated schedule and permissions before committing it.
 
+Before enabling it, create a repository secret named `SANAD_TOKEN` containing a fine-grained personal access token with **Contents**, **Workflows**, and **Pull requests** write permissions. Alternatively, edit the caller to generate and pass a GitHub App installation token with those permissions. Limit either credential to the repository being updated.
+
 ## Scheduled update pull requests
 
 The updater calls Sanad's reusable update workflow. It maintains one PR containing eligible dependency updates or newly recorded observations. It stages only the files reported by Sanad and never enables automatic merging.
@@ -62,7 +64,7 @@ The updater calls Sanad's reusable update workflow. It maintains one PR containi
 | Pull-request check | `contents: read` | Verify the proposed dependency graph and policy. |
 | Scheduled updater | `contents: write`, `pull-requests: write` | Push the managed update branch and create or update a PR. |
 
-The repository must allow GitHub Actions to create pull requests. The default token may not trigger additional workflows when it creates a PR. Supply an appropriately scoped GitHub App or personal access token when those follow-up checks are required.
+The reusable updater requires its `token` secret and rejects the built-in `GITHUB_TOKEN`, which cannot push the workflow edits produced by version updates. The supplied App or personal access token also allows the resulting PR's checks to run automatically.
 
 ## Choose one updater
 
