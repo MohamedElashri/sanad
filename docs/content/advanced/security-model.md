@@ -56,6 +56,8 @@ Protect workflows, lockfiles, policy, and observations with appropriate review c
 
 Release archives include a checksum-verified official backend. The Action checks the GitHub release's immutability, validates the archive digest, and requires the CLI version to match its own release.
 
+Cache hits repeat the release lookup and archive digest check, then extract fresh executables into the runner's temporary directory. Cached executable files are never run directly. A modified cached archive fails verification; an older cache without an archive is downloaded again.
+
 Authentication is host-aware. Tenant credentials are not reused for public GitHub release discovery. Environment tokens must belong to the host you intend to access; they take precedence over stored GitHub CLI credentials.
 
 ## Repository writes and recovery
