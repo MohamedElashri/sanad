@@ -50,7 +50,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			report.finding("recovery", "warning", "run sanad recover --write to restore files from the interrupted transaction")
 			return report, nil
 		}
-		return report, recoverTransaction(root)
+		return report, recoverTransaction(root, opts.Config)
 	}
 	if _, err := os.Stat(filepath.Join(root, transactionPath)); err == nil {
 		report.finding("interrupted-transaction", "error", "run sanad recover --write before continuing")
@@ -187,14 +187,19 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
-		if opts.Offline && (opts.Base != "" || minimum > 0) {
+		cooldown, e := releaseCooldown(root)
+		if e != nil {
+			return report, e
+		}
+		policyRequired := minimum > 0 || cooldown > 0
+		if opts.Offline && (opts.Base != "" || policyRequired) {
 			report.finding("offline-policy", "error", "offline coverage cannot enforce adoption policy; run an online check with --base")
 			return report, nil
 		}
 		if opts.Offline {
 			report.finding("offline-only", "warning", "coverage checked locally; source identity and commit reachability were not verified")
 		}
-		if !opts.Offline && (opts.Base != "" || minimum > 0) {
+		if !opts.Offline && (opts.Base != "" || policyRequired) {
 			if e := checkBase(ctx, opts, input, old, host, &report); e != nil {
 				return report, e
 			}

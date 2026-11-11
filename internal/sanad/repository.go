@@ -350,14 +350,14 @@ func applyTree(root, config string, before, after tree) error {
 	for _, name := range paths {
 		f, ok := after[name]
 		if err := atomicFile(root, name, f, ok); err != nil {
-			restoreErr := recoverTransaction(root)
+			restoreErr := recoverTransaction(root, config)
 			return errors.Join(err, restoreErr)
 		}
 	}
 	return os.Remove(path)
 }
 
-func recoverTransaction(root string) error {
+func recoverTransaction(root, config string) error {
 	path, err := safePath(root, transactionPath)
 	if err != nil {
 		return err
@@ -372,6 +372,9 @@ func recoverTransaction(root string) error {
 	var j journal
 	if err := json.Unmarshal(b, &j); err != nil || len(j.Paths) == 0 {
 		return fmt.Errorf("invalid recovery record; inspect %s manually", transactionPath)
+	}
+	if err := validateJournal(root, config, j); err != nil {
+		return err
 	}
 	// Check all files before restoring any, so recovery never erases later edits.
 	for _, name := range j.Paths {
@@ -397,4 +400,34 @@ func recoverTransaction(root string) error {
 		}
 	}
 	return os.Remove(path)
+}
+
+func validateJournal(root, config string, j journal) error {
+	for _, files := range []tree{j.Before, j.After} {
+		for name, f := range files {
+			if _, err := safePath(root, name); err != nil {
+				return err
+			}
+			for _, part := range strings.Split(name, "/") {
+				if strings.EqualFold(part, ".git") {
+					return fmt.Errorf("recovery cannot modify Git metadata: %s", name)
+				}
+			}
+			if !relevant(name, config) || name == transactionPath || f.Mode & ^fs.FileMode(0o777) != 0 {
+				return fmt.Errorf("invalid managed file in recovery record: %s", name)
+			}
+		}
+	}
+	want := changedFiles(j.Before, j.After)
+	got := append([]string(nil), j.Paths...)
+	sort.Strings(got)
+	if len(want) != len(got) {
+		return fmt.Errorf("recovery paths do not match recorded changes")
+	}
+	for i := range want {
+		if want[i] != got[i] {
+			return fmt.Errorf("recovery paths do not match recorded changes")
+		}
+	}
+	return nil
 }

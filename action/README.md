@@ -15,7 +15,7 @@ check to your pull-request workflow:
 
 Run `sanad sync --write` and commit the updated lockfile after adding the workflow.
 You can also pin the Action to the release's full commit. The trusted `base` and
-full checkout history are required when enforcing observation policy.
+full checkout history are required when enforcing observation or release-cooldown policy.
 
 | Input | Default | Purpose |
 | --- | --- | --- |
