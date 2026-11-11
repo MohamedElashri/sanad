@@ -29,7 +29,7 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
 ```
 
-`fetch-depth: 0` makes the trusted base commit available locally. `base` is required when enforcing first-seen policy and also lets Sanad compare changes with the existing baseline.
+`fetch-depth: 0` makes the trusted base commit available locally. `base` is required when enforcing first-seen or release-cooldown policy and also lets Sanad compare changes with the existing baseline.
 
 Run the following locally and commit both the workflow and the resulting lockfile:
 
