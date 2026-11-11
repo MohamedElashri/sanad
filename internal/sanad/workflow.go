@@ -280,3 +280,41 @@ func scalarStart(chars []rune, index int) int {
 	}
 	return index
 }
+
+func legacyCommentFile(files tree) (string, error) {
+	active, err := activeMetadata(files)
+	if err != nil {
+		return "", err
+	}
+	names := []string{}
+	for name := range active {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var doc yaml.Node
+		if err := yaml.Unmarshal(files[name].Data, &doc); err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		var hasLegacy func(*yaml.Node) bool
+		hasLegacy = func(n *yaml.Node) bool {
+			for _, comment := range []string{n.HeadComment, n.LineComment, n.FootComment} {
+				for _, line := range strings.Split(comment, "\n") {
+					if strings.HasPrefix(strings.TrimSpace(line), "# sanad:") {
+						return true
+					}
+				}
+			}
+			for _, child := range n.Content {
+				if hasLegacy(child) {
+					return true
+				}
+			}
+			return false
+		}
+		if hasLegacy(&doc) {
+			return name, nil
+		}
+	}
+	return "", nil
+}

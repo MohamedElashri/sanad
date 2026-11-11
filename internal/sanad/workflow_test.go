@@ -32,3 +32,19 @@ func TestAliasedLocalActionIsReachable(t *testing.T) {
 		t.Fatalf("local alias lost: %+v %v", refs, err)
 	}
 }
+
+func TestLegacyDetectionUsesActiveYAMLComments(t *testing.T) {
+	files := tree{
+		".github/workflows/ci.yml": {Data: []byte("name: literal\non: push\njobs:\n  test:\n    steps:\n      - run: \"echo '# sanad:'\"\n"), Mode: 0o644},
+		"unused/action.yml":        {Data: []byte("# sanad: old fixture\nruns:\n  using: composite\n  steps: []\n"), Mode: 0o644},
+		ConfigPath:                 {Data: []byte("# sanad: configuration note\nversion=1\n"), Mode: 0o644},
+	}
+	if got, err := legacyCommentFile(files); err != nil || got != "" {
+		t.Fatalf("literal or inactive comment treated as legacy: %q %v", got, err)
+	}
+	f := workflow("a/root@v1.0.0 # sanad: old pin")
+	files[".github/workflows/ci.yml"] = f
+	if got, err := legacyCommentFile(files); err != nil || got != ".github/workflows/ci.yml" {
+		t.Fatalf("active legacy comment missed: %q %v", got, err)
+	}
+}
