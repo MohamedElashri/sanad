@@ -132,7 +132,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			}
 			sort.Strings(keys)
 			for _, key := range keys {
-				parts := strings.Split(key, "|")
+				parts, _ := observationParts(key, false)
 				installed := false
 				for _, d := range old {
 					if observationKey(d) == key {
