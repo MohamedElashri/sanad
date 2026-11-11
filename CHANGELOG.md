@@ -2,6 +2,32 @@
 
 All notable changes to Sanad are documented here.
 
+## 1.0.3 - 2026-11-11
+
+### Security
+
+- Restrict transaction recovery to managed files and reject Git metadata paths. Serialize writes and recovery with an operating-system lock held through snapshot checks and file updates.
+- Enforce configured release cooldowns during verification and include the locked commit's timestamp when assessing release age.
+- Verify cached Action release archives against immutable release metadata and extract fresh executables before running them.
+
+### Fixed
+
+- Enforce transitive version constraints and update levels, including repositories with multiple installed versions of the same dependency.
+- Apply every selected sub-action policy consistently, normalize repository-name casing, and preserve case-sensitive sub-action selection.
+- Limit automatic update targets to complete stable versions and traverse shared dependency nodes in both scope graphs.
+- Support YAML anchors and aliases while preserving workflow formatting, and collect reachable local actions regardless of their directory names.
+- Encode observation identities without delimiter ambiguity and migrate existing history without resetting its maturity.
+- Detect legacy directives only in comments in active workflow and action metadata.
+- Require dedicated credentials with workflow-write access for generated update automation.
+- Synchronize the documentation version badge and update terminal dependencies.
+
+### Upgrade notes
+
+- Online checks with a nonzero release cooldown require a trusted `--base`; offline checks cannot enforce waiting periods.
+- Generated update workflows expect a `SANAD_TOKEN` secret with Contents, Workflows, and Pull requests write permissions, or an equivalent GitHub App token. The built-in `GITHUB_TOKEN` is rejected for updates.
+- Observation state version 1 remains readable and is written as version 2 on the next state change. Upgrade the CLI and Action together when observation history is shared.
+- Release age does not prove when a tag last moved, and commit timestamps can be backdated. Use first-seen policy when that distinction matters.
+
 ## 1.0.2 - 2026-11-07
 
 ### Fixed

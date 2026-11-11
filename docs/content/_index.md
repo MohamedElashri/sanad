@@ -22,7 +22,7 @@ sanad init --confirm-native
 After checking out your repository with `fetch-depth: 0`, add this step to a pull-request workflow:
 
 ```yaml
-- uses: MohamedElashri/sanad@8c3467535793d9b31edbb7e7f49d35ef88e2a2d5 # v1.0.2
+- uses: MohamedElashri/sanad@v1.0.3
   with:
     mode: check
     base: ${{ github.event.pull_request.base.sha }}

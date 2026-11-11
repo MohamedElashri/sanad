@@ -1,10 +1,24 @@
 +++
 title = "Release notes"
-description = "Sanad 1.0.2 · November 7, 2026"
+description = "Sanad 1.0.3 · November 11, 2026"
 template = "page"
 +++
 
 Sanad 1.0 manages GitHub's native Actions lockfile. GitHub enforces the pins at runtime; Sanad adds onboarding, controlled updates, policy, and review reports.
+
+## New in 1.0.3
+
+This patch hardens recovery, policy enforcement, and Action installation. Recovery rejects unmanaged paths, and writes and recovery share an operating-system lock. Verification enforces release cooldowns, transitive updates obey version policy, and cached release archives are verified before fresh executables are extracted.
+
+Workflow handling now supports YAML anchors and aliases, discovers reachable local actions in directories such as `vendor` and `dist`, and preserves case-sensitive sub-action selection. Automatic updates select only complete stable versions. Observation identities safely support Git refs containing delimiters, and existing history keeps its maturity when migrated.
+
+When upgrading:
+
+- Supply a trusted `--base` for online checks when either first-seen or release-cooldown policy is enabled.
+- Configure `SANAD_TOKEN` for generated scheduled updates with Contents, Workflows, and Pull requests write permissions, or pass an equivalent GitHub App token. The built-in `GITHUB_TOKEN` cannot push workflow edits.
+- Upgrade the CLI and Action together when they share observation history. Version 1 state remains readable; subsequent state changes write version 2.
+
+Release cooldowns use the later of release publication and the locked commit's committer timestamp. They do not establish when a tag last moved; use first-seen policy for that waiting period.
 
 ## New in 1.0.2
 
@@ -30,4 +44,4 @@ The commands, configuration, inline comments, and metadata from 0.x are removed.
 
 The native producer rejects actions with generated local sub-actions, including `pypa/gh-action-pypi-publish@v1.14.2`. See [Security and design](../advanced/security-model/) for the supported boundaries.
 
-[Download v1.0.2](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.2) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
+[Download v1.0.3](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.3) · [Full changelog](https://github.com/MohamedElashri/sanad/blob/main/CHANGELOG.md)
