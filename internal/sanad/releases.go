@@ -129,31 +129,30 @@ func (a *githubAPI) Timestamp(ctx context.Context, d Dependency) (time.Time, err
 	}
 	nwo, ref, _ := strings.Cut(d.Key, "@")
 	var release Release
-	code, err := a.get(ctx, d.Host, "/repos/"+nwo+"/releases/tags/"+url.PathEscape(ref), &release)
+	_, err := a.get(ctx, d.Host, "/repos/"+nwo+"/releases/tags/"+url.PathEscape(ref), &release)
 	if err != nil {
 		return time.Time{}, err
 	}
 	at := release.Published
-	if code == 404 || at.IsZero() {
-		_, sha, _ := strings.Cut(d.Commit, "-")
-		var commit struct {
-			Commit struct {
-				Committer struct {
-					Date time.Time `json:"date"`
-				} `json:"committer"`
-			} `json:"commit"`
-		}
-		code, err = a.get(ctx, d.Host, "/repos/"+nwo+"/commits/"+url.PathEscape(sha), &commit)
-		if err != nil {
-			return at, err
-		}
-		if code == 404 {
-			return at, fmt.Errorf("timestamp unavailable for %s", d.Key)
-		}
-		at = commit.Commit.Committer.Date
+	_, sha, _ := strings.Cut(d.Commit, "-")
+	var commit struct {
+		Commit struct {
+			Committer struct {
+				Date time.Time `json:"date"`
+			} `json:"committer"`
+		} `json:"commit"`
 	}
-	if at.IsZero() {
+	code, err := a.get(ctx, d.Host, "/repos/"+nwo+"/commits/"+url.PathEscape(sha), &commit)
+	if err != nil {
+		return at, err
+	}
+	if code == 404 || commit.Commit.Committer.Date.IsZero() {
 		return at, fmt.Errorf("timestamp unavailable for %s", d.Key)
+	}
+	// A release can outlive its original tag target. An old publication date
+	// must not age a newer commit that the tag now resolves to.
+	if commit.Commit.Committer.Date.After(at) {
+		at = commit.Commit.Committer.Date
 	}
 	a.dates[key] = at
 	return at, nil

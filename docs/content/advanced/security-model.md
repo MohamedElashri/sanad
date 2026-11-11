@@ -48,6 +48,8 @@ Selected version updates cannot move unrelated pins. Broad mutable-ref refresh i
 
 First-seen state is keyed by host, numeric source identity, ref, and commit. A retargeted ref starts a new clock. All newly changed transitive commits must also mature.
 
+Release cooldowns use the later of release publication and the locked commit's committer timestamp. Commit timestamps can be backdated, and release publication does not date tag retargeting. Only first-seen policy establishes a waiting period from Sanad's observation of a particular ref and commit.
+
 CI reads observation history from a trusted `--base` revision. Proposed changes cannot establish their own maturity by adding old-looking observations to the same PR. Administrators can still edit policy and history: this is reviewed Git state, not a trusted timestamp service.
 
 Protect workflows, lockfiles, policy, and observations with appropriate review controls. See [Waiting periods](../../guide/policy/) for the operational workflow.
