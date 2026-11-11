@@ -44,6 +44,7 @@ By default, Sanad considers newer stable releases within the current major versi
 | `pending` | A release-age or first-seen waiting period has not elapsed. | Record observations if needed, then check the eligible date. |
 | `unchanged` | No matching newer release is available, or the requested ref is already tracked. | Keep the current lockfile. |
 | `frozen` | The current ref is not a complete stable version. | Choose an explicit target if you want to change it. |
+| `blocked` | A changed transitive version violates its update level or constraint. | Review the policy or select another parent version. |
 
 The review includes transitive changes and affected workflows. A version change can introduce more than one new commit.
 

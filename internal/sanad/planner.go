@@ -31,6 +31,10 @@ func targets(releases []Release, current string, p UpdatePolicy, explicit string
 	list := []candidate{}
 	seen := map[string]bool{}
 	for _, r := range releases {
+		parsed, full := lock.ParseSemVer(r.Ref)
+		if !full || !parsed.IsFull() || !parsed.IsStable() {
+			continue
+		}
 		v, err := semver.NewVersion(r.Ref)
 		if err != nil || r.Draft || r.Prerelease || v.Prerelease() != "" || !v.GreaterThan(from) || seen[r.Ref] {
 			continue
@@ -100,11 +104,73 @@ func closure(g graph, key string, set map[string]bool) {
 
 func validateScope(before, after graph, oldKey, newKey string) error {
 	allowed := map[string]bool{}
+	next := map[string]bool{}
 	closure(before, oldKey, allowed)
-	closure(after, newKey, allowed)
+	closure(after, newKey, next)
+	for key := range next {
+		allowed[key] = true
+	}
 	for _, change := range graphDiff(before, after) {
 		if !allowed[change.Key] {
 			return fmt.Errorf("native producer changed unrelated dependency %s; update refused", change.Key)
+		}
+	}
+	return nil
+}
+
+func effectivePolicy(cfg Config, opts Options, name, nwo string) UpdatePolicy {
+	if opts.Level != "" || opts.Constraint != "" {
+		return UpdatePolicy{Level: opts.Level, Constraint: opts.Constraint}
+	}
+	for _, key := range []string{name, nwo} {
+		if p, ok := cfg.Actions[canonicalActionName(key)]; ok && (p.Level != "" || p.Constraint != "") {
+			return p
+		}
+	}
+	return cfg.Update
+}
+
+func matchesAction(selected string, ref reference) bool {
+	return selected == "" || canonicalActionName(selected) == canonicalActionName(ref.Name) || canonicalActionName(selected) == canonicalActionName(ref.NWO)
+}
+
+func validateTransitivePolicies(before, after graph, selected string, cfg Config, opts Options) error {
+	for _, c := range graphDiff(before, after) {
+		if c.After == nil || c.Key == selected || c.Before != nil && c.Before.Commit == c.After.Commit {
+			continue
+		}
+		nwo, ref, _ := strings.Cut(c.Key, "@")
+		policy := effectivePolicy(cfg, opts, nwo, nwo)
+		version, err := semver.NewVersion(ref)
+		if policy.Constraint != "" {
+			constraint, _ := semver.NewConstraint(policy.Constraint)
+			if err != nil || !constraint.Check(version) {
+				return fmt.Errorf("%s violates constraint %s", c.Key, policy.Constraint)
+			}
+		}
+		if err != nil || policy.Level == "" || policy.Level == "major" {
+			continue
+		}
+		previous := []string{}
+		allowed := false
+		for key, old := range before {
+			oldNWO, oldRef, _ := strings.Cut(key, "@")
+			if oldNWO != nwo || old.Host != c.After.Host {
+				continue
+			}
+			v, err := semver.NewVersion(oldRef)
+			if err != nil {
+				continue
+			}
+			previous = append(previous, oldRef)
+			if version.Major() == v.Major() && (policy.Level != "patch" || version.Minor() == v.Minor()) {
+				allowed = true
+				break
+			}
+		}
+		if len(previous) > 0 && !allowed {
+			sort.Strings(previous)
+			return fmt.Errorf("%s exceeds %s update policy from %s", c.Key, policy.Level, strings.Join(previous, ", "))
 		}
 	}
 	return nil
@@ -187,7 +253,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 		if _, exists := initial[key]; !exists {
 			continue
 		}
-		if opts.Action != "" && !strings.EqualFold(opts.Action, ref.Name) && !strings.EqualFold(opts.Action, ref.NWO) {
+		if !matchesAction(opts.Action, ref) {
 			continue
 		}
 		if _, ok := groups[key]; !ok {
@@ -203,17 +269,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 	for _, key := range keys {
 		group := groups[key]
 		ref := group[0]
-		effective := policy
-		if opts.Level == "" && opts.Constraint == "" {
-			if override, ok := cfg.Actions[ref.Name]; ok {
-				effective = override
-			} else if override, ok := cfg.Actions[ref.NWO]; ok {
-				effective = override
-			}
-		}
-		if effective.Level == "" && effective.Constraint == "" {
-			effective = cfg.Update
-		}
+		effective := effectivePolicy(cfg, opts, ref.Name, ref.NWO)
 		var releases []Release
 		if opts.To == "" {
 			parsed, versionRef := lock.ParseSemVer(ref.Ref)
@@ -227,6 +283,19 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			}
 		}
 		candidates := targets(releases, ref.Ref, effective, opts.To)
+		for _, sibling := range group[1:] {
+			allowed := map[string]bool{}
+			for _, target := range targets(releases, sibling.Ref, effectivePolicy(cfg, opts, sibling.Name, sibling.NWO), opts.To) {
+				allowed[target] = true
+			}
+			filtered := []string{}
+			for _, target := range candidates {
+				if allowed[target] {
+					filtered = append(filtered, target)
+				}
+			}
+			candidates = filtered
+		}
 		if len(candidates) == 0 {
 			r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, Status: "unchanged", Reason: "no newer stable release matches policy"})
 			continue
@@ -252,7 +321,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			}
 			selected := []reference{}
 			for _, candidate := range currentRefs {
-				if strings.EqualFold(candidate.NWO, ref.NWO) && candidate.Ref == ref.Ref && (opts.Action == "" || strings.EqualFold(opts.Action, candidate.Name) || strings.EqualFold(opts.Action, candidate.NWO)) {
+				if strings.EqualFold(candidate.NWO, ref.NWO) && candidate.Ref == ref.Ref && matchesAction(opts.Action, candidate) {
 					selected = append(selected, candidate)
 				}
 			}
@@ -287,6 +356,10 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			newKey := strings.ToLower(ref.NWO) + "@" + target
 			if err := validateScope(before, after, key, newKey); err != nil {
 				return err
+			}
+			if err := validateTransitivePolicies(before, after, newKey, cfg, opts); err != nil {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "blocked", Reason: err.Error()})
+				continue
 			}
 			ready, until, err := assess(before, after, state, observed, minimum, opts.Now)
 			if err != nil {

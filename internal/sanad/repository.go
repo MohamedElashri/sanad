@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
@@ -146,49 +147,62 @@ func relevant(name, config string) bool {
 func readTree(root, config string) (tree, error) {
 	out := tree{}
 	var total int64
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	load := func(name string) (bool, error) {
+		if _, ok := out[name]; ok {
+			return true, nil
 		}
-		if path == root {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		name := filepath.ToSlash(rel)
-		if entry.IsDir() {
-			switch entry.Name() {
-			case ".git", "node_modules", "vendor", ".gocache", ".gomodcache", ".gopath", ".cache", "bin", "dist":
-				return filepath.SkipDir
+		for _, part := range strings.Split(name, "/") {
+			if strings.EqualFold(part, ".git") {
+				return false, fmt.Errorf("git metadata cannot be managed: %s", name)
 			}
-			return nil
 		}
-		if !relevant(name, config) {
-			return nil
-		}
-		if _, err := safePath(root, name); err != nil {
-			return err
-		}
-		info, err := entry.Info()
+		path, err := safePath(root, name)
 		if err != nil {
-			return err
+			return false, err
+		}
+		info, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
 		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("managed file %s is not regular", name)
+			return false, fmt.Errorf("managed file %s is not regular", name)
 		}
 		total += info.Size()
 		if total > 64<<20 {
-			return fmt.Errorf("workflow and action metadata exceed 64 MiB")
+			return false, fmt.Errorf("workflow and action metadata exceed 64 MiB")
 		}
 		b, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return false, err
 		}
 		out[name] = file{Data: b, Mode: info.Mode().Perm()}
-		return nil
-	})
+		return true, nil
+	}
+	for _, name := range []string{config, StatePath, ".github/workflows/actions.lock", ".github/dependabot.yml", ".github/dependabot.yaml"} {
+		if _, err := load(name); err != nil {
+			return nil, err
+		}
+	}
+	dir, err := safePath(root, ".github/workflows")
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !(strings.HasSuffix(entry.Name(), ".yml") || strings.HasSuffix(entry.Name(), ".yaml")) {
+			continue
+		}
+		if _, err := load(".github/workflows/" + entry.Name()); err != nil {
+			return nil, err
+		}
+	}
+	_, err = collectMetadata(out, load)
 	return out, err
 }
 
@@ -316,13 +330,6 @@ func applyTree(root, config string, before, after tree) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	current, err := readTree(root, config)
-	if err != nil {
-		return err
-	}
-	if len(changedFiles(before, current)) != 0 {
-		return fmt.Errorf("repository changed during planning; rerun the command")
-	}
 	path, err := safePath(root, transactionPath)
 	if err != nil {
 		return err
@@ -330,9 +337,22 @@ func applyTree(root, config string, before, after tree) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	record, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	record, err := openJournal(path, true)
 	if err != nil {
 		return fmt.Errorf("another write or interrupted transaction exists; run sanad recover --write: %w", err)
+	}
+	defer record.Close()
+	if err := lockJournal(record); err != nil {
+		_ = os.Remove(path)
+		return fmt.Errorf("transaction is active: %w", err)
+	}
+	current, err := readTree(root, config)
+	if err != nil || len(changedFiles(before, current)) != 0 {
+		_ = os.Remove(path)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("repository changed during planning; rerun the command")
 	}
 	j := journal{Before: before, After: after, Paths: paths}
 	data, err := json.Marshal(j)
@@ -342,7 +362,6 @@ func applyTree(root, config string, before, after tree) error {
 	if err == nil {
 		err = record.Sync()
 	}
-	err = errors.Join(err, record.Close())
 	if err != nil {
 		_ = os.Remove(path)
 		return err
@@ -350,7 +369,7 @@ func applyTree(root, config string, before, after tree) error {
 	for _, name := range paths {
 		f, ok := after[name]
 		if err := atomicFile(root, name, f, ok); err != nil {
-			restoreErr := recoverTransaction(root, config)
+			restoreErr := recoverRecord(root, config, record)
 			return errors.Join(err, restoreErr)
 		}
 	}
@@ -362,10 +381,25 @@ func recoverTransaction(root, config string) error {
 	if err != nil {
 		return err
 	}
-	b, err := os.ReadFile(path)
+	record, err := openJournal(path, false)
 	if os.IsNotExist(err) {
 		return nil
 	}
+	if err != nil {
+		return err
+	}
+	defer record.Close()
+	if err := lockJournal(record); err != nil {
+		return fmt.Errorf("transaction is active; wait for the writer to finish: %w", err)
+	}
+	return recoverRecord(root, config, record)
+}
+
+func recoverRecord(root, config string, record *os.File) error {
+	if _, err := record.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	b, err := io.ReadAll(record)
 	if err != nil {
 		return err
 	}
@@ -399,7 +433,7 @@ func recoverTransaction(root, config string) error {
 			return err
 		}
 	}
-	return os.Remove(path)
+	return os.Remove(record.Name())
 }
 
 func validateJournal(root, config string, j journal) error {

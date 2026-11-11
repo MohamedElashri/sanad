@@ -78,11 +78,13 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if err != nil {
 		return report, err
 	}
-	for _, f := range input {
-		if strings.Contains(string(f.Data), "# sanad:") {
-			report.finding("legacy-comments", "error", "remove old # sanad: comments and set desired readable uses refs before native onboarding")
-			return report, nil
-		}
+	legacy, err := legacyCommentFile(input)
+	if err != nil {
+		return report, err
+	}
+	if legacy != "" {
+		report.Findings = append(report.Findings, Finding{Code: "legacy-comments", Severity: "error", File: legacy, Message: "remove old # sanad: comments and set desired readable uses refs before native onboarding"})
+		return report, nil
 	}
 	host, repo, identityErr := repository(ctx, root, opts.Repo)
 	if identityErr != nil {
@@ -132,7 +134,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			}
 			sort.Strings(keys)
 			for _, key := range keys {
-				parts := strings.Split(key, "|")
+				parts, _ := observationParts(key, false)
 				installed := false
 				for _, d := range old {
 					if observationKey(d) == key {

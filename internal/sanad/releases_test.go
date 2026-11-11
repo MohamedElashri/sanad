@@ -76,3 +76,13 @@ func TestPartialRefsDoNotSelectOlderReleaseCode(t *testing.T) {
 		t.Fatalf("partial ref was treated as an installed full version: %+v %v", r, err)
 	}
 }
+
+func TestAutomaticTargetsRequireFullStableVersions(t *testing.T) {
+	got := targets([]Release{{Ref: "v1.2"}, {Ref: "v1.2.0"}, {Ref: "v2"}, {Ref: "v2.0.0-beta.1"}}, "v1.0.0", UpdatePolicy{Level: "major"}, "")
+	if len(got) != 1 || got[0] != "v1.2.0" {
+		t.Fatalf("unexpected targets: %v", got)
+	}
+	if got := targets(nil, "v1.0.0", UpdatePolicy{Level: "minor"}, "v2"); len(got) != 1 || got[0] != "v2" {
+		t.Fatal("explicit partial ref should remain available", got)
+	}
+}

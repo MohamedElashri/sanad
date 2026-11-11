@@ -37,3 +37,69 @@ func TestRecoveryRequiresExactChangedPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestReadTreeFollowsLocalActionsInAnyDirectory(t *testing.T) {
+	for _, dir := range []string{"vendor", "dist", "bin", "node_modules", ".cache"} {
+		t.Run(dir, func(t *testing.T) {
+			root := t.TempDir()
+			files := tree{
+				".github/workflows/ci.yml": workflow("$/" + dir + "/local"),
+				dir + "/local/action.yml":  {Data: []byte("runs:\n  using: composite\n  steps:\n    - uses: $/nested\n"), Mode: 0o644},
+				"nested/action.yaml":       {Data: []byte("runs:\n  using: composite\n  steps: []\n"), Mode: 0o644},
+				"unused/action.yml":        {Data: []byte("invalid: ["), Mode: 0o644},
+			}
+			for name, f := range files {
+				if err := putFile(root, name, f); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := readTree(root, ConfigPath)
+			if err != nil || len(got) != 3 {
+				t.Fatalf("reachable metadata lost: %v %v", got, err)
+			}
+			for _, name := range []string{dir + "/local/action.yml", "nested/action.yaml"} {
+				if _, ok := got[name]; !ok {
+					t.Fatal("missing local metadata", name)
+				}
+			}
+		})
+	}
+}
+
+func TestRecoveryRefusesActiveWriter(t *testing.T) {
+	root := t.TempDir()
+	name := ".github/workflows/ci.yml"
+	before := tree{name: workflow("a/root@v1")}
+	after := tree{name: workflow("a/root@v2")}
+	if err := putFile(root, name, after[name]); err != nil {
+		t.Fatal(err)
+	}
+	path, _ := safePath(root, transactionPath)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	record, err := openJournal(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer record.Close()
+	if err := lockJournal(record); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(journal{Before: before, After: after, Paths: []string{name}})
+	if _, err := record.Write(b); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverTransaction(root, ConfigPath); err == nil {
+		t.Fatal("recovery overlapped an active writer")
+	}
+	if err := applyTree(root, ConfigPath, after, before); err == nil {
+		t.Fatal("second writer overlapped the transaction")
+	}
+	if err := record.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverTransaction(root, ConfigPath); err != nil {
+		t.Fatal("closed transaction could not recover", err)
+	}
+}
