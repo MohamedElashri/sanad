@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	lock "github.com/github/actions-lockfile/go/pkg/lockfile"
 	"gopkg.in/yaml.v3"
@@ -16,6 +17,7 @@ type reference struct {
 }
 
 func mapping(n *yaml.Node, key string) *yaml.Node {
+	n = unalias(n)
 	if n == nil || n.Kind != yaml.MappingNode {
 		return nil
 	}
@@ -27,8 +29,21 @@ func mapping(n *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
+func unalias(n *yaml.Node) *yaml.Node {
+	seen := map[*yaml.Node]bool{}
+	for n != nil && n.Kind == yaml.AliasNode {
+		if seen[n] {
+			return nil
+		}
+		seen[n] = true
+		n = n.Alias
+	}
+	return n
+}
+
 func references(files tree) ([]reference, error) {
 	out := []reference{}
+	seen := map[reference]bool{}
 	active, err := activeMetadata(files)
 	if err != nil {
 		return nil, err
@@ -50,6 +65,7 @@ func references(files tree) ([]reference, error) {
 		}
 		root := doc.Content[0]
 		add := func(n *yaml.Node, reusable bool) error {
+			n = unalias(n)
 			if n == nil {
 				return nil
 			}
@@ -68,10 +84,14 @@ func references(files tree) ([]reference, error) {
 			} else {
 				return nil
 			}
-			out = append(out, ref)
+			if !seen[ref] {
+				seen[ref] = true
+				out = append(out, ref)
+			}
 			return nil
 		}
 		steps := func(n *yaml.Node) error {
+			n = unalias(n)
 			if n == nil {
 				return nil
 			}
@@ -86,7 +106,7 @@ func references(files tree) ([]reference, error) {
 			return nil
 		}
 		if workflow {
-			jobs := mapping(root, "jobs")
+			jobs := unalias(mapping(root, "jobs"))
 			if jobs != nil {
 				for i := 1; i < len(jobs.Content); i += 2 {
 					job := jobs.Content[i]
@@ -106,6 +126,9 @@ func references(files tree) ([]reference, error) {
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].File == out[j].File {
+			if out[i].Line == out[j].Line {
+				return out[i].Column < out[j].Column
+			}
 			return out[i].Line < out[j].Line
 		}
 		return out[i].File < out[j].File
@@ -139,13 +162,20 @@ func activeMetadata(files tree) (map[string]bool, error) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		var walk func(*yaml.Node)
+		visited := map[*yaml.Node]bool{}
 		walk = func(n *yaml.Node) {
+			n = unalias(n)
+			if n == nil || visited[n] {
+				return
+			}
+			visited[n] = true
 			if n.Kind == yaml.MappingNode {
 				for i := 0; i+1 < len(n.Content); i += 2 {
-					if n.Content[i].Value != "uses" || n.Content[i+1].Kind != yaml.ScalarNode {
+					valueNode := unalias(n.Content[i+1])
+					if n.Content[i].Value != "uses" || valueNode == nil || valueNode.Kind != yaml.ScalarNode {
 						continue
 					}
-					value := n.Content[i+1].Value
+					value := valueNode.Value
 					var path string
 					if strings.HasPrefix(value, "$/") {
 						path = strings.TrimPrefix(value, "$/")
@@ -194,9 +224,12 @@ func rewriteRefs(files tree, refs []reference, target string) error {
 		if r.Line <= 0 || r.Line > len(lines) {
 			return fmt.Errorf("invalid source location")
 		}
-		line := lines[r.Line-1]
-		chars := []rune(line)
+		chars := []rune(string(f.Data))
 		index := r.Column - 1
+		for _, line := range lines[:r.Line-1] {
+			index += len([]rune(line)) + 1
+		}
+		index = scalarStart(chars, index)
 		if index < 0 || index >= len(chars) {
 			return fmt.Errorf("invalid source column")
 		}
@@ -209,9 +242,25 @@ func rewriteRefs(files tree, refs []reference, target string) error {
 		if !strings.HasPrefix(tail, old) {
 			return fmt.Errorf("%s:%d: cannot preserve uses formatting", r.File, r.Line)
 		}
-		lines[r.Line-1] = string(chars[:index]) + r.Name + "@" + target + strings.TrimPrefix(tail, old)
-		f.Data = []byte(strings.Join(lines, "\n"))
+		f.Data = []byte(string(chars[:index]) + r.Name + "@" + target + strings.TrimPrefix(tail, old))
 		files[r.File] = f
 	}
 	return nil
+}
+
+// YAML source positions include node properties such as &anchors and !!tags.
+func scalarStart(chars []rune, index int) int {
+	for index >= 0 && index < len(chars) {
+		if unicode.IsSpace(chars[index]) {
+			index++
+			continue
+		}
+		if chars[index] != '&' && chars[index] != '!' {
+			break
+		}
+		for index < len(chars) && !unicode.IsSpace(chars[index]) {
+			index++
+		}
+	}
+	return index
 }
