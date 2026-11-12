@@ -108,6 +108,9 @@ func (b *fakeBackend) Run(ctx context.Context, root, host, repo string, args ...
 		return r, err
 	}
 	for _, ref := range refs {
+		if ref.Workflow {
+			continue
+		}
 		if err := add(strings.ToLower(ref.NWO) + "@" + ref.Ref); err != nil {
 			return r, err
 		}

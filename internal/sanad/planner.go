@@ -249,6 +249,9 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 	groups := map[string][]reference{}
 	keys := []string{}
 	for _, ref := range refs {
+		if ref.Workflow {
+			continue
+		}
 		key := strings.ToLower(ref.NWO) + "@" + ref.Ref
 		if _, exists := initial[key]; !exists {
 			continue
@@ -261,7 +264,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 		}
 		groups[key] = append(groups[key], ref)
 	}
-	if opts.Action != "" && len(keys) == 0 {
+	if opts.Action != "" && len(keys) == 0 && !hasWorkflowSelection(refs, opts.Action) {
 		return fmt.Errorf("no locked action matches %s", opts.Action)
 	}
 	sort.Strings(keys)

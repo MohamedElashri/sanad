@@ -128,6 +128,10 @@ func (a *githubAPI) Timestamp(ctx context.Context, d Dependency) (time.Time, err
 		return at, nil
 	}
 	nwo, ref, _ := strings.Cut(d.Key, "@")
+	parts := strings.Split(nwo, "/")
+	if len(parts) > 2 {
+		nwo = strings.Join(parts[:2], "/")
+	}
 	var release Release
 	_, err := a.get(ctx, d.Host, "/repos/"+nwo+"/releases/tags/"+url.PathEscape(ref), &release)
 	if err != nil {

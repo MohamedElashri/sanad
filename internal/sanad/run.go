@@ -19,6 +19,7 @@ type Options struct {
 	Write, Offline, ConfirmNative, Automation bool
 	Action, To, Level, Constraint, ActionRef  string
 	Backend                                   Backend
+	Workflows                                 WorkflowSource
 	Releases                                  ReleaseSource
 	Now                                       time.Time
 }
@@ -102,7 +103,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, identityErr
 		}
 	}
-	old, err := loadGraph(input, host)
+	old, err := loadPolicyGraph(input, host)
 	if err != nil {
 		return report, err
 	}
@@ -180,6 +181,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	}
 	defer os.RemoveAll(work)
 	if command == "check" {
+		if e := reconcileWorkflows(ctx, input, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
 		args := []string{"--verify"}
 		report.Verification = "online"
 		if opts.Offline {
@@ -239,6 +246,18 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, err
 		}
 	}
+	if command == "init" || command == "sync" {
+		staged, e := readTree(work, opts.Config)
+		if e != nil {
+			return report, e
+		}
+		if e := reconcileWorkflows(ctx, staged, host, opts, false, &report); e != nil {
+			return report, e
+		}
+		if e := installTree(work, input, staged); e != nil {
+			return report, e
+		}
+	}
 	if command == "plan" || command == "update" {
 		if _, ok := input[lock.Path]; !ok {
 			return report, fmt.Errorf("run sanad init before planning updates")
@@ -252,7 +271,20 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if report.Blocked() {
 			return report, nil
 		}
+		staged, e := readTree(work, opts.Config)
+		if e != nil {
+			return report, e
+		}
+		if e := reconcileWorkflows(ctx, staged, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
 		if e := planUpdates(ctx, work, host, repo, cfg, opts, backend, &report); e != nil {
+			return report, e
+		}
+		if e := planWorkflows(ctx, work, host, cfg, opts, &report); e != nil {
 			return report, e
 		}
 	} else {
@@ -268,7 +300,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
-		next, e := loadGraph(candidate, host)
+		next, e := loadPolicyGraph(candidate, host)
 		if e != nil {
 			return report, e
 		}
@@ -341,7 +373,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if report.Blocked() {
 		return report, nil
 	}
-	finalGraph, e := loadGraph(final, host)
+	finalGraph, e := loadPolicyGraph(final, host)
 	if e != nil {
 		return report, e
 	}
@@ -351,6 +383,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	}
 	report.native(verified)
 	report.Verification = "online"
+	if report.Blocked() {
+		return report, nil
+	}
+	if e := reconcileWorkflows(ctx, final, host, opts, true, &report); e != nil {
+		return report, e
+	}
 	if report.Blocked() {
 		return report, nil
 	}
@@ -387,7 +425,7 @@ func baseFiles(ctx context.Context, root, base, config string) (tree, error) {
 	}
 	hash := strings.TrimSpace(string(b))
 	out := tree{}
-	for _, name := range []string{lock.Path, StatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
+	for _, name := range []string{lock.Path, StatePath, WorkflowStatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
 		cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "--name-only", hash, "--", name)
 		b, err = cmd.Output()
 		if err != nil {
@@ -411,7 +449,7 @@ func checkBase(ctx context.Context, opts Options, current tree, installed graph,
 	if err != nil {
 		return err
 	}
-	old, err := loadGraph(base, host)
+	old, err := loadPolicyGraph(base, host)
 	if err != nil {
 		return err
 	}

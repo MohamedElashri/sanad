@@ -95,3 +95,34 @@ sanad check --base origin/main
 ```
 
 Use a fetched, trusted base revision when evaluating changes with adoption policy. Observations added only by a pull request cannot make that request's dependencies mature. See [Waiting periods](../policy/) for the full observation workflow.
+
+## Reusable workflows
+
+`init` and `sync` resolve remote job-level `uses:` calls to full commit SHAs.
+Sanad records the readable source ref, host, and numeric repository/owner identity
+in `.github/sanad/workflows.json`. Commit this file with the workflow edits.
+
+```sh
+sanad sync
+sanad sync --write
+sanad plan --action org/ci/.github/workflows/build.yml --to v1.2.0
+sanad update --action org/ci/.github/workflows/build.yml --to v1.2.0 --write
+```
+
+Calls tracked from full stable versions participate in automatic version updates,
+SemVer policy, release cooldowns, and trusted first-seen waiting periods. Calls
+on branches or unlabelled SHAs remain frozen until you select an explicit target.
+The caller executes the inline SHA; this tracking file is Sanad policy metadata.
+
+Online checks verify source identity and that the pinned commit is still reachable
+from its recorded ref. An unlabelled SHA must be in the default branch's history;
+use an explicit tag or branch when that conservative check excludes a maintenance
+branch. Changed full-version tag targets fail verification. Offline checks only
+check the recorded SHA and local structure.
+
+Sanad also reads the callee's workflow and native lockfile at that exact commit.
+It warns if the workflow lacks structural lockfile coverage. This inspection does
+not remotely verify every callee dependency or recursively inspect nested workflow
+calls. GitHub applies the callee repository's native lockfile; your caller's
+lockfile cannot supply that protection. API failures block the operation instead
+of being treated as absent coverage.
