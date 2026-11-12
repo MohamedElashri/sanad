@@ -5,9 +5,55 @@ version = 1
 
 [update]
   level = "minor"
-  constraint = ""
 
-[observation]
-  minimum_age = ""
+[publisher]
+  actions = ["action.yml", "action/action.yml"]
 
-[actions]
+[trust]
+  require_approval = true
+
+# Direct and transitive sources already used by this repository.
+# Verify numeric identities before approving an additional source.
+[trust.repositories."github.com/actions/attest"]
+  owner_id = 44036562
+  repo_id = 760701061
+
+[trust.repositories."github.com/actions/attest-build-provenance"]
+  owner_id = 44036562
+  repo_id = 760702757
+
+[trust.repositories."github.com/actions/checkout"]
+  owner_id = 44036562
+  repo_id = 197814629
+
+[trust.repositories."github.com/actions/configure-pages"]
+  owner_id = 44036562
+  repo_id = 513659658
+
+[trust.repositories."github.com/actions/deploy-pages"]
+  owner_id = 44036562
+  repo_id = 438112499
+
+[trust.repositories."github.com/actions/setup-go"]
+  owner_id = 44036562
+  repo_id = 192624594
+
+[trust.repositories."github.com/actions/setup-node"]
+  owner_id = 44036562
+  repo_id = 189476904
+
+[trust.repositories."github.com/actions/upload-artifact"]
+  owner_id = 44036562
+  repo_id = 192625955
+
+[trust.repositories."github.com/actions/upload-pages-artifact"]
+  owner_id = 44036562
+  repo_id = 496012378
+
+[trust.repositories."github.com/goreleaser/goreleaser-action"]
+  owner_id = 24697112
+  repo_id = 209873006
+
+[trust.repositories."github.com/mohamedelashri/sanad"]
+  owner_id = 25898984
+  repo_id = 1242434851

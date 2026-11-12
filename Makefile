@@ -1,4 +1,4 @@
-.PHONY: build test race lint check fmt docs-build docs-serve sync-version package-backend test-native
+.PHONY: build test race lint check fmt docs-build docs-serve sync-version package-backend test-native sanad-check sanad-local sanad-plan
 
 export GOCACHE ?= $(CURDIR)/.gocache
 export XDG_CACHE_HOME ?= $(CURDIR)/.cache
@@ -6,6 +6,8 @@ VERSION := $(shell cat VERSION)
 COMMIT := $(shell git rev-parse HEAD)
 STATICCHECK ?= $(CURDIR)/bin/staticcheck
 STATICCHECK_VERSION := v0.8.2
+SANAD ?= sanad
+SANAD_BASE ?= origin/main
 STATICCHECK_STAMP := $(CURDIR)/bin/.staticcheck-$(STATICCHECK_VERSION)-$(shell go env GOVERSION)
 LDFLAGS := -X github.com/MohamedElashri/sanad/internal/cli.version=$(VERSION) -X github.com/MohamedElashri/sanad/internal/cli.commit=$(COMMIT)
 
@@ -34,6 +36,15 @@ fmt:
 	gofmt -w cmd internal scripts
 
 check: test lint build
+
+sanad-check:
+	$(SANAD) check --base "$(SANAD_BASE)"
+
+sanad-local:
+	$(SANAD) check --offline --coverage-only
+
+sanad-plan:
+	$(SANAD) plan
 
 package-backend:
 	go run ./scripts/package-backend

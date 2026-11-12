@@ -113,3 +113,21 @@ make check
 npm ci --prefix action
 npm test --prefix action
 ```
+
+We use Sanad v1.1.0 to verify our own workflows, approve direct and transitive
+source identities, and guard both published action entry points. Pull-request
+checks attach JSON and Markdown reports with dependency and protection details.
+
+With the release CLI and backend on `PATH`:
+
+```sh
+make sanad-check                 # online verification against origin/main
+make sanad-local                 # local coverage without network access
+make sanad-plan                  # preview eligible updates
+pre-commit install               # optional; requires pre-commit
+```
+
+The local hook checks coverage; online CI enforces source approvals. Review and
+merge approval changes before introducing dependencies from new repositories.
+Dependabot continues to propose updates; scheduled Sanad update PRs need a
+workflow-capable `SANAD_TOKEN` repository secret.

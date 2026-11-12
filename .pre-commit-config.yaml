@@ -1,0 +1,5 @@
+repos:
+  - repo: https://github.com/MohamedElashri/sanad
+    rev: f7fa1a6dc17e14f7d15354402dd8d24939e80fa1 # v1.1.0
+    hooks:
+      - id: sanad-check
