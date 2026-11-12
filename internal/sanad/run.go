@@ -15,10 +15,13 @@ import (
 )
 
 type Options struct {
-	Root, Repo, Config, Base                  string
+	Root, Repo, Config, Base, ZizmorReport    string
 	Write, Offline, ConfirmNative, Automation bool
+	CoverageOnly                              bool
 	Action, To, Level, Constraint, ActionRef  string
 	Backend                                   Backend
+	Archives                                  ArchiveSource
+	Workflows                                 WorkflowSource
 	Releases                                  ReleaseSource
 	Now                                       time.Time
 }
@@ -31,6 +34,9 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		}
 		report.Success = err == nil && !report.Blocked()
 	}()
+	if opts.CoverageOnly && (command != "check" || !opts.Offline || opts.Base != "") {
+		return report, fmt.Errorf("--coverage-only requires check --offline without --base")
+	}
 	root, err := Root(ctx, opts.Root)
 	if err != nil {
 		return report, err
@@ -50,7 +56,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			report.finding("recovery", "warning", "run sanad recover --write to restore files from the interrupted transaction")
 			return report, nil
 		}
-		return report, recoverTransaction(root)
+		return report, recoverTransaction(root, opts.Config)
 	}
 	if _, err := os.Stat(filepath.Join(root, transactionPath)); err == nil {
 		report.finding("interrupted-transaction", "error", "run sanad recover --write before continuing")
@@ -74,19 +80,39 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if err != nil {
 		return report, err
 	}
+	vendors, e := loadVendors(input)
+	if e != nil {
+		return report, e
+	}
+	if e := vendorChecks(input, vendors); e != nil {
+		return report, e
+	}
+	if err := checkPublisher(input, cfg, &report); err != nil {
+		return report, err
+	}
+	if report.Blocked() {
+		return report, nil
+	}
+	if opts.ZizmorReport != "" {
+		if err := importZizmor(root, opts.ZizmorReport, &report); err != nil {
+			return report, err
+		}
+	}
 	refs, err := references(input)
 	if err != nil {
 		return report, err
 	}
-	for _, f := range input {
-		if strings.Contains(string(f.Data), "# sanad:") {
-			report.finding("legacy-comments", "error", "remove old # sanad: comments and set desired readable uses refs before native onboarding")
-			return report, nil
-		}
+	legacy, err := legacyCommentFile(input)
+	if err != nil {
+		return report, err
+	}
+	if legacy != "" {
+		report.Findings = append(report.Findings, Finding{Code: "legacy-comments", Severity: "error", File: legacy, Message: "remove old # sanad: comments and set desired readable uses refs before native onboarding"})
+		return report, nil
 	}
 	host, repo, identityErr := repository(ctx, root, opts.Repo)
 	if identityErr != nil {
-		if command == "status" || command == "doctor" || opts.Offline {
+		if command == "status" || command == "doctor" || command == "explain" || opts.Offline {
 			host = "github.com"
 			repo = "local/repository"
 			report.finding("repository-identity", "warning", identityErr.Error())
@@ -94,12 +120,19 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, identityErr
 		}
 	}
-	old, err := loadGraph(input, host)
+	old, err := loadPolicyGraph(input, host)
 	if err != nil {
 		return report, err
 	}
 	report.Dependencies = old.list()
+	if !opts.CoverageOnly {
+		report.Findings = append(report.Findings, trustFindings(old, cfg.Trust)...)
+	}
 	report.Coverage = coverage(input)
+	report.Protection, err = protections(input, host)
+	if err != nil {
+		return report, err
+	}
 	for _, ref := range refs {
 		if ref.Workflow {
 			report.Findings = append(report.Findings, Finding{Code: "external-workflow", Severity: "warning", File: ref.File, Message: ref.Name + ": dependencies inside the called workflow use its defining repository's lockfile"})
@@ -108,7 +141,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if !cfg.Native.Enabled {
 		report.finding("native-support-unknown", "warning", "native enforcement is not confirmed; verify GitHub eligibility, then use init --confirm-native --write")
 	}
-	if command == "status" || command == "doctor" {
+	if command == "status" || command == "doctor" || command == "explain" {
 		if _, ok := input[lock.Path]; !ok {
 			report.finding("not-initialized", "warning", "run sanad init to preview native onboarding")
 		}
@@ -132,7 +165,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			}
 			sort.Strings(keys)
 			for _, key := range keys {
-				parts := strings.Split(key, "|")
+				parts, _ := observationParts(key, false)
 				installed := false
 				for _, d := range old {
 					if observationKey(d) == key {
@@ -153,9 +186,17 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 				report.Decisions = append(report.Decisions, Decision{Action: parts[3], Status: status, Reason: reason, EligibleAt: &until})
 			}
 		}
+		if command == "explain" {
+			if e := explain(input, old, cfg, opts, &report); e != nil {
+				return report, e
+			}
+		}
 		if command == "doctor" && newAPI(host).token(ctx, host) == "" {
 			report.finding("authentication", "warning", "no GitHub credentials found; run gh auth login --hostname "+host+" or set GH_TOKEN")
 		}
+		return report, nil
+	}
+	if report.Blocked() {
 		return report, nil
 	}
 	backend := opts.Backend
@@ -166,12 +207,24 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		}
 		backend = native
 	}
+	if e := verifyVendors(ctx, input, host, repo, opts, backend, &report); e != nil {
+		return report, e
+	}
+	if report.Blocked() {
+		return report, nil
+	}
 	work, err := snapshot(input)
 	if err != nil {
 		return report, err
 	}
 	defer os.RemoveAll(work)
 	if command == "check" {
+		if e := reconcileWorkflows(ctx, input, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
 		args := []string{"--verify"}
 		report.Verification = "online"
 		if opts.Offline {
@@ -187,26 +240,40 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
-		if opts.Offline && (opts.Base != "" || minimum > 0) {
+		cooldown, e := releaseCooldown(root)
+		if e != nil {
+			return report, e
+		}
+		policyRequired := minimum > 0 || cooldown > 0 || cfg.Trust.RequireApproval || len(cfg.Trust.Repositories) > 0
+		if opts.Offline && (opts.Base != "" || policyRequired && !opts.CoverageOnly) {
 			report.finding("offline-policy", "error", "offline coverage cannot enforce adoption policy; run an online check with --base")
 			return report, nil
 		}
 		if opts.Offline {
 			report.finding("offline-only", "warning", "coverage checked locally; source identity and commit reachability were not verified")
 		}
-		if !opts.Offline && (opts.Base != "" || minimum > 0) {
+		if !opts.Offline && (opts.Base != "" || policyRequired) {
 			if e := checkBase(ctx, opts, input, old, host, &report); e != nil {
 				return report, e
 			}
 		}
 		return report, nil
 	}
-	if command != "init" && command != "sync" && command != "plan" && command != "update" {
+	if command != "init" && command != "sync" && command != "plan" && command != "update" && command != "vendor" {
 		return report, fmt.Errorf("unsupported command %s", command)
 	}
 	if opts.Write && !cfg.Native.Enabled {
 		report.finding("native-support-required", "error", "verify native lockfile support for this repository, then run init --confirm-native --write")
 		return report, nil
+	}
+	if command == "vendor" {
+		if e := reconcileWorkflows(ctx, input, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
+		return runVendor(ctx, root, host, repo, cfg, opts, backend, input, &report)
 	}
 	if opts.ConfirmNative {
 		var b strings.Builder
@@ -226,6 +293,18 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, err
 		}
 	}
+	if command == "init" || command == "sync" {
+		staged, e := readTree(work, opts.Config)
+		if e != nil {
+			return report, e
+		}
+		if e := reconcileWorkflows(ctx, staged, host, opts, false, &report); e != nil {
+			return report, e
+		}
+		if e := installTree(work, input, staged); e != nil {
+			return report, e
+		}
+	}
 	if command == "plan" || command == "update" {
 		if _, ok := input[lock.Path]; !ok {
 			return report, fmt.Errorf("run sanad init before planning updates")
@@ -239,11 +318,24 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if report.Blocked() {
 			return report, nil
 		}
+		staged, e := readTree(work, opts.Config)
+		if e != nil {
+			return report, e
+		}
+		if e := reconcileWorkflows(ctx, staged, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
 		if e := planUpdates(ctx, work, host, repo, cfg, opts, backend, &report); e != nil {
 			return report, e
 		}
+		if e := planWorkflows(ctx, work, host, cfg, opts, &report); e != nil {
+			return report, e
+		}
 	} else {
-		native, e := backend.Run(ctx, work, host, repo)
+		native, e := backend.Run(ctx, work, host, repo, "--migrate-local-actions")
 		if e != nil {
 			return report, e
 		}
@@ -255,9 +347,13 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
-		next, e := loadGraph(candidate, host)
+		next, e := loadPolicyGraph(candidate, host)
 		if e != nil {
 			return report, e
+		}
+		report.Findings = append(report.Findings, trustFindings(next, cfg.Trust)...)
+		if report.Blocked() {
+			return report, nil
 		}
 		// init accepts a baseline only when no native lockfile exists yet.
 		_, alreadyLocked := input[lock.Path]
@@ -303,7 +399,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 					}
 				}
 				// Only persist observations. The existing workflow may still need sync.
-				return finish(root, opts.Config, input, pending, opts.Write, &report)
+				return finish(ctx, root, opts.Config, input, pending, opts.Write, &report)
 			}
 		} else if cfg.Observation.MinimumAge != "" {
 			state := observations{Version: 1, Seen: map[string]time.Time{}}
@@ -322,9 +418,22 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if e != nil {
 		return report, e
 	}
-	finalGraph, e := loadGraph(final, host)
+	if err := vendorChecks(final, vendors); err != nil {
+		return report, fmt.Errorf("operation would modify an immutable vendor snapshot: %w", err)
+	}
+	if err := checkPublisher(final, cfg, &report); err != nil {
+		return report, err
+	}
+	if report.Blocked() {
+		return report, nil
+	}
+	finalGraph, e := loadPolicyGraph(final, host)
 	if e != nil {
 		return report, e
+	}
+	report.Findings = append(report.Findings, trustFindings(finalGraph, cfg.Trust)...)
+	if report.Blocked() {
+		return report, nil
 	}
 	verified, e := backend.Run(ctx, work, host, repo, "--verify")
 	if e != nil {
@@ -335,18 +444,34 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if report.Blocked() {
 		return report, nil
 	}
+	if e := reconcileWorkflows(ctx, final, host, opts, true, &report); e != nil {
+		return report, e
+	}
+	if report.Blocked() {
+		return report, nil
+	}
 	report.Dependencies = finalGraph.list()
 	report.Coverage = coverage(final)
+	report.Protection, err = protections(final, host)
+	if err != nil {
+		return report, err
+	}
 	report.Changes = graphDiff(old, finalGraph)
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
-	return finish(root, opts.Config, input, final, opts.Write, &report)
+	return finish(ctx, root, opts.Config, input, final, opts.Write, &report)
 }
 
-func finish(root, config string, before, after tree, write bool, r *Report) (Report, error) {
+func finish(ctx context.Context, root, config string, before, after tree, write bool, r *Report) (Report, error) {
+	if err := ctx.Err(); err != nil {
+		return *r, err
+	}
 	for _, name := range changedFiles(before, after) {
 		r.Files = append(r.Files, FileChange{Path: name, Diff: fileDiff(name, before[name], after[name])})
+	}
+	if err := ctx.Err(); err != nil {
+		return *r, err
 	}
 	if write {
 		if err := applyTree(root, config, before, after); err != nil {
@@ -368,21 +493,52 @@ func baseFiles(ctx context.Context, root, base, config string) (tree, error) {
 	}
 	hash := strings.TrimSpace(string(b))
 	out := tree{}
-	for _, name := range []string{lock.Path, StatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
-		cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "--name-only", hash, "--", name)
-		b, err = cmd.Output()
+	cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "-r", "-z", "--name-only", hash)
+	paths, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	exists := map[string]bool{}
+	for _, name := range strings.Split(string(paths), "\x00") {
+		exists[name] = true
+	}
+	var total int64
+	load := func(name string) (bool, error) {
+		if _, ok := out[name]; ok {
+			return true, nil
+		}
+		if !exists[name] {
+			return false, nil
+		}
+		if _, err := safePath(root, name); err != nil {
+			return false, err
+		}
+		cmd := exec.CommandContext(ctx, "git", "-C", root, "show", hash+":"+name)
+		data, err := cmd.Output()
 		if err != nil {
+			return false, err
+		}
+		total += int64(len(data))
+		if total > 64<<20 {
+			return false, fmt.Errorf("trusted base metadata exceeds 64 MiB")
+		}
+		out[name] = file{Data: data, Mode: 0o644}
+		return true, nil
+	}
+	for _, name := range []string{lock.Path, StatePath, WorkflowStatePath, VendorStatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
+		if _, err := load(name); err != nil {
 			return nil, err
 		}
-		if strings.TrimSpace(string(b)) == "" {
-			continue
+	}
+	for name := range exists {
+		if isWorkflow(name) {
+			if _, err := load(name); err != nil {
+				return nil, err
+			}
 		}
-		cmd = exec.CommandContext(ctx, "git", "-C", root, "show", hash+":"+name)
-		b, err = cmd.Output()
-		if err != nil {
-			return nil, err
-		}
-		out[name] = file{Data: b, Mode: 0o644}
+	}
+	if _, err := collectMetadata(out, load); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -392,9 +548,21 @@ func checkBase(ctx context.Context, opts Options, current tree, installed graph,
 	if err != nil {
 		return err
 	}
-	old, err := loadGraph(base, host)
+	old, err := loadPolicyGraph(base, host)
 	if err != nil {
 		return err
+	}
+	if _, ok := base[opts.Config]; ok {
+		policyRoot, e := snapshot(base)
+		if e != nil {
+			return e
+		}
+		defer os.RemoveAll(policyRoot)
+		trusted, e := loadConfig(policyRoot, opts.Config)
+		if e != nil {
+			return e
+		}
+		r.Findings = append(r.Findings, trustFindings(installed, trusted.Trust)...)
 	}
 	r.Changes = graphDiff(old, installed)
 	if _, exists := base[lock.Path]; !exists {

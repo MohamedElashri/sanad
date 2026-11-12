@@ -13,3 +13,14 @@ level = "minor"
 
 # [actions."actions/checkout"]
 # constraint = ">= 6, < 8"
+
+# Protect inline SHAs in published composite actions, including unused exports.
+# [publisher]
+# actions = ["action.yml"]
+
+# Require reviewed source identities for direct and transitive dependencies.
+# [trust]
+# require_approval = true
+# [trust.repositories."github.com/actions/checkout"]
+# owner_id = 44036562
+# repo_id = 197814629

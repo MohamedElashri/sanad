@@ -9,7 +9,7 @@ It generates lockfiles, explains dependency changes, applies update policies, an
 verifies them in CI. GitHub enforces the locked commits when workflows run.
 
 Requires [native lockfile support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
-for your repository. Native lockfiles are in GitHub's public preview.
+for your repository. Native lockfiles are generally available on GitHub Free, Team, and Enterprise Cloud (including data residency). GitHub Enterprise Server is not supported.
 
 ## CLI quickstart
 
@@ -19,14 +19,14 @@ Install with Homebrew:
 brew install --cask MohamedElashri/sanad/sanad
 ```
 
-Or download a [v1.0.2 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.2)
+Or download a [v1.1.0 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.1.0)
 for Linux, macOS, or Windows on amd64/arm64. Keep the included `sanad` and
 `gh-actions-lock` executables together on your `PATH`.
 
-In your repository, authenticate and review the initial lockfile:
+In your repository, provide a read token and review the initial lockfile:
 
 ```sh
-gh auth login
+export GH_TOKEN="<read-token>"
 sanad init --confirm-native
 sanad init --confirm-native --write
 sanad check
@@ -35,7 +35,10 @@ sanad check
 `--confirm-native` records that you verified GitHub supports enforcement for this
 repository. Review the preview before writing, then commit
 `.github/workflows/actions.lock` and `.sanad.toml`. Authentication also accepts
-`GH_TOKEN` or `GITHUB_TOKEN`.
+`GH_TOKEN` or `GITHUB_TOKEN`, or stored credentials from `gh auth login`. The
+release binaries work without Node.js, Go, or a GitHub CLI installation when a
+token is supplied. See [CLI-only integrations](docs/content/guide/cli-only.md)
+for Makefile and pre-commit usage.
 
 ## Action quickstart
 
@@ -53,7 +56,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: MohamedElashri/sanad@8c3467535793d9b31edbb7e7f49d35ef88e2a2d5 # v1.0.2
+      - uses: MohamedElashri/sanad@v1.1.0
         with:
           mode: check
           base: ${{ github.event.pull_request.base.sha }}
@@ -110,3 +113,21 @@ make check
 npm ci --prefix action
 npm test --prefix action
 ```
+
+We use Sanad v1.1.0 to verify our own workflows, approve direct and transitive
+source identities, and guard both published action entry points. Pull-request
+checks attach JSON and Markdown reports with dependency and protection details.
+
+With the release CLI and backend on `PATH`:
+
+```sh
+make sanad-check                 # online verification against origin/main
+make sanad-local                 # local coverage without network access
+make sanad-plan                  # preview eligible updates
+pre-commit install               # optional; requires pre-commit
+```
+
+The local hook checks coverage; online CI enforces source approvals. Review and
+merge approval changes before introducing dependencies from new repositories.
+Dependabot continues to propose updates; scheduled Sanad update PRs need a
+workflow-capable `SANAD_TOKEN` repository secret.

@@ -14,6 +14,7 @@ import (
 )
 
 type Release struct {
+	TagOnly    bool      `json:"-"`
 	Ref        string    `json:"tag_name"`
 	Draft      bool      `json:"draft"`
 	Prerelease bool      `json:"prerelease"`
@@ -28,12 +29,13 @@ type githubAPI struct {
 	home     string
 	client   *http.Client
 	tokens   map[string]string
+	tags     map[string][]Release
 	releases map[string][]Release
 	dates    map[string]time.Time
 }
 
 func newAPI(host string) *githubAPI {
-	return &githubAPI{home: host, client: &http.Client{Timeout: 30 * time.Second}, tokens: map[string]string{}, releases: map[string][]Release{}, dates: map[string]time.Time{}}
+	return &githubAPI{home: host, client: &http.Client{Timeout: 30 * time.Second}, tokens: map[string]string{}, tags: map[string][]Release{}, releases: map[string][]Release{}, dates: map[string]time.Time{}}
 }
 
 func (a *githubAPI) token(ctx context.Context, host string) string {
@@ -46,6 +48,8 @@ func (a *githubAPI) token(ctx context.Context, host string) string {
 		if token == "" {
 			token = os.Getenv("GITHUB_TOKEN")
 		}
+	} else if host == "github.com" {
+		token = os.Getenv("SANAD_GITHUB_COM_TOKEN")
 	}
 	if token == "" {
 		cmd := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", host)
@@ -128,33 +132,111 @@ func (a *githubAPI) Timestamp(ctx context.Context, d Dependency) (time.Time, err
 		return at, nil
 	}
 	nwo, ref, _ := strings.Cut(d.Key, "@")
+	parts := strings.Split(nwo, "/")
+	if len(parts) > 2 {
+		nwo = strings.Join(parts[:2], "/")
+	}
 	var release Release
-	code, err := a.get(ctx, d.Host, "/repos/"+nwo+"/releases/tags/"+url.PathEscape(ref), &release)
+	_, err := a.get(ctx, d.Host, "/repos/"+nwo+"/releases/tags/"+url.PathEscape(ref), &release)
 	if err != nil {
 		return time.Time{}, err
 	}
 	at := release.Published
-	if code == 404 || at.IsZero() {
-		_, sha, _ := strings.Cut(d.Commit, "-")
-		var commit struct {
-			Commit struct {
-				Committer struct {
-					Date time.Time `json:"date"`
-				} `json:"committer"`
-			} `json:"commit"`
-		}
-		code, err = a.get(ctx, d.Host, "/repos/"+nwo+"/commits/"+url.PathEscape(sha), &commit)
-		if err != nil {
-			return at, err
-		}
-		if code == 404 {
-			return at, fmt.Errorf("timestamp unavailable for %s", d.Key)
-		}
-		at = commit.Commit.Committer.Date
+	_, sha, _ := strings.Cut(d.Commit, "-")
+	var commit struct {
+		Commit struct {
+			Committer struct {
+				Date time.Time `json:"date"`
+			} `json:"committer"`
+		} `json:"commit"`
 	}
-	if at.IsZero() {
+	code, err := a.get(ctx, d.Host, "/repos/"+nwo+"/commits/"+url.PathEscape(sha), &commit)
+	if err != nil {
+		return at, err
+	}
+	if code == 404 || commit.Commit.Committer.Date.IsZero() {
 		return at, fmt.Errorf("timestamp unavailable for %s", d.Key)
+	}
+	// A release can outlive its original tag target. An old publication date
+	// must not age a newer commit that the tag now resolves to.
+	if commit.Commit.Committer.Date.After(at) {
+		at = commit.Commit.Committer.Date
 	}
 	a.dates[key] = at
 	return at, nil
+}
+
+// TagSource is optional for injected release providers; preferring tags never
+// silently falls back to an implementation that only supplies releases.
+type TagSource interface {
+	Tags(context.Context, string, string) ([]Release, error)
+}
+
+func listCandidates(ctx context.Context, source ReleaseSource, host, nwo string, p UpdatePolicy) ([]Release, error) {
+	releases, err := source.List(ctx, host, nwo)
+	if err != nil {
+		return nil, err
+	}
+	if p.PreferTags == nil || !*p.PreferTags {
+		return releases, nil
+	}
+	tags, ok := source.(TagSource)
+	if !ok {
+		return nil, fmt.Errorf("release provider does not support prefer_tags")
+	}
+	list, err := tags.Tags(ctx, host, nwo)
+	if err != nil {
+		return nil, err
+	}
+	releases = append([]Release{}, releases...)
+	known := map[string]bool{}
+	for _, r := range releases {
+		known[r.Ref] = true
+	}
+	for _, r := range list {
+		if !known[r.Ref] {
+			r.TagOnly = true
+			releases = append(releases, r)
+			known[r.Ref] = true
+		}
+	}
+	return releases, nil
+}
+func tagOnlyCandidate(list []Release, ref string) bool {
+	for _, r := range list {
+		if r.Ref == ref {
+			return r.TagOnly && r.Published.IsZero()
+		}
+	}
+	return false
+}
+func (a *githubAPI) Tags(ctx context.Context, host, nwo string) ([]Release, error) {
+	key := host + "/" + nwo
+	if list, ok := a.tags[key]; ok {
+		return list, nil
+	}
+	out := []Release{}
+	for page := 1; page <= 100; page++ {
+		var list []struct {
+			Name string `json:"name"`
+		}
+		code, err := a.get(ctx, host, fmt.Sprintf("/repos/%s/tags?per_page=100&page=%d", nwo, page), &list)
+		if err != nil {
+			return nil, err
+		}
+		if code == 404 {
+			return nil, fmt.Errorf("tags unavailable for %s/%s", host, nwo)
+		}
+		for _, tag := range list {
+			out = append(out, Release{Ref: tag.Name, TagOnly: true})
+		}
+		if len(list) < 100 {
+			if a.tags == nil {
+				a.tags = map[string][]Release{}
+			}
+			a.tags[key] = out
+			return out, nil
+		}
+	}
+	return nil, fmt.Errorf("tag pagination limit reached for %s", nwo)
 }

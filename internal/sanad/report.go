@@ -25,9 +25,12 @@ type Dependency struct {
 }
 
 type Change struct {
-	Key    string      `json:"key"`
-	Before *Dependency `json:"before,omitempty"`
-	After  *Dependency `json:"after,omitempty"`
+	CompareURL      string      `json:"compare_url,omitempty"`
+	NewSource       bool        `json:"new_source,omitempty"`
+	IdentityChanged bool        `json:"identity_changed,omitempty"`
+	Key             string      `json:"key"`
+	Before          *Dependency `json:"before,omitempty"`
+	After           *Dependency `json:"after,omitempty"`
 }
 
 type Decision struct {
@@ -46,21 +49,23 @@ type FileChange struct {
 }
 
 type Report struct {
-	Version         int          `json:"version"`
-	Command         string       `json:"command"`
-	Success         bool         `json:"success"`
-	BackendVersion  string       `json:"backend_version"`
-	ParserVersion   string       `json:"parser_version"`
-	LockfileVersion string       `json:"lockfile_version"`
-	Verification    string       `json:"verification"`
-	NativeSupport   string       `json:"native_support"`
-	Coverage        Coverage     `json:"coverage"`
-	Findings        []Finding    `json:"findings"`
-	Dependencies    []Dependency `json:"dependencies"`
-	Changes         []Change     `json:"changes"`
-	Decisions       []Decision   `json:"decisions"`
-	Files           []FileChange `json:"files"`
-	Changed         bool         `json:"changed"`
+	Version         int           `json:"version"`
+	Command         string        `json:"command"`
+	Success         bool          `json:"success"`
+	BackendVersion  string        `json:"backend_version"`
+	ParserVersion   string        `json:"parser_version"`
+	LockfileVersion string        `json:"lockfile_version"`
+	Verification    string        `json:"verification"`
+	NativeSupport   string        `json:"native_support"`
+	Explanations    []Explanation `json:"explanations"`
+	Protection      []Protection  `json:"protection"`
+	Coverage        Coverage      `json:"coverage"`
+	Findings        []Finding     `json:"findings"`
+	Dependencies    []Dependency  `json:"dependencies"`
+	Changes         []Change      `json:"changes"`
+	Decisions       []Decision    `json:"decisions"`
+	Files           []FileChange  `json:"files"`
+	Changed         bool          `json:"changed"`
 }
 
 type Coverage struct {
@@ -70,7 +75,7 @@ type Coverage struct {
 }
 
 func NewReport(command string) Report {
-	return Report{Version: 1, Command: command, BackendVersion: BackendVersion, ParserVersion: "v0.0.6", LockfileVersion: "v0.0.3", Verification: "none", NativeSupport: "unknown", Coverage: Coverage{Uncovered: []string{}}, Findings: []Finding{}, Dependencies: []Dependency{}, Changes: []Change{}, Decisions: []Decision{}, Files: []FileChange{}}
+	return Report{Version: 1, Command: command, BackendVersion: BackendVersion, ParserVersion: "v0.0.6", LockfileVersion: "v0.0.3", Verification: "none", NativeSupport: "unknown", Explanations: []Explanation{}, Protection: []Protection{}, Coverage: Coverage{Uncovered: []string{}}, Findings: []Finding{}, Dependencies: []Dependency{}, Changes: []Change{}, Decisions: []Decision{}, Files: []FileChange{}}
 }
 
 func (r *Report) finding(code, severity, message string) {
@@ -99,6 +104,21 @@ func (r Report) Markdown() string {
 			fmt.Fprintf(&b, "| %s | %s | %s |\n", escape(d.Key), escape(d.Commit), escape(d.Host))
 		}
 	}
+	for _, e := range r.Explanations {
+		fmt.Fprintf(&b, "\n%s: %s (owner %d, repository %d)\n%s\n%s\n", escape(e.Dependency.Key), escape(e.Status), e.Dependency.OwnerID, e.Dependency.RepoID, escape(e.Reason), escape(e.SourceURL))
+		for _, path := range e.Paths {
+			fmt.Fprintf(&b, "\n- %s\n", escape(strings.Join(path, " → ")))
+		}
+		if e.EligibleAt != nil {
+			fmt.Fprintf(&b, "\nEligible at: %s\n", e.EligibleAt.Format(time.RFC3339))
+		}
+	}
+	if len(r.Protection) > 0 {
+		b.WriteString("\n| Surface | Location | Protection | Detail |\n| --- | --- | --- | --- |\n")
+		for _, p := range r.Protection {
+			fmt.Fprintf(&b, "| %s | %s:%d | %s | %s |\n", escape(p.Kind), escape(p.File), p.Line, escape(p.Status), escape(p.Subject+": "+p.Reason))
+		}
+	}
 	for _, f := range r.Findings {
 		fmt.Fprintf(&b, "\n- %s: %s\n", escape(f.Severity), escape(f.Message))
 	}
@@ -123,6 +143,17 @@ func (r Report) Markdown() string {
 			}
 			sort.Strings(paths)
 			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", escape(c.Key), escape(old), escape(next), escape(strings.Join(unique(paths), ", ")))
+		}
+	}
+	for _, c := range r.Changes {
+		if c.CompareURL != "" {
+			fmt.Fprintf(&b, "\n%s: %s\n", escape(c.Key), escape(c.CompareURL))
+		}
+		if c.NewSource {
+			fmt.Fprintf(&b, "\nNew source: %s\n", escape(c.Key))
+		}
+		if c.IdentityChanged {
+			fmt.Fprintf(&b, "\nSource identity changed: %s\n", escape(c.Key))
 		}
 	}
 	if len(r.Files) > 0 {

@@ -38,6 +38,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.Repo, "repo", "", "repository identity: [HOST/]OWNER/REPO")
 	root.PersistentFlags().StringVar(&opts.Config, "config", sanad.ConfigPath, "versioned policy file")
 	root.PersistentFlags().StringVar(&format, "format", "table", "table, json, or markdown")
+	root.PersistentFlags().StringVar(&opts.ZizmorReport, "zizmor-report", "", "import a repository-relative zizmor SARIF report")
 	run := func(name string) func(*cobra.Command, []string) error {
 		return func(cmd *cobra.Command, args []string) error {
 			if format != "table" && format != "json" && format != "markdown" {
@@ -61,9 +62,19 @@ func NewRootCommand() *cobra.Command {
 	if date != "" && strings.HasPrefix(version, "1.") && !strings.Contains(version, "-") {
 		actionRef = commit
 	}
-	for _, name := range []string{"status", "doctor", "init", "sync", "plan", "update", "check", "recover"} {
+	for _, name := range []string{"status", "doctor", "explain", "init", "sync", "plan", "update", "vendor", "check", "recover"} {
 		cmd := &cobra.Command{Use: name, Short: descriptions[name], Args: cobra.NoArgs, RunE: run(name)}
-		if name == "init" || name == "sync" || name == "update" || name == "recover" {
+		if name == "explain" {
+			cmd.Use = "explain [owner/repo[/path][@ref]]"
+			cmd.Args = cobra.MaximumNArgs(1)
+			cmd.RunE = func(cmd *cobra.Command, args []string) error {
+				if len(args) > 0 {
+					opts.Action = args[0]
+				}
+				return run("explain")(cmd, args)
+			}
+		}
+		if name == "init" || name == "sync" || name == "update" || name == "recover" || name == "vendor" {
 			cmd.Flags().BoolVar(&opts.Write, "write", false, "apply the proposed local changes")
 		}
 		if name == "init" {
@@ -72,8 +83,13 @@ func NewRootCommand() *cobra.Command {
 			cmd.Flags().StringVar(&opts.ActionRef, "action-ref", actionRef, "released Sanad action commit for generated workflows")
 		}
 		if name == "check" {
+			cmd.Flags().BoolVar(&opts.CoverageOnly, "coverage-only", false, "explicitly skip adoption policy for an offline developer hook")
 			cmd.Flags().BoolVar(&opts.Offline, "offline", false, "check local coverage without network access")
 			cmd.Flags().StringVar(&opts.Base, "base", "", "trusted base commit for adoption-policy checks")
+		}
+		if name == "vendor" {
+			cmd.Flags().StringVar(&opts.Action, "action", "", "repository to vendor: owner/repo")
+			cmd.Flags().StringVar(&opts.To, "to", "", "explicit upstream version for a reviewed vendor update")
 		}
 		if name == "plan" || name == "update" {
 			cmd.Flags().StringVar(&opts.Action, "action", "", "select owner/repo[/path]")
@@ -135,4 +151,4 @@ func NewRootCommand() *cobra.Command {
 	return root
 }
 
-var descriptions = map[string]string{"status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}
+var descriptions = map[string]string{"vendor": "Copy complete action source at a verified commit", "explain": "Explain dependency paths, source identities, and observations", "status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}

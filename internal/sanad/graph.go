@@ -6,6 +6,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -122,13 +123,47 @@ func graphDiff(before, after graph) []Change {
 		if bok {
 			c.After = &b
 		}
+		reviewChange(&c, before)
 		out = append(out, c)
 	}
 	return out
 }
 
 func observationKey(d Dependency) string {
-	return fmt.Sprintf("%s|%d|%d|%s|%s", d.Host, d.OwnerID, d.RepoID, d.Key, d.Commit)
+	return encodeObservation([5]string{d.Host, strconv.FormatInt(d.OwnerID, 10), strconv.FormatInt(d.RepoID, 10), d.Key, d.Commit})
+}
+
+func encodeObservation(parts [5]string) string {
+	b, _ := json.Marshal(parts)
+	return string(b)
+}
+
+func observationParts(key string, legacy bool) ([5]string, error) {
+	var parts []string
+	if strings.HasPrefix(key, "[") {
+		if err := json.Unmarshal([]byte(key), &parts); err != nil {
+			return [5]string{}, err
+		}
+	} else if legacy {
+		parts = strings.Split(key, "|")
+		if len(parts) >= 5 {
+			parts = []string{parts[0], parts[1], parts[2], strings.Join(parts[3:len(parts)-1], "|"), parts[len(parts)-1]}
+		}
+	}
+	if len(parts) != 5 {
+		return [5]string{}, fmt.Errorf("invalid observation key")
+	}
+	for _, part := range parts {
+		if part == "" {
+			return [5]string{}, fmt.Errorf("empty observation key field")
+		}
+	}
+	for _, id := range parts[1:3] {
+		if n, err := strconv.ParseInt(id, 10, 64); err != nil || n <= 0 {
+			return [5]string{}, fmt.Errorf("invalid observation identity")
+		}
+	}
+	return [5]string(parts), nil
 }
 
 type observations struct {
@@ -137,7 +172,7 @@ type observations struct {
 }
 
 func loadObservations(files tree, now time.Time) (observations, error) {
-	s := observations{Version: 1, Seen: map[string]time.Time{}}
+	s := observations{Version: 2, Seen: map[string]time.Time{}}
 	if f, ok := files[StatePath]; ok {
 		decoder := json.NewDecoder(strings.NewReader(string(f.Data)))
 		decoder.DisallowUnknownFields()
@@ -147,19 +182,38 @@ func loadObservations(files tree, now time.Time) (observations, error) {
 		if err := decoder.Decode(new(any)); err != io.EOF {
 			return s, fmt.Errorf("invalid trailing observation data")
 		}
-		if s.Version != 1 || s.Seen == nil {
+		if (s.Version != 1 && s.Version != 2) || s.Seen == nil {
 			return s, fmt.Errorf("unsupported observation state")
 		}
+		normalized := map[string]time.Time{}
 		for key, at := range s.Seen {
-			if len(strings.Split(key, "|")) != 5 || at.IsZero() || at.After(now) {
+			parts, err := observationParts(key, s.Version == 1)
+			if err != nil || at.IsZero() || at.After(now) {
 				return s, fmt.Errorf("invalid observation %q", key)
 			}
+			canonical := encodeObservation(parts)
+			if previous, ok := normalized[canonical]; !ok || at.After(previous) {
+				normalized[canonical] = at
+			}
 		}
+		s.Version, s.Seen = 2, normalized
 	}
 	return s, nil
 }
 
 func saveObservations(files tree, s observations) error {
+	normalized := map[string]time.Time{}
+	for key, at := range s.Seen {
+		parts, err := observationParts(key, true)
+		if err != nil {
+			return err
+		}
+		canonical := encodeObservation(parts)
+		if previous, ok := normalized[canonical]; !ok || at.After(previous) {
+			normalized[canonical] = at
+		}
+	}
+	s.Version, s.Seen = 2, normalized
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -179,9 +233,9 @@ func assess(before, after graph, state observations, observed map[string]time.Ti
 			continue
 		}
 		d := *change.After
-		nwo, _, _ := strings.Cut(d.Key, "@")
+		nwo := repositoryName(d.Key)
 		for _, old := range before {
-			oldNWO, _, _ := strings.Cut(old.Key, "@")
+			oldNWO := repositoryName(old.Key)
 			if nwo == oldNWO && (d.Host != old.Host || d.OwnerID != old.OwnerID || d.RepoID != old.RepoID) {
 				return false, eligible, fmt.Errorf("source identity changed for %s", d.Key)
 			}

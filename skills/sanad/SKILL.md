@@ -55,6 +55,8 @@ preview only; an authorized fix or update can proceed after reviewing the previe
 | Reconcile added, removed, or edited workflows/actions | `sanad sync` | `sanad sync --write` |
 | Review newer stable versions | `sanad plan` | No write operation needed. |
 | Update eligible dependencies | `sanad update` | `sanad update --write` |
+| Explain a dependency and stored observations | `sanad explain OWNER/REPO` | No write operation needed. |
+| Copy or update a complete upstream action snapshot | `sanad vendor --action OWNER/REPO [--to REF]` | Repeat with `--write`. |
 
 Use `--confirm-native` only after the user has confirmed GitHub native lockfile
 support for the repository, or existing repository configuration records that
@@ -83,6 +85,26 @@ ranges, while still obeying waiting periods. Use it for a requested or explicitl
 reviewed target. Branches, commit SHA refs, partial versions, and prerelease refs
 remain frozen during automatic selection.
 
+Remote reusable workflow calls are inline SHA-pinned; their associated versions
+and identities are recorded in `.github/sanad/workflows.json`. Use the workflow's
+full `OWNER/REPO/.github/workflows/NAME.yml` path with `--action`. Callee lockfile
+inspection checks structural coverage at the pinned commit, not every dependency's
+remote trust. An existing unlabelled SHA needs an explicit version to auto-update.
+
+Publisher policy can require inline SHAs in declared exported action files. Do not
+remove that protection to make native normalization succeed. Source trust policy
+can require reviewed host/repository numeric identities across all transitive
+sources; approval changes must reach the trusted base before a dependency PR can
+use them. Use `tag_prefix` for explicit monorepo version families and `prefer_tags`
+when release records are incomplete; unknown tag publication age cannot satisfy
+an automatic release cooldown.
+
+Vendoring preserves the full source tree and licenses under `.github/sanad/vendor/`
+with provenance in `.github/sanad/vendor.json`. Local edits to managed snapshots
+block replacement. Review all copied code, use explicit `vendor --to` updates,
+and keep its upstream pins and file hashes intact. It does not establish runtime
+compatibility with `act` or vendor downloaded tools and containers.
+
 For persistent version limits, per-action overrides, waiting periods, or CI
 setup, read [policy and automation](references/policy-and-automation.md).
 
@@ -96,10 +118,13 @@ Use `--format json` for structured reports. Inspect `success`, `findings`,
 - `2`: operational, parsing, or configuration error; consult stderr too.
 
 `files` contains proposed diffs even in a preview. For successful `init`, `sync`,
-and `update` operations, `changed` records whether repository changes were written.
+`update`, and `vendor` operations, `changed` records whether repository changes were written.
 Recovery restores files without populating that change report; inspect the working
 tree after recovery or a failed write. `config`, `version`, and `setup` have their
-own output shapes. Review transitive changes as well as direct ones.
+own output shapes. Review transitive changes as well as direct ones. The
+`protection` inventory distinguishes native pins from containers, runners, and
+uninspected runtime downloads. `explanations` shows dependency paths and numeric
+source identities. A recorded pin is separate from online trust verification.
 
 For `pending` decisions, explain the reason and `eligible_at` date when present.
 Previews do not persist observations. With first-seen policy, an authorized
@@ -115,8 +140,7 @@ both rather than treating every pending decision as a command failure.
 Investigate source-identity changes, replaced repositories, unreachable commits,
 and moved refs before choosing an explicitly reviewed target. Generate lockfile
 pins with Sanad rather than editing dependency IDs or commits by hand. Sanad 1.x
-uses native lockfiles; legacy `.github/sanad.lock.json`, `# sanad:` comments, and
-inline SHA management belong to the separate
+uses native lockfiles; legacy `.github/sanad.lock.json` and `# sanad:` comments belong to the separate
 [0.x reset workflow](https://melashri.net/sanad/guide/migration/).
 
 If `.github/sanad/transaction.json` exists, inspect the working tree and use
@@ -127,8 +151,9 @@ investigate the journal if recovery fails.
 ## Verify and report
 
 After applying changes, run `sanad check --base REV` when first-seen policy is
-enabled or when evaluating a pull request against adoption policy. First-seen
-policy requires a base even for local checks. Choose the actual fetched, trusted
+enabled, source approvals are configured, release cooldowns apply, or when
+evaluating a pull request against adoption policy. These policies require a
+base even for local checks. Choose the actual fetched, trusted
 base revision; a revision containing only the proposed changes cannot establish
 their trusted history. Otherwise, run `sanad check`.
 
@@ -139,7 +164,8 @@ and leave existing policy intact. `status` is not frozen verification.
 
 Review the final working-tree diff. Include every reported managed file in the
 change: the native lockfile, the selected policy file, observation state when
-present, and workflow or local-action edits (including conversions from `./path` to native
+present, reusable-workflow tracking, vendor snapshots and their provenance when
+reported, and workflow or local-action edits (including conversions from `./path` to native
 `$/path`). Summarize dependency changes, pending decisions, verification results,
 and any blockers. The transaction journal is recovery metadata, not a file to
 include in a normal commit. Follow the user's scope for commits and pull requests.

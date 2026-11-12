@@ -2,6 +2,35 @@
 
 All notable changes to Sanad are documented here.
 
+## 1.1.0 - 2026-11-12
+
+### Features
+
+- Pin and update reusable workflows.
+- Explain dependency paths and source identities.
+- Report coverage gaps and import zizmor findings.
+- Protect published action pins and approve trusted sources.
+- Vendor verified action source snapshots.
+- Support tag families and tag-based updates.
+- Add CLI hooks, SBOMs, and build provenance.
+
+### Fixes
+
+- Upgrade the native backend to v0.4.1.
+- Harden recovery, transaction locks, and cached binaries.
+- Enforce cooldowns and transitive update policies.
+- Fix YAML aliases, parallel groups, and subaction policies.
+- Preserve repository identities and immutable vendor snapshots.
+- Correct callee coverage and retain observation history.
+- Stop canceled operations before repository writes.
+
+### Upgrade
+
+- Upgrade the CLI and Action together; 1.x interfaces remain supported.
+- Run `sanad sync --write` to onboard reusable workflows.
+- Use a trusted `--base` for adoption checks.
+- Scheduled updates require a workflow-capable `SANAD_TOKEN`.
+
 ## 1.0.2 - 2026-11-07
 
 ### Fixed

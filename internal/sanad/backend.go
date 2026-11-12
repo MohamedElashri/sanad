@@ -18,15 +18,15 @@ import (
 	"time"
 )
 
-const BackendVersion = "v0.2.0"
+const BackendVersion = "v0.4.1"
 
 var backendDigests = map[string]string{
-	"darwin-amd64":      "23832d88761af62021b75b12a97663483d753a90c4951550874bcb2ce3b7d1c6",
-	"darwin-arm64":      "eef4de166006eeec7d2d1bbb780371f6f34a397a18f0b3638547eb7c8432b512",
-	"linux-amd64":       "79ec84c191667fd935a277e6fd3662cf5d3669cccc9e99998731d8f306f373b6",
-	"linux-arm64":       "c79a279d6b0b635dc89ab6d38d0ecf98ff83abcee7bb483cd53353b74cd4f6df",
-	"windows-amd64.exe": "b25318292a6f2a07103067fa3edfe7ec8b6f779e8f4bc4ffe89aa96a91800e38",
-	"windows-arm64.exe": "56a10c1909426e786dfe9cdd1a8247ae3462828d87ed2ab4aa8c39fc1cbe5b0f",
+	"darwin-amd64":      "4ef64599440398999f184321d5237df131721434901ecaaf3da6aa018bdd1f8f",
+	"darwin-arm64":      "f205ea5dbbda67165e08aab1fb6395290ca62f0a038bf27d4b684abd0816635c",
+	"linux-amd64":       "39deb2fe714dbf74b073d8245fc7f3d50cd0eee18d5c0900e9e849ae933ae17e",
+	"linux-arm64":       "aee61c993da36a5f09be2c77e6e4a1a22542a1b30ded4996bf8301c15dcf2b39",
+	"windows-amd64.exe": "d3582b58f907c145d673f5f31ebfa21a6570df04f3aca9cce667d129a3c607dc",
+	"windows-arm64.exe": "6e769101eb05342b1e29585f39aa14b8a0be8cac8fe8cb9fd0b21177abe7294f",
 }
 
 func BackendTargets() []string {
@@ -191,7 +191,13 @@ func backendEnv(root, host, repo string) []string {
 		env = append(env, pair)
 	}
 	// User-global upstream cooldowns must not change repository policy.
-	return append(env, "GH_HOST="+host, "GH_REPO="+host+"/"+repo, "GH_ACTIONS_LOCK_REPO_ROOT="+root, "GH_ACTIONS_LOCK_CONFIG="+os.DevNull, "NO_COLOR=1")
+	env = append(env, "GH_HOST="+host, "GH_REPO="+host+"/"+repo, "GH_ACTIONS_LOCK_REPO_ROOT="+root, "GH_ACTIONS_LOCK_CONFIG="+os.DevNull, "NO_COLOR=1")
+	if validTenant(host) {
+		if token := os.Getenv("SANAD_GITHUB_COM_TOKEN"); token != "" {
+			env = append(env, "GH_ACTIONS_LOCK_GITHUB_COM_TOKEN="+token)
+		}
+	}
+	return env
 }
 
 func (b NativeBackend) Run(ctx context.Context, root, host, repo string, args ...string) (NativeResult, error) {
@@ -224,20 +230,9 @@ func (b NativeBackend) Run(ctx context.Context, root, host, repo string, args ..
 	return result, nil
 }
 
-// Successful producer output contains the pre-fix diagnosis. Its valid field can
-// therefore be false even after a successful write. A separate frozen check of
-// the candidate is the authority for success.
-func (r *Report) generated(result NativeResult) {
-	if result.ExitCode != 0 {
-		r.native(result)
-		return
-	}
-	for _, f := range result.Findings {
-		if f.Severity == "warning" {
-			r.Findings = append(r.Findings, Finding{Code: f.Category, Severity: "warning", Message: strings.TrimSpace(f.Detail + " " + f.Remediation), File: f.Workflow})
-		}
-	}
-}
+// The pinned producer reports its post-fix state. Frozen verification still
+// checks the complete candidate before any changes are installed.
+func (r *Report) generated(result NativeResult) { r.native(result) }
 
 func (r *Report) native(result NativeResult) {
 	for _, f := range result.Findings {

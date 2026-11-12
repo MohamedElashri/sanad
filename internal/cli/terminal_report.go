@@ -123,6 +123,25 @@ func renderReport(report sanad.Report, width int, profile termenv.Profile) strin
 		}
 		t.renderTable("Dependencies", []string{"Dependency", "Commit", "Host"}, rows, -1)
 	}
+	for _, e := range report.Explanations {
+		t.heading(e.Dependency.Key)
+		t.line(t.text(fmt.Sprintf("%s; owner %d; repository %d", e.Status, e.Dependency.OwnerID, e.Dependency.RepoID), stateColor(e.Status), false))
+		t.line(t.text(e.Reason, "", false))
+		t.line(t.text(e.SourceURL, colorCyan, false))
+		for _, path := range e.Paths {
+			t.line(t.text(strings.Join(path, " → "), "", false))
+		}
+		if e.EligibleAt != nil {
+			t.line(t.text("Eligible at: "+e.EligibleAt.Format("2006-01-02T15:04:05Z07:00"), "", false))
+		}
+	}
+	if len(report.Protection) > 0 {
+		rows := make([][]string, 0, len(report.Protection))
+		for _, p := range report.Protection {
+			rows = append(rows, []string{p.Kind, fmt.Sprintf("%s:%d", p.File, p.Line), p.Status, p.Subject + ": " + p.Reason})
+		}
+		t.renderTable("Protection coverage", []string{"Surface", "Location", "Protection", "Detail"}, rows, -1)
+	}
 	if len(report.Decisions) > 0 {
 		rows := make([][]string, 0, len(report.Decisions))
 		for _, decision := range report.Decisions {
@@ -147,6 +166,17 @@ func renderReport(report sanad.Report, width int, profile termenv.Profile) strin
 			rows = append(rows, []string{change.Key, before, after, strings.Join(slices.Compact(paths), ", ")})
 		}
 		t.renderTable("Dependency changes", []string{"Dependency", "Before", "After", "Affected workflows"}, rows, -1)
+	}
+	for _, c := range report.Changes {
+		if c.CompareURL != "" {
+			t.line(t.text(c.Key+": "+c.CompareURL, colorCyan, false))
+		}
+		if c.NewSource {
+			t.line(t.text("New source: "+c.Key, colorYellow, false))
+		}
+		if c.IdentityChanged {
+			t.line(t.text("Source identity changed: "+c.Key, colorRed, true))
+		}
 	}
 	if len(report.Files) > 0 {
 		title := "Proposed files"

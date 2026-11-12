@@ -35,7 +35,7 @@ jobs:
         shell: bash
         env:
           SANAD_TEST_BACKEND: ${{ runner.temp }}/gh-actions-lock${{ runner.os == 'Windows' && '.exe' || '' }}
-        run: go test ./internal/sanad -run TestNativeBackendContract -v
+        run: go test ./internal/sanad -run 'Test(NativeBackendContract|EnsureBackendContract)' -v
       - run: npm ci --prefix action
       - run: npm test --prefix action
       - name: Test Action against built CLI
@@ -57,6 +57,11 @@ jobs:
         with:
           node-version: '24'
       - run: go test -race ./...
+      - name: Fuzz workflow, state, and archive boundaries
+        run: |
+          go test ./internal/sanad -run '^$' -fuzz '^FuzzWorkflowReferenceRewrite$' -fuzztime=10s -parallel=2
+          go test ./internal/sanad -run '^$' -fuzz '^FuzzObservationRoundTrip$' -fuzztime=10s -parallel=2
+          go test ./internal/sanad -run '^$' -fuzz '^FuzzVendorArchive$' -fuzztime=10s -parallel=2
       - run: go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
       - run: staticcheck ./...
       - run: test -z "$(gofmt -l cmd internal scripts)"

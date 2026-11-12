@@ -124,7 +124,7 @@ func TestVersionHelpAndCompletions(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &v); err != nil {
 		t.Fatal(err)
 	}
-	if v["backend_version"] != "v0.2.0" {
+	if v["backend_version"] != "v0.4.1" {
 		t.Fatal(v)
 	}
 	out, err = execute("--help")

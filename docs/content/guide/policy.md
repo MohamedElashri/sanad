@@ -11,7 +11,7 @@ Sanad can delay adoption of changed commits in two ways: upstream release age an
 
 | Policy | Clock starts from | Configuration | Persistent state |
 | --- | --- | --- | --- |
-| Release age | The upstream release, tag, or commit timestamp used for the dependency. | Dependabot `github-actions` cooldown. | No observation file required. |
+| Release age | The later of the release publication and the locked commit's committer timestamp; the commit timestamp alone when no release exists. | Dependabot `github-actions` cooldown. | No observation file required. |
 | First seen | Sanad's recorded observation of an identity, ref, and commit. | `.sanad.toml` observation policy. | Commit `.github/sanad/state.json`. |
 
 If both are enabled, every changed dependency must satisfy both. Neither policy is a vulnerability assessment or a guarantee about upstream code quality.
@@ -84,6 +84,38 @@ updates:
 
 Sanad uses this age when evaluating changed dependency commits. Unsupported cooldown keys or ambiguous multiple `github-actions` entries produce an error. See [Configuration](../../reference/configuration/) for the supported shape.
 
+An old release cannot make a commit with a newer committer timestamp mature. However, Git commit timestamps are supplied by upstream authors, and GitHub's release publication time does not record later tag retargeting. Release-age policy therefore cannot prove how long a particular ref has pointed to a commit. Enable first-seen policy when adoption must wait after Sanad first observes that exact identity, ref, and commit.
+
 ## Protect the history
 
 Observation history is reviewed Git state, not a trusted timestamp service. Administrators can change it. Protect policy, workflows, lockfiles, and observation records with the same review controls you use for dependency changes.
+
+## Approved sources
+
+You can require reviewed repository identities for every direct action, transitive
+action, and managed reusable workflow:
+
+```toml
+[trust]
+require_approval = true
+
+[trust.repositories."github.com/actions/checkout"]
+owner_id = 44036562
+repo_id = 197814629
+```
+
+Use `sanad explain` to see the recorded host and numeric owner/repository IDs,
+verify them with the source repository, and approve the policy change through
+review. The example IDs identify actions/checkout; verify current ownership before
+adopting them. Entries apply to all action subdirectories and reusable workflows
+in that repository. Names and hosts compare without case; wildcards are not used.
+A listed source remains bound to its IDs even when `require_approval` is false.
+
+Unapproved sources block synchronization and onboarding. During version selection,
+Sanad rejects a candidate introducing an unapproved transitive source and tries the
+next candidate. Existing native organization allowlists still apply at runtime.
+
+Online checks with source trust policy require `--base`. The trusted base's
+approvals apply in addition to current policy, so a dependency PR cannot approve
+its own new repository or replace a source identity. Merge approval changes first,
+then introduce the dependency. Offline checks cannot establish source trust.

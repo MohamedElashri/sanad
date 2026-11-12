@@ -7,7 +7,7 @@ check to your pull-request workflow:
 - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
   with:
     fetch-depth: 0
-- uses: MohamedElashri/sanad@8c3467535793d9b31edbb7e7f49d35ef88e2a2d5 # v1.0.2
+- uses: MohamedElashri/sanad@v1.1.0
   with:
     mode: check
     base: ${{ github.event.pull_request.base.sha }}
@@ -15,7 +15,7 @@ check to your pull-request workflow:
 
 Run `sanad sync --write` and commit the updated lockfile after adding the workflow.
 You can also pin the Action to the release's full commit. The trusted `base` and
-full checkout history are required when enforcing observation policy.
+full checkout history are required when enforcing observation or release-cooldown policy.
 
 | Input | Default | Purpose |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ masked; tenant tokens are not sent to the public release API.
 
 Generate scheduled PR workflows with `sanad init --automation --write`, including
 observation-only changes. PR checks need read permissions; the scheduled workflow needs contents
-and pull-request writes. The CLI itself does not commit, push, or open PRs.
+and pull-request writes. Configure `SANAD_TOKEN` with Contents, Workflows, and Pull requests write permissions; the built-in `GITHUB_TOKEN` cannot push workflow edits. The CLI itself does not commit, push, or open PRs.
 
 Development: `npm ci`, `npm test`, `npm run build`. `npm run test:integration`
 requires `SANAD_ACTION_BINARY` and `SANAD_BACKEND` pointing to built/official tools.

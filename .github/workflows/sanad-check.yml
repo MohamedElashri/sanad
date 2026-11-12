@@ -10,6 +10,18 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: MohamedElashri/sanad@v1.0.1
+      - name: Verify dependencies and source policy
+        id: sanad
+        uses: MohamedElashri/sanad@v1.1.0
         with:
           base: ${{ github.event.pull_request.base.sha }}
+      - name: Upload dependency and protection report
+        if: ${{ always() && steps.sanad.outputs.report-path != '' }}
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: sanad-check
+          path: |
+            ${{ steps.sanad.outputs.report-path }}
+            ${{ steps.sanad.outputs.pr-body-path }}
+          if-no-files-found: error
+          retention-days: 14

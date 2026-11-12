@@ -48,6 +48,8 @@ Selected version updates cannot move unrelated pins. Broad mutable-ref refresh i
 
 First-seen state is keyed by host, numeric source identity, ref, and commit. A retargeted ref starts a new clock. All newly changed transitive commits must also mature.
 
+Release cooldowns use the later of release publication and the locked commit's committer timestamp. Commit timestamps can be backdated, and release publication does not date tag retargeting. Only first-seen policy establishes a waiting period from Sanad's observation of a particular ref and commit.
+
 CI reads observation history from a trusted `--base` revision. Proposed changes cannot establish their own maturity by adding old-looking observations to the same PR. Administrators can still edit policy and history: this is reviewed Git state, not a trusted timestamp service.
 
 Protect workflows, lockfiles, policy, and observations with appropriate review controls. See [Waiting periods](../../guide/policy/) for the operational workflow.
@@ -55,6 +57,8 @@ Protect workflows, lockfiles, policy, and observations with appropriate review c
 ## Credentials and installation
 
 Release archives include a checksum-verified official backend. The Action checks the GitHub release's immutability, validates the archive digest, and requires the CLI version to match its own release.
+
+Cache hits repeat the release lookup and archive digest check, then extract fresh executables into the runner's temporary directory. Cached executable files are never run directly. A modified cached archive fails verification; an older cache without an archive is downloaded again.
 
 Authentication is host-aware. Tenant credentials are not reused for public GitHub release discovery. Environment tokens must belong to the host you intend to access; they take precedence over stored GitHub CLI credentials.
 
@@ -66,6 +70,6 @@ An unexpected journal needs investigation. Use the [recovery procedure](../troub
 
 ## Pinned native components
 
-Sanad 1.0 uses `gh-actions-lock v0.2.0` and `actions-lockfile/go v0.0.6`. Backend binaries are pinned by SHA-256. Changing either component requires the producer contract tests.
+Sanad 1.1 uses `gh-actions-lock v0.4.1` and `actions-lockfile/go v0.0.6`. Backend binaries are pinned by SHA-256. Changing either component requires the producer contract tests.
 
 The implementation has two packages: `internal/sanad` for the core behavior and `internal/cli` for commands and presentation. Dependency resolution stays in the official producer.
