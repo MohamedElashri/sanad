@@ -250,7 +250,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, e
 		}
 	} else {
-		native, e := backend.Run(ctx, work, host, repo)
+		native, e := backend.Run(ctx, work, host, repo, "--migrate-local-actions")
 		if e != nil {
 			return report, e
 		}
