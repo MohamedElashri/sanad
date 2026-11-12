@@ -60,6 +60,8 @@ jobs:
         run: |
           go run ./scripts/release-sbom --dir dist
           npm sbom --prefix action --sbom-format spdx --omit dev > "dist/sanad_action_${GITHUB_REF_NAME#v}.spdx.json"
+          # SPDX 2.3 timestamps require whole UTC seconds; npm emits milliseconds.
+          node -e 'const fs = require("fs"); const p = process.argv[1]; const d = JSON.parse(fs.readFileSync(p)); d.creationInfo.created = d.creationInfo.created.replace(/\.\d+Z$/, "Z"); fs.writeFileSync(p, JSON.stringify(d, null, 2) + "\n");' "dist/sanad_action_${GITHUB_REF_NAME#v}.spdx.json"
       - name: Attest release artifacts and inventories
         uses: actions/attest-build-provenance@v4.2.2
         with:
