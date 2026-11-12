@@ -7,10 +7,10 @@ template = "page"
 
 Sanad includes a reusable [agent skill](https://github.com/MohamedElashri/sanad/tree/main/skills/sanad)
 for Codex, Claude Code, Cursor, GitHub Copilot, Antigravity, and OpenCode. It teaches
-agents to choose between `init`, `sync`, `plan`, `update`, and `check`, review
-structured reports, respect update policies, and verify the resulting changes.
-The same skill works across these tools. Its supporting references cover policy
-configuration, CI automation, host/authentication setup, and troubleshooting.
+agents to manage action and reusable-workflow pins, explain dependency paths,
+review vendor snapshots, and verify the resulting changes. Its supporting
+references cover source approvals, publisher guards, tag families, CI automation,
+local hooks, coverage reports, and troubleshooting.
 
 ## Install the skill
 
@@ -18,7 +18,7 @@ Copy the entire `skills/sanad` directory, including `references/`, from a Sanad
 source checkout into a skill directory your agent discovers. Paths in the project
 column are relative to the repository where you want to use Sanad.
 
-The skill provides instructions; install [Sanad 1.x](../getting-started/)
+The skill provides instructions; install [Sanad 1.1+](../getting-started/)
 separately and make it available on the agent's `PATH`.
 
 | Agent | Project directory | Personal directory | Documentation |
@@ -63,6 +63,9 @@ Example requests:
 - "Use Sanad to reconcile the lockfile after my workflow edits, then verify it."
 - "Use Sanad to preview patch updates for actions/checkout without writing files."
 - "Use Sanad to update actions/checkout within our existing policy."
+- "Explain how actions/upload-artifact enters our dependency graph."
+- "Use Sanad to preview vendoring actions/github-script at our current pin."
+- "Configure source approvals and protect our published composite actions."
 - "Explain why Sanad reports pending dependencies and when they become eligible."
 
 For first-time adoption, confirm that the repository supports GitHub's native

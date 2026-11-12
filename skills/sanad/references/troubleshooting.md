@@ -20,6 +20,12 @@ is `GH_TOKEN`, `GITHUB_TOKEN`, then stored GitHub CLI credentials. Environment
 tokens must belong to the intended host; inspect their presence without printing
 their values. Tenant credentials are not reused for public release discovery.
 
+For token-only Enterprise Cloud data-residency operation, use
+`--repo example.ghe.com/owner/repo` with `GH_HOST=example.ghe.com` and `GH_TOKEN`.
+Supply `SANAD_GITHUB_COM_TOKEN` separately for public github.com reads when needed;
+otherwise public reads use stored public credentials or anonymous access. Do not
+reuse the tenant credential for public source lookups.
+
 ## Backend installation and checksums
 
 The bundled `gh-actions-lock` is an exact, checksum-pinned official binary.
@@ -52,6 +58,27 @@ Retain the repository's existing protection when an upstream limitation prevents
 onboarding and report the unsupported dependency. Use the finding and pinned
 backend version to assess the limitation; do not create a fallback inline-pinning
 scheme or claim that unsupported workflows are covered.
+
+## Source approvals, workflow calls, and snapshots
+
+For `source-unapproved`, inspect the dependency path with `sanad explain`, verify
+its numeric identity, and review the policy approval before introducing the new
+source. For `source-identity-changed`, investigate ownership or repository
+replacement instead of replacing approved IDs just to pass the check.
+
+Reusable workflow calls need their inline SHA and
+`.github/sanad/workflows.json` to agree. Reconcile them with `sync` after edits;
+do not invent tracking records. Missing callee lock coverage is a boundary in
+the callee repository; the caller's native lockfile cannot repair it.
+
+For a modified vendor snapshot, preserve any local work and restore the reviewed
+snapshot before using `vendor --to` for an upstream update. Do not regenerate
+digests to bless local edits. Errors about archive paths, file limits, or metadata
+rewrites require a compatible source snapshot, not disabled integrity checks.
+
+Plain offline checks reject source-approval and first-seen policies. Use
+`check --offline --coverage-only` only for the explicit developer-hook scope;
+online `check --base REV` remains necessary for policy verification.
 
 ## Interrupted or concurrent writes
 
