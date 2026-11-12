@@ -120,3 +120,52 @@ func TestReleaseAgeIncludesTheLockedCommit(t *testing.T) {
 		}
 	}
 }
+
+type taggedReleases struct {
+	fakeReleases
+	tags []Release
+}
+
+func (f taggedReleases) Tags(context.Context, string, string) ([]Release, error) { return f.tags, nil }
+func TestTagFamiliesKeepVersionSelectionWithinNamespace(t *testing.T) {
+	p := UpdatePolicy{Level: "minor", TagPrefix: "tool/"}
+	list := []Release{{Ref: "v9.0.0"}, {Ref: "other/v1.9.0"}, {Ref: "tool/v1.2.0"}, {Ref: "tool/v2.0.0"}, {Ref: "tool/v1.3.0-rc.1"}, {Ref: "tool/v1.2"}}
+	got := targets(list, "tool/v1.0.0", p, "")
+	if len(got) != 1 || got[0] != "tool/v1.2.0" {
+		t.Fatalf("family selection %v", got)
+	}
+	cfg := DefaultConfig()
+	cfg.Actions["a/root"] = p
+	effective := effectivePolicy(cfg, Options{Level: "patch"}, "a/root", "a/root")
+	if effective.TagPrefix != "tool/" || effective.Level != "patch" {
+		t.Fatalf("CLI erased family %+v", effective)
+	}
+}
+func TestTagCatalogFallbackPreservesReleaseMetadata(t *testing.T) {
+	source := taggedReleases{fakeReleases: fakeReleases{refs: []Release{{Ref: "v1.2.0", Draft: true}, {Ref: "v1.1.0"}}}, tags: []Release{{Ref: "v1.3.0"}, {Ref: "v1.2.0"}}}
+	list, err := listCandidates(context.Background(), source, "github.com", "a/root", UpdatePolicy{PreferTags: boolValue(true)})
+	if err != nil || len(list) != 3 || !list[0].Draft || !tagOnlyCandidate(list, "v1.3.0") || tagOnlyCandidate(list, "v1.1.0") {
+		t.Fatalf("catalog %+v %v", list, err)
+	}
+	got := targets(list, "v1.0.0", UpdatePolicy{Level: "minor"}, "")
+	if len(got) != 2 || got[0] != "v1.3.0" || got[1] != "v1.1.0" {
+		t.Fatalf("draft was restored by tags: %v", got)
+	}
+}
+func TestUnknownTagAgeCannotBypassCooldown(t *testing.T) {
+	root := fixture(t, map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a")}, "")
+	if err := putFile(root, ConfigPath, file{Data: []byte("version=1\n[native]\nenabled=true\n[update]\nprefer_tags=true\n"), Mode: 0o644}); err != nil {
+		t.Fatal(err)
+	}
+	if err := putFile(root, ".github/dependabot.yml", file{Data: []byte("version: 2\nupdates:\n  - package-ecosystem: github-actions\n    directory: /\n    schedule:\n      interval: weekly\n    cooldown:\n      default-days: 7\n"), Mode: 0o644}); err != nil {
+		t.Fatal(err)
+	}
+	opts := options(root, &fakeBackend{t: t, definitions: map[string]lock.Action{"a/root@v1.1.0": action("v1.1.0", "b")}})
+	opts.Releases = taggedReleases{fakeReleases: fakeReleases{refs: []Release{{Ref: "v1.1.0"}}, at: testNow.AddDate(0, 0, -30)}, tags: []Release{{Ref: "v1.2.0"}}}
+	r, err := Run(context.Background(), "plan", opts)
+	if err != nil || !r.Success || len(r.Decisions) != 2 || r.Decisions[0].Status != "blocked" || r.Decisions[1].Status != "eligible" {
+		t.Fatalf("tag age %+v %v", r, err)
+	}
+}
+
+func boolValue(value bool) *bool { return &value }

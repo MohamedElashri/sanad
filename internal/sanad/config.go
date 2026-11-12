@@ -38,6 +38,8 @@ const ConfigPath = ".sanad.toml"
 const StatePath = ".github/sanad/state.json"
 
 type UpdatePolicy struct {
+	TagPrefix  string `toml:"tag_prefix" json:"tag_prefix,omitempty"`
+	PreferTags *bool  `toml:"prefer_tags" json:"prefer_tags,omitempty"`
 	Level      string `toml:"level" json:"level,omitempty"`
 	Constraint string `toml:"constraint" json:"constraint,omitempty"`
 }
@@ -142,6 +144,9 @@ func canonicalActionName(name string) string {
 }
 
 func validatePolicy(p UpdatePolicy) error {
+	if p.TagPrefix != "" && (strings.Contains(p.TagPrefix, "..") || strings.ContainsAny(p.TagPrefix, " \t\n\r@'\"#") || !lockParsePrefix(p.TagPrefix)) {
+		return fmt.Errorf("invalid tag_prefix %q", p.TagPrefix)
+	}
 	if p.Level != "" && p.Constraint != "" {
 		return fmt.Errorf("level and constraint are mutually exclusive")
 	}

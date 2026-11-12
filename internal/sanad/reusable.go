@@ -292,9 +292,29 @@ func (a *githubAPI) Workflow(ctx context.Context, host, name, ref, sha string) (
 	if code == 404 || (comparison.Status != "ahead" && comparison.Status != "identical") {
 		return WorkflowPin{}, fmt.Errorf("workflow commit is not reachable from %s in %s", anchor, nwo)
 	}
-	if v, ok := lock.ParseSemVer(ref); ok && v.IsFull() && !strings.EqualFold(resolved.SHA, sha) {
-		return WorkflowPin{}, fmt.Errorf("workflow tag moved: %s@%s", name, ref)
+	if !fullSHA.MatchString(ref) {
+		var marker struct {
+			Ref string `json:"ref"`
+		}
+		code, err := a.get(ctx, host, "/repos/"+nwo+"/git/ref/tags/"+url.PathEscape(ref), &marker)
+		if err != nil {
+			return WorkflowPin{}, err
+		}
+		if code == 200 {
+			if !strings.EqualFold(resolved.SHA, sha) {
+				return WorkflowPin{}, fmt.Errorf("workflow tag moved: %s@%s", name, ref)
+			}
+		} else {
+			code, err = a.get(ctx, host, "/repos/"+nwo+"/git/ref/heads/"+url.PathEscape(ref), &marker)
+			if err != nil {
+				return WorkflowPin{}, err
+			}
+			if code != 200 {
+				return WorkflowPin{}, fmt.Errorf("workflow ref is not a repository-owned tag or branch: %s", ref)
+			}
+		}
 	}
+
 	data, exists, err := a.content(ctx, host, nwo, parts[2], sha)
 	if err != nil {
 		return WorkflowPin{}, err
@@ -403,12 +423,12 @@ func planWorkflows(ctx context.Context, work, host string, cfg Config, opts Opti
 		}
 		var list []Release
 		if opts.To == "" {
-			v, ok := lock.ParseSemVer(old.Ref)
-			if !ok || !v.IsFull() || !v.IsStable() {
+			_, ok := policyVersion(old.Ref, effectivePolicy(cfg, opts, ref.Name, ref.NWO))
+			if !ok {
 				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: old.Ref, Status: "frozen", Reason: "choose a full stable version with --action and --to to begin version tracking"})
 				continue
 			}
-			list, err = releases.List(ctx, old.Host, ref.NWO)
+			list, err = listCandidates(ctx, releases, old.Host, ref.NWO, effectivePolicy(cfg, opts, ref.Name, ref.NWO))
 			if err != nil {
 				return err
 			}
@@ -418,6 +438,10 @@ func planWorkflows(ctx context.Context, work, host string, cfg Config, opts Opti
 			r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: old.Ref, Status: "unchanged", Reason: "no newer stable release matches policy"})
 		}
 		for _, target := range candidates {
+			if age > 0 && tagOnlyCandidate(list, target) {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: old.Ref, To: target, Status: "blocked", Reason: "tag-only candidate has no release publication timestamp for cooldown policy"})
+				continue
+			}
 			if target == old.Ref {
 				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: old.Ref, To: target, Status: "unchanged", Reason: "already tracking this ref"})
 				continue

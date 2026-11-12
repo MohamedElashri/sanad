@@ -144,3 +144,26 @@ func TestWorkflowAPIInspectsExactCommitAndRejectsForkOnlySHA(t *testing.T) {
 		})
 	}
 }
+
+func TestReusableWorkflowFamilyTagsCannotRetargetFrozenPins(t *testing.T) {
+	api := newAPI("github.com")
+	api.tokens["github.com"] = "test"
+	api.client = &http.Client{Transport: transportFunc(func(req *http.Request) (*http.Response, error) {
+		switch {
+		case req.URL.Path == "/repos/org/ci":
+			return response(200, `{"id":4,"owner":{"id":3},"default_branch":"main"}`), nil
+		case strings.Contains(req.URL.Path, "/commits/"):
+			return response(200, `{"sha":"`+strings.Repeat("b", 40)+`"}`), nil
+		case strings.Contains(req.URL.Path, "/compare/"):
+			return response(200, `{"status":"ahead"}`), nil
+		case strings.Contains(req.URL.Path, "/git/ref/tags/"):
+			return response(200, `{"ref":"refs/tags/build/v1.0.0"}`), nil
+		default:
+			t.Fatalf("unexpected endpoint after retarget: %s", req.URL)
+			return nil, nil
+		}
+	})}
+	if _, err := api.Workflow(context.Background(), "github.com", "org/ci/.github/workflows/build.yml", "build/v1.0.0", strings.Repeat("a", 40)); err == nil {
+		t.Fatal("retargeted family tag was accepted")
+	}
+}

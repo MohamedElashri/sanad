@@ -164,3 +164,32 @@ A source snapshot does not vendor runtime downloads, container images, or remote
 actions called by a composite; native locks and the protection report still matter.
 Vendoring also does not establish compatibility with `act`: test that runner's
 execution behavior separately before relying on native lockfile enforcement.
+
+## Tag families and repositories without releases
+
+For a repository that versions several tools independently, select a literal tag
+prefix. Version policy applies to the full stable SemVer after that prefix:
+
+```toml
+[actions."org/tools/build"]
+tag_prefix = "build/"
+level = "minor"
+prefer_tags = true
+```
+
+An installed `build/v1.2.0` can advance to `build/v1.3.0`, while `deploy/v9.0.0` and
+unprefixed versions are excluded. Prefixes are explicit; Sanad does not guess a
+monorepo's release conventions. CLI level/constraint overrides retain the family.
+
+By default candidates come from GitHub Releases. `prefer_tags = true` adds full
+stable tags when a project does not publish corresponding releases. Existing
+release metadata takes precedence, so a draft or prerelease is not reintroduced
+through the tag list. This setting can also be placed in `[update]` and applies
+to managed reusable workflow versions.
+
+A tag-only automatic candidate has no GitHub release publication timestamp. With
+a release cooldown it is blocked, and Sanad can select an older eligible release.
+Commit/tag author dates do not establish publication age for this fallback.
+First-seen observations remain available when you want waiting periods for projects
+without release records. Explicit `--to` selections retain the ordinary adoption
+checks and are separate from automatic catalog selection.
