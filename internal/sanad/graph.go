@@ -233,9 +233,9 @@ func assess(before, after graph, state observations, observed map[string]time.Ti
 			continue
 		}
 		d := *change.After
-		nwo, _, _ := strings.Cut(d.Key, "@")
+		nwo := repositoryName(d.Key)
 		for _, old := range before {
-			oldNWO, _, _ := strings.Cut(old.Key, "@")
+			oldNWO := repositoryName(old.Key)
 			if nwo == oldNWO && (d.Host != old.Host || d.OwnerID != old.OwnerID || d.RepoID != old.RepoID) {
 				return false, eligible, fmt.Errorf("source identity changed for %s", d.Key)
 			}
