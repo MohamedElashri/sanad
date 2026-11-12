@@ -51,6 +51,9 @@ type Config struct {
 	Observation struct {
 		MinimumAge string `toml:"minimum_age" json:"minimum_age,omitempty"`
 	} `toml:"observation" json:"observation"`
+	Publisher struct {
+		Actions []string `toml:"actions" json:"actions,omitempty"`
+	} `toml:"publisher" json:"publisher"`
 	Actions map[string]UpdatePolicy `toml:"actions" json:"actions,omitempty"`
 }
 
@@ -107,6 +110,19 @@ func loadConfig(root, name string) (Config, error) {
 		policies[key] = policy
 	}
 	raw.Actions = policies
+	for _, name := range raw.Publisher.Actions {
+		if _, err := safePath(root, name); err != nil {
+			return c, err
+		}
+		if name != "action.yml" && name != "action.yaml" && !strings.HasSuffix(name, "/action.yml") && !strings.HasSuffix(name, "/action.yaml") {
+			return c, fmt.Errorf("publisher action must name an action.yml or action.yaml file: %s", name)
+		}
+		for _, part := range strings.Split(name, "/") {
+			if strings.EqualFold(part, ".git") {
+				return c, fmt.Errorf("publisher action cannot name Git metadata")
+			}
+		}
+	}
 	if _, err := duration(raw.Observation.MinimumAge); err != nil {
 		return c, err
 	}

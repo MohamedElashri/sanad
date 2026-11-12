@@ -42,12 +42,16 @@ func unalias(n *yaml.Node) *yaml.Node {
 }
 
 func references(files tree) ([]reference, error) {
-	out := []reference{}
-	seen := map[reference]bool{}
 	active, err := activeMetadata(files)
 	if err != nil {
 		return nil, err
 	}
+	return referencesIn(files, active)
+}
+
+func referencesIn(files tree, active map[string]bool) ([]reference, error) {
+	out := []reference{}
+	seen := map[reference]bool{}
 	for name, f := range files {
 		if !active[name] {
 			continue

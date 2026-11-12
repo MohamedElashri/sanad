@@ -13,3 +13,7 @@ level = "minor"
 
 # [actions."actions/checkout"]
 # constraint = ">= 6, < 8"
+
+# Protect inline SHAs in published composite actions, including unused exports.
+# [publisher]
+# actions = ["action.yml"]
