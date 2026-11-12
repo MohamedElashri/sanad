@@ -35,6 +35,22 @@ replace the global version limit, with an exact action subpath policy taking
 precedence over its repository policy. CLI `--level` or `--constraint` overrides
 both. Explicit `--to` targets override automatic version selection.
 
+For independently versioned subactions, set an explicit tag family:
+
+```toml
+[actions."org/tools/build"]
+tag_prefix = "build/"
+level = "minor"
+prefer_tags = true
+```
+
+This allows `build/v1.2.0` to advance to `build/v1.3.0`. `prefer_tags` adds stable
+tags to the release catalog; it does not override draft/prerelease metadata.
+Level/constraint overrides retain inherited tag-family and catalog settings.
+An explicit `prefer_tags = false` disables inherited tag fallback. Shared-ref
+subactions must satisfy all selected policies. Tag-only automatic candidates
+cannot satisfy a release cooldown without a release publication timestamp.
+
 These version limits do not replace adoption waiting periods. To add first-seen
 policy to the existing TOML file:
 
@@ -77,6 +93,39 @@ least the base's waiting periods. Lowering a period or backdating state in the
 proposed change cannot make its dependencies mature. A plain `check` without a
 base does not compare dependency changes for release-age policy; use a trusted
 base when checking that policy as well.
+
+## Publisher and source policies
+
+List all distributed metadata files, including exports unused by local workflows:
+
+```toml
+[publisher]
+actions = ["action.yml", "action/action.yml"]
+```
+
+Remote calls in these files must retain full SHAs; `$/` paths are forbidden
+because they resolve in the consumer's repository. If native normalization
+conflicts with this contract, use a separate internal composite rather than
+removing the guard or rewriting protected metadata after generation.
+
+Require approved identities for every action, transitive source, and reusable
+workflow with `[trust] require_approval = true`. Inspect `sanad explain` and verify
+the source's current numeric IDs before adding an entry such as:
+
+```toml
+[trust]
+require_approval = true
+
+[trust.repositories."github.com/actions/checkout"]
+owner_id = 44036562
+repo_id = 197814629
+```
+
+Verify the example IDs before adopting them. Approval covers that repository's
+subactions and workflows. Listed IDs remain enforced with `require_approval = false`.
+Merge new-source approvals before introducing that source: online checks enforce
+both current and trusted-base policy, so a dependency PR cannot approve itself.
+Use `check --base REV` whenever source approvals are configured.
 
 ## Pull-request checks
 
@@ -157,3 +206,24 @@ the runner and must be uploaded explicitly if they are needed after the job ends
 
 See the [configuration](https://melashri.net/sanad/reference/configuration/) and
 [Action](https://melashri.net/sanad/reference/action/) references for more detail.
+
+## Local hooks and release artifacts
+
+Use `sanad check --offline --coverage-only` for developer hooks when an official
+backend is already installed. This explicit mode skips waiting periods and source
+approvals, validates local graph coverage, and rejects `--base`. Keep online
+`check --base REV` in CI. The repository ships Makefile examples and a
+system-language pre-commit hook; pin the hook to a reviewed release commit and
+keep the matching CLI/backend on `PATH`.
+
+Sanad 1.1 release archives include SPDX inventories for the compiled CLI/backend;
+the release also includes the Action's production npm inventory. Build provenance
+covers the archives, checksums, and inventories. When artifact verification is
+part of the task, verify the downloaded archive with:
+
+```sh
+gh attestation verify sanad_1.1.0_Linux_x86_64.tar.gz --repo MohamedElashri/sanad
+```
+
+These inventories do not cover arbitrary runtime downloads or prove code safety.
+Normal token-only CLI operation does not require GitHub CLI.

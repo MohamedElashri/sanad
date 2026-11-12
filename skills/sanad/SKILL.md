@@ -1,6 +1,6 @@
 ---
 name: sanad
-description: Manage native GitHub Actions lockfiles with Sanad. Use when asked to adopt Sanad, reconcile workflow edits in a repository using Sanad, review or apply action dependency updates, configure Sanad policy or CI automation, or diagnose verification and adoption-policy findings.
+description: Manage native GitHub Actions lockfiles with Sanad. Use for onboarding, action and reusable-workflow updates, source approval and publisher policies, action vendoring, CI automation, or diagnosing Sanad verification findings.
 license: MIT
 ---
 
@@ -22,7 +22,7 @@ Run from the target repository, or pass `--root PATH` to each command.
 sanad version
 ```
 
-These instructions target Sanad 1.x. If it is missing or reports 0.x, follow the
+These instructions target Sanad 1.1 or later. If it is missing or older, follow the
 [installation guide](https://melashri.net/sanad/guide/getting-started/) before
 using this workflow. Keep the release's `sanad` and `gh-actions-lock` executables
 together on `PATH`. `sanad setup` installs and verifies the exact official backend
@@ -31,7 +31,7 @@ Authentication uses `GH_TOKEN`, then `GITHUB_TOKEN`, then stored `gh` credential
 For repository/host discovery failures, checksum errors, interrupted writes, or
 unsupported actions, read [troubleshooting](references/troubleshooting.md).
 
-Once Sanad 1.x is available, inspect the repository:
+Once Sanad 1.1 or later is available, inspect the repository:
 
 ```sh
 git status --short
@@ -95,9 +95,9 @@ Publisher policy can require inline SHAs in declared exported action files. Do n
 remove that protection to make native normalization succeed. Source trust policy
 can require reviewed host/repository numeric identities across all transitive
 sources; approval changes must reach the trusted base before a dependency PR can
-use them. Use `tag_prefix` for explicit monorepo version families and `prefer_tags`
-when release records are incomplete; unknown tag publication age cannot satisfy
-an automatic release cooldown.
+introduce a new source. Use `tag_prefix` for explicit monorepo version families
+and `prefer_tags` when release records are incomplete; unknown tag publication
+age cannot satisfy an automatic release cooldown.
 
 Vendoring preserves the full source tree and licenses under `.github/sanad/vendor/`
 with provenance in `.github/sanad/vendor.json`. Local edits to managed snapshots
@@ -105,6 +105,8 @@ block replacement. Review all copied code, use explicit `vendor --to` updates,
 and keep its upstream pins and file hashes intact. It does not establish runtime
 compatibility with `act` or vendor downloaded tools and containers.
 
+For reusable-workflow selection, vendor updates, dependency explanations, or
+importing zizmor findings, read [dependency operations](references/dependency-operations.md).
 For persistent version limits, per-action overrides, waiting periods, or CI
 setup, read [policy and automation](references/policy-and-automation.md).
 
@@ -159,8 +161,11 @@ their trusted history. Otherwise, run `sanad check`.
 
 `sanad check --offline` checks local coverage and graph integrity with an installed
 official backend. It rejects `--base` and enabled first-seen policy, and cannot
-enforce adoption policy. When online checks cannot run, report the verification limitation
-and leave existing policy intact. `status` is not frozen verification.
+enforce adoption policy. Plain offline checks also reject source-approval policy.
+For an explicitly local developer hook, use `sanad check --offline --coverage-only`;
+this skips adoption policy and source approvals. Keep the online check in CI.
+When online checks cannot run, report the verification limitation and leave
+existing policy intact. `status` is not frozen verification.
 
 Review the final working-tree diff. Include every reported managed file in the
 change: the native lockfile, the selected policy file, observation state when

@@ -95,9 +95,9 @@ mkdir -p "$HOME/.agents/skills"
 cp -R skills/sanad "$HOME/.agents/skills/"
 ```
 
-The skill covers onboarding, workflow reconciliation, scoped updates, and
-verification. It requires Sanad 1.x on the agent's `PATH`. See the
-[agent guide](docs/content/guide/agents.md) for each agent's installation paths
+The skill covers onboarding, workflow reconciliation, scoped updates, source
+policies, vendoring, and verification. It requires Sanad 1.1+ on the agent's
+`PATH`. See the [agent guide](docs/content/guide/agents.md) for installation paths
 and example requests, or read [SKILL.md](skills/sanad/SKILL.md).
 
 [Documentation](https://melashri.net/sanad/) ·
