@@ -580,6 +580,12 @@ func runVendor(ctx context.Context, root, host, repo string, cfg Config, opts Op
 	if r.Blocked() {
 		return *r, nil
 	}
+	if err := reconcileWorkflows(ctx, final, host, opts, true, r); err != nil {
+		return *r, err
+	}
+	if r.Blocked() {
+		return *r, nil
+	}
 	r.Dependencies = after.list()
 	r.Changes = graphDiff(before, after)
 	r.Coverage = coverage(final)
