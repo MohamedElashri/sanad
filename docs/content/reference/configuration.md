@@ -5,7 +5,9 @@ weight = 20
 template = "page"
 +++
 
-Sanad reads `.sanad.toml` from the repository root by default. Use `--config` for another repository-relative path. Configuration is strict: unknown keys, invalid values, and incompatible policy options produce an error.
+Sanad reads `.sanad.toml` from the repository root by default. Use `--config`
+for another repository-relative path. Configuration is strict: unknown keys,
+invalid values, and incompatible policy options produce an error.
 
 ## Minimal configuration
 
@@ -19,20 +21,24 @@ enabled = true
 level = "minor"
 ```
 
-`sanad init --confirm-native --write` writes the native-support confirmation. Set `native.enabled` only after verifying that GitHub enforces native lockfiles for your repository. It is an explicit confirmation, not an entitlement detector.
+`sanad init --confirm-native --write` writes the native-support confirmation.
+Set `native.enabled` only after verifying that GitHub enforces native lockfiles
+for your repository. It is an explicit confirmation, not an entitlement
+detector.
 
-Without a policy file, read-only commands use defaults. Repository writes require native support to be confirmed.
+Without a policy file, read-only commands use defaults. Repository writes
+require native support to be confirmed.
 
 ## Configuration fields
 
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `version` | Required in a file | Configuration schema version; must be `1`. |
-| `native.enabled` | `false` | Your confirmation of repository support. |
-| `update.level` | `minor` when no global range is set | Maximum automatic update level. |
-| `update.constraint` | Unset | SemVer range instead of a level. |
-| `observation.minimum_age` | Unset | Minimum first-seen age for changed commits. |
-| `actions."OWNER/REPO"` | Unset | Per-action version policy. |
+| Setting                   | Default                             | Meaning                                     |
+| ------------------------- | ----------------------------------- | ------------------------------------------- |
+| `version`                 | Required in a file                  | Configuration schema version; must be `1`.  |
+| `native.enabled`          | `false`                             | Your confirmation of repository support.    |
+| `update.level`            | `minor` when no global range is set | Maximum automatic update level.             |
+| `update.constraint`       | Unset                               | SemVer range instead of a level.            |
+| `observation.minimum_age` | Unset                               | Minimum first-seen age for changed commits. |
+| `actions."OWNER/REPO"`    | Unset                               | Per-action version policy.                  |
 
 Inspect the effective configuration:
 
@@ -43,24 +49,30 @@ sanad config --config .github/sanad.toml
 
 ## Version update levels
 
-| Level | Automatic candidates |
-| --- | --- |
+| Level   | Automatic candidates                                           |
+| ------- | -------------------------------------------------------------- |
 | `patch` | Newer stable releases within the same major and minor version. |
-| `minor` | Newer stable releases within the same major version. |
-| `major` | Any newer stable release. |
+| `minor` | Newer stable releases within the same major version.           |
+| `major` | Any newer stable release.                                      |
 
-Only complete stable versions update automatically. Branches, partial versions such as `v7`, and prerelease refs remain frozen until you choose an explicit target.
+Only complete stable versions update automatically. Branches, partial versions
+such as `v7`, and prerelease refs remain frozen until you choose an explicit
+target.
 
 ## SemVer constraints
 
-Use a constraint when a simple level is not sufficient. A global constraint applies to every action; use a per-action override when their version ranges differ:
+Use a constraint when a simple level is not sufficient. A global constraint
+applies to every action; use a per-action override when their version ranges
+differ:
 
 ```toml
 [update]
 constraint = ">= 6, < 8"
 ```
 
-Do not set `level` and `constraint` in the same policy. Constraints filter stable version candidates; they do not replace native verification or adoption waiting periods.
+Do not set `level` and `constraint` in the same policy. Constraints filter
+stable version candidates; they do not replace native verification or adoption
+waiting periods.
 
 ## Per-action overrides
 
@@ -80,7 +92,9 @@ constraint = ">= 6, < 8"
 level = "patch"
 ```
 
-A per-action policy replaces the global version limit for that action. CLI `--level` or `--constraint` selection takes precedence. Adoption waiting periods remain repository-wide and apply to the resulting changed dependency graph.
+A per-action policy replaces the global version limit for that action. CLI
+`--level` or `--constraint` selection takes precedence. Adoption waiting periods
+remain repository-wide and apply to the resulting changed dependency graph.
 
 ## First-seen waiting period
 
@@ -89,11 +103,15 @@ A per-action policy replaces the global version limit for that action. CLI `--le
 minimum_age = "7d"
 ```
 
-Accepted values include `7d`, `48h`, and `0h`. Negative and invalid durations are rejected. Observations are stored in `.github/sanad/state.json`; commit them to the trusted base branch. See [Waiting periods](../../guide/policy/) before enabling this policy in CI.
+Accepted values include `7d`, `48h`, and `0h`. Negative and invalid durations
+are rejected. Observations are stored in `.github/sanad/state.json`; commit them
+to the trusted base branch. See [Waiting periods](../../guide/policy/) before
+enabling this policy in CI.
 
 ## Dependabot release-age policy
 
-Sanad supports one repository-wide `github-actions` entry with `cooldown.default-days`:
+Sanad supports one repository-wide `github-actions` entry with
+`cooldown.default-days`:
 
 ```yaml
 version: 2
@@ -106,13 +124,20 @@ updates:
       default-days: 7
 ```
 
-The minimum age applies to changed direct and transitive commits. Other cooldown keys and multiple `github-actions` entries are rejected instead of being interpreted ambiguously. When both release-age and first-seen policy are enabled, both must pass.
+The minimum age applies to changed direct and transitive commits. Other cooldown
+keys and multiple `github-actions` entries are rejected instead of being
+interpreted ambiguously. When both release-age and first-seen policy are
+enabled, both must pass.
 
 ## Files to commit
 
-Commit `.sanad.toml`, `.github/workflows/actions.lock`, and any reported workflow or local-action edits. Commit `.github/sanad/state.json` when observation policy creates or updates it.
+Commit `.sanad.toml`, `.github/workflows/actions.lock`, and any reported
+workflow or local-action edits. Commit `.github/sanad/state.json` when
+observation policy creates or updates it.
 
-Do not treat temporary caches as observation history. The transaction journal is recovery metadata; an unexpected `.github/sanad/transaction.json` needs investigation and recovery rather than a normal commit.
+Do not treat temporary caches as observation history. The transaction journal is
+recovery metadata; an unexpected `.github/sanad/transaction.json` needs
+investigation and recovery rather than a normal commit.
 
 ## Published actions
 
@@ -125,19 +150,21 @@ actions = ["action.yml", "helpers/action.yml"]
 
 Sanad checks these files even when your own workflows never call them. Remote
 `uses:` entries must retain full commit SHAs so callers without native lockfiles
-keep their inline protection. Exported metadata must not contain `$/` references,
-which resolve in the caller's repository. Your own workflows can use native locks.
+keep their inline protection. Exported metadata must not contain `$/`
+references, which resolve in the caller's repository. Your own workflows can use
+native locks.
 
 If the native producer normalizes an exported SHA into a tag, Sanad rejects the
 whole write. It does not silently restore incompatible metadata into the native
 graph. Keep exported composites pinned; use a separate internal composite for CI
 when producer normalization conflicts with the published contract. This guard
-covers the declared metadata, not code downloaded by action scripts or Dockerfiles.
+covers the declared metadata, not code downloaded by action scripts or
+Dockerfiles.
 
-Update settings inherit from `[update]`, then the repository entry in `[actions]`,
-then the matching subaction or reusable-workflow entry. An override of level or
-constraint keeps inherited tag-family and catalog settings. An explicit
-`prefer_tags = false` overrides an inherited `true`.
+Update settings inherit from `[update]`, then the repository entry in
+`[actions]`, then the matching subaction or reusable-workflow entry. An override
+of level or constraint keeps inherited tag-family and catalog settings. An
+explicit `prefer_tags = false` overrides an inherited `true`.
 
 When subactions share a ref, automatic selection intersects candidates from each
 selected subaction's catalog and version policy. A release-only subaction is not

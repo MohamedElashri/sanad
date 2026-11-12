@@ -10,6 +10,14 @@ npm ci --prefix action
 npm test --prefix action
 ```
 
+Markdown prose wraps at 80 columns. Format it with:
+
+```sh
+npx prettier@3.6.2 --write --ignore-path .gitignore '**/*.md'
+```
+
+Code, tables, links, and front matter can exceed the prose width.
+
 ## Repository dependency checks
 
 We use Sanad v1.1.0 to verify our workflows, approve direct and transitive

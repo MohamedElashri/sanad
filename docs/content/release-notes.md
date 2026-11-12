@@ -25,9 +25,9 @@ template = "page"
 
 ## Upgrade
 
-Upgrade the CLI and Action together, then run `sanad sync --write`.
-Adoption checks need a trusted `--base`.
-Scheduled updates need a workflow-capable `SANAD_TOKEN`.
+Upgrade the CLI and Action together, then run `sanad sync --write`. Adoption
+checks need a trusted `--base`. Scheduled updates need a workflow-capable
+`SANAD_TOKEN`.
 
 [Upgrade guide](../guide/updating/) ·
 [Download v1.1.0](https://github.com/MohamedElashri/sanad/releases/tag/v1.1.0) ·
