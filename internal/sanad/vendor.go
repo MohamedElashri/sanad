@@ -569,7 +569,7 @@ func runVendor(ctx context.Context, root, host, repo string, cfg Config, opts Op
 				return *r, err
 			}
 		}
-		return finish(root, opts.Config, input, pending, opts.Write, r)
+		return finish(ctx, root, opts.Config, input, pending, opts.Write, r)
 	}
 	result, err = backend.Run(ctx, work, host, repo, "--verify")
 	if err != nil {
@@ -594,7 +594,7 @@ func runVendor(ctx context.Context, root, host, repo string, cfg Config, opts Op
 		return *r, err
 	}
 	r.Decisions = append(r.Decisions, Decision{Action: nwo, To: target, Status: "eligible", Reason: "verified complete source snapshot; review the copied code and retained licenses", Changes: r.Changes})
-	return finish(root, opts.Config, input, final, opts.Write, r)
+	return finish(ctx, root, opts.Config, input, final, opts.Write, r)
 }
 
 func marshalVendorLock(deps map[string]lock.Action, keys []string) ([]byte, error) {
