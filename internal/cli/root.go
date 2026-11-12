@@ -62,8 +62,18 @@ func NewRootCommand() *cobra.Command {
 	if date != "" && strings.HasPrefix(version, "1.") && !strings.Contains(version, "-") {
 		actionRef = commit
 	}
-	for _, name := range []string{"status", "doctor", "init", "sync", "plan", "update", "check", "recover"} {
+	for _, name := range []string{"status", "doctor", "explain", "init", "sync", "plan", "update", "check", "recover"} {
 		cmd := &cobra.Command{Use: name, Short: descriptions[name], Args: cobra.NoArgs, RunE: run(name)}
+		if name == "explain" {
+			cmd.Use = "explain [owner/repo[/path][@ref]]"
+			cmd.Args = cobra.MaximumNArgs(1)
+			cmd.RunE = func(cmd *cobra.Command, args []string) error {
+				if len(args) > 0 {
+					opts.Action = args[0]
+				}
+				return run("explain")(cmd, args)
+			}
+		}
 		if name == "init" || name == "sync" || name == "update" || name == "recover" {
 			cmd.Flags().BoolVar(&opts.Write, "write", false, "apply the proposed local changes")
 		}
@@ -136,4 +146,4 @@ func NewRootCommand() *cobra.Command {
 	return root
 }
 
-var descriptions = map[string]string{"status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}
+var descriptions = map[string]string{"explain": "Explain dependency paths, source identities, and observations", "status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}

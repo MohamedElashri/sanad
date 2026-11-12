@@ -100,7 +100,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	}
 	host, repo, identityErr := repository(ctx, root, opts.Repo)
 	if identityErr != nil {
-		if command == "status" || command == "doctor" || opts.Offline {
+		if command == "status" || command == "doctor" || command == "explain" || opts.Offline {
 			host = "github.com"
 			repo = "local/repository"
 			report.finding("repository-identity", "warning", identityErr.Error())
@@ -126,7 +126,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if !cfg.Native.Enabled {
 		report.finding("native-support-unknown", "warning", "native enforcement is not confirmed; verify GitHub eligibility, then use init --confirm-native --write")
 	}
-	if command == "status" || command == "doctor" {
+	if command == "status" || command == "doctor" || command == "explain" {
 		if _, ok := input[lock.Path]; !ok {
 			report.finding("not-initialized", "warning", "run sanad init to preview native onboarding")
 		}
@@ -169,6 +169,11 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 					reason = "waiting until " + until.Format(time.RFC3339)
 				}
 				report.Decisions = append(report.Decisions, Decision{Action: parts[3], Status: status, Reason: reason, EligibleAt: &until})
+			}
+		}
+		if command == "explain" {
+			if e := explain(input, old, cfg, opts, &report); e != nil {
+				return report, e
 			}
 		}
 		if command == "doctor" && newAPI(host).token(ctx, host) == "" {
