@@ -144,7 +144,7 @@ func canonicalActionName(name string) string {
 }
 
 func validatePolicy(p UpdatePolicy) error {
-	if p.TagPrefix != "" && (strings.Contains(p.TagPrefix, "..") || strings.ContainsAny(p.TagPrefix, " \t\n\r@'\"#") || lockParsePrefix(p.TagPrefix) == false) {
+	if p.TagPrefix != "" && (strings.Contains(p.TagPrefix, "..") || strings.ContainsAny(p.TagPrefix, " \t\n\r@'\"#") || !lockParsePrefix(p.TagPrefix)) {
 		return fmt.Errorf("invalid tag_prefix %q", p.TagPrefix)
 	}
 	if p.Level != "" && p.Constraint != "" {
