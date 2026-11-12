@@ -349,8 +349,16 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 		}
 		candidates := targets(releases, ref.Ref, effective, opts.To)
 		for _, sibling := range group[1:] {
+			siblingPolicy := effectivePolicy(cfg, opts, sibling.Name, sibling.NWO)
+			siblingReleases := releases
+			if opts.To == "" {
+				siblingReleases, err = listCandidates(ctx, source, initial[key].Host, sibling.NWO, siblingPolicy)
+				if err != nil {
+					return err
+				}
+			}
 			allowed := map[string]bool{}
-			for _, target := range targets(releases, sibling.Ref, effectivePolicy(cfg, opts, sibling.Name, sibling.NWO), opts.To) {
+			for _, target := range targets(siblingReleases, sibling.Ref, siblingPolicy, opts.To) {
 				allowed[target] = true
 			}
 			filtered := []string{}

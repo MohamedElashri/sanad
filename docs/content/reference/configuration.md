@@ -138,3 +138,7 @@ Update settings inherit from `[update]`, then the repository entry in `[actions]
 then the matching subaction or reusable-workflow entry. An override of level or
 constraint keeps inherited tag-family and catalog settings. An explicit
 `prefer_tags = false` overrides an inherited `true`.
+
+When subactions share a ref, automatic selection intersects candidates from each
+selected subaction's catalog and version policy. A release-only subaction is not
+advanced to a tag-only candidate because another subaction enables tags.
