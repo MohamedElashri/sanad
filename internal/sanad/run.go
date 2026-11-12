@@ -28,15 +28,15 @@ type Options struct {
 
 func Run(ctx context.Context, command string, opts Options) (report Report, err error) {
 	report = NewReport(command)
-	if opts.CoverageOnly && (command != "check" || !opts.Offline || opts.Base != "") {
-		return report, fmt.Errorf("--coverage-only requires check --offline without --base")
-	}
 	defer func() {
 		if err != nil {
 			report.finding("operation-failed", "error", err.Error())
 		}
 		report.Success = err == nil && !report.Blocked()
 	}()
+	if opts.CoverageOnly && (command != "check" || !opts.Offline || opts.Base != "") {
+		return report, fmt.Errorf("--coverage-only requires check --offline without --base")
+	}
 	root, err := Root(ctx, opts.Root)
 	if err != nil {
 		return report, err
@@ -125,7 +125,9 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		return report, err
 	}
 	report.Dependencies = old.list()
-	report.Findings = append(report.Findings, trustFindings(old, cfg.Trust)...)
+	if !opts.CoverageOnly {
+		report.Findings = append(report.Findings, trustFindings(old, cfg.Trust)...)
+	}
 	report.Coverage = coverage(input)
 	report.Protection, err = protections(input, host)
 	if err != nil {
@@ -476,21 +478,52 @@ func baseFiles(ctx context.Context, root, base, config string) (tree, error) {
 	}
 	hash := strings.TrimSpace(string(b))
 	out := tree{}
+	cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "-r", "-z", "--name-only", hash)
+	paths, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	exists := map[string]bool{}
+	for _, name := range strings.Split(string(paths), "\x00") {
+		exists[name] = true
+	}
+	var total int64
+	load := func(name string) (bool, error) {
+		if _, ok := out[name]; ok {
+			return true, nil
+		}
+		if !exists[name] {
+			return false, nil
+		}
+		if _, err := safePath(root, name); err != nil {
+			return false, err
+		}
+		cmd := exec.CommandContext(ctx, "git", "-C", root, "show", hash+":"+name)
+		data, err := cmd.Output()
+		if err != nil {
+			return false, err
+		}
+		total += int64(len(data))
+		if total > 64<<20 {
+			return false, fmt.Errorf("trusted base metadata exceeds 64 MiB")
+		}
+		out[name] = file{Data: data, Mode: 0o644}
+		return true, nil
+	}
 	for _, name := range []string{lock.Path, StatePath, WorkflowStatePath, VendorStatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
-		cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "--name-only", hash, "--", name)
-		b, err = cmd.Output()
-		if err != nil {
+		if _, err := load(name); err != nil {
 			return nil, err
 		}
-		if strings.TrimSpace(string(b)) == "" {
-			continue
+	}
+	for name := range exists {
+		if isWorkflow(name) {
+			if _, err := load(name); err != nil {
+				return nil, err
+			}
 		}
-		cmd = exec.CommandContext(ctx, "git", "-C", root, "show", hash+":"+name)
-		b, err = cmd.Output()
-		if err != nil {
-			return nil, err
-		}
-		out[name] = file{Data: b, Mode: 0o644}
+	}
+	if _, err := collectMetadata(out, load); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

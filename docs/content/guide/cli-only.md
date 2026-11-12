@@ -62,3 +62,19 @@ gh attestation verify sanad_<version>_Linux_x86_64.tar.gz --repo MohamedElashri/
 
 Older releases do not acquire attestations retroactively. Token-only operation of
 Sanad itself does not depend on this optional GitHub CLI verification command.
+
+For Enterprise Cloud data-residency repositories, keep tenant and public reads
+separate when running without GitHub CLI:
+
+```sh
+export GH_HOST="customer.ghe.com"
+export GH_TOKEN="<tenant-read-token>"
+export SANAD_GITHUB_COM_TOKEN="<public-github-com-read-token>"
+sanad plan --repo customer.ghe.com/owner/repo
+```
+
+`SANAD_GITHUB_COM_TOKEN` is used only for public github.com sources while targeting
+a tenant. It is passed to the pinned producer through its dedicated public-token
+setting. Tenant credentials are never reused for public API calls. Without this
+optional credential, public reads use stored github.com credentials or anonymous
+access and its lower rate limit.

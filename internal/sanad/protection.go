@@ -41,24 +41,50 @@ func protections(files tree, host string) ([]Protection, error) {
 			return nil, err
 		}
 	}
+	chains, err := metadataChains(files)
+	if err != nil {
+		return nil, err
+	}
+	nativeGraph, err := loadGraph(files, host)
+	if err != nil {
+		return nil, err
+	}
+	workflowPins := map[string]map[string]bool{}
+	for wf, keys := range parsed.Workflows {
+		set := map[string]bool{}
+		for _, key := range keys {
+			closure(nativeGraph, key, set)
+		}
+		workflowPins[wf] = set
+	}
 	for _, ref := range refs {
 		p := Protection{Kind: "action", File: ref.File, Line: ref.Line, Subject: ref.Name + "@" + ref.Ref, Status: "uncovered", Reason: "no native pin recorded for this call"}
 		key := strings.ToLower(ref.NWO) + "@" + ref.Ref
 		if _, ok := parsed.Dependencies[key]; ok {
-			covered := false
-			for wf, keys := range parsed.Workflows {
-				if strings.HasPrefix(ref.File, ".github/workflows/") && wf != ref.File {
-					continue
-				}
-				for _, k := range keys {
-					if k == key {
-						covered = true
+			covered := true
+			owners := map[string]bool{}
+			for _, chain := range chains[ref.File] {
+				wf := ""
+				for _, file := range chain {
+					if isWorkflow(file) {
+						wf = file
 					}
+				}
+				if wf != "" {
+					owners[wf] = true
+				}
+			}
+			if len(owners) == 0 {
+				covered = false
+			}
+			for wf := range owners {
+				if !workflowPins[wf][key] {
+					covered = false
 				}
 			}
 			if covered {
 				p.Status = "native-lock"
-				p.Reason = "native pin recorded; online check verifies identity and reachability"
+				p.Reason = "native pin recorded for every visible workflow callsite; online check verifies identity and reachability"
 			}
 		}
 		if ref.Workflow {
@@ -85,8 +111,10 @@ func protections(files tree, host string) ([]Protection, error) {
 		if err := yaml.Unmarshal(f.Data, &doc); err != nil {
 			return nil, err
 		}
-		seen := map[*yaml.Node]bool{}
-		var walk func(*yaml.Node)
+		if len(doc.Content) == 0 {
+			continue
+		}
+		root := doc.Content[0]
 		image := func(n *yaml.Node, label string) {
 			n = unalias(n)
 			if n == nil {
@@ -108,62 +136,72 @@ func protections(files tree, host string) ([]Protection, error) {
 			}
 			out = append(out, Protection{Kind: "container", File: name, Line: n.Line, Subject: label + n.Value, Status: status, Reason: reason})
 		}
-		walk = func(n *yaml.Node) {
-			n = unalias(n)
-			if n == nil || seen[n] {
-				return
+		seen := map[*yaml.Node]bool{}
+		steps := func(n *yaml.Node, parallel bool) error {
+			nodes, err := stepNodes(n, parallel)
+			if err != nil {
+				return err
 			}
-			seen[n] = true
-			if n.Kind == yaml.MappingNode {
-				for i := 0; i+1 < len(n.Content); i += 2 {
-					key := n.Content[i].Value
-					value := unalias(n.Content[i+1])
-					if value == nil {
-						continue
-					}
-					switch key {
-					case "runs-on":
-						out = append(out, Protection{Kind: "runner", File: name, Line: value.Line, Subject: "runs-on", Status: "unknown", Reason: "runner labels and groups do not pin the VM or host image contents"})
-					case "run":
-						out = append(out, Protection{Kind: "runtime", File: name, Line: value.Line, Subject: "shell command", Status: "uninspected", Reason: "shell downloads and runtime dependencies are outside native action lockfiles"})
-					case "uses":
-						if strings.HasPrefix(value.Value, "docker://") {
-							image(value, "uses: ")
-						}
-						if strings.HasPrefix(value.Value, "./") {
-							out = append(out, Protection{Kind: "local-action", File: name, Line: value.Line, Subject: value.Value, Status: "workspace", Reason: "runs files from the checked-out workspace, which can differ from the workflow commit"})
-						}
-					case "container":
-						image(value, "")
-					case "services":
-						if value.Kind == yaml.MappingNode {
-							for j := 1; j < len(value.Content); j += 2 {
-								image(value.Content[j], "service: ")
-							}
-						}
-					}
+			for _, step := range nodes {
+				if seen[step] {
+					continue
 				}
-				if u := unalias(mapping(n, "using")); u != nil && u.Value == "docker" {
-					image(mapping(n, "image"), "Docker action: ")
+				seen[step] = true
+				if run := unalias(mapping(step, "run")); run != nil {
+					out = append(out, Protection{Kind: "runtime", File: name, Line: run.Line, Subject: "shell command", Status: "uninspected", Reason: "shell downloads and runtime dependencies are outside native action lockfiles"})
 				}
-				if u := unalias(mapping(n, "uses")); u != nil {
-					versions := map[string]string{"actions/setup-node": "node-version", "actions/setup-go": "go-version", "actions/setup-python": "python-version", "actions/setup-java": "java-version", "ruby/setup-ruby": "ruby-version", "actions/setup-dotnet": "dotnet-version"}
-					for action, key := range versions {
-						if strings.HasPrefix(strings.ToLower(u.Value), action+"@") {
-							subject := action
-							if v := unalias(mapping(mapping(n, "with"), key)); v != nil {
-								subject += " " + v.Value
-							}
-							out = append(out, Protection{Kind: "runtime-tool", File: name, Line: u.Line, Subject: subject, Status: "uninspected", Reason: "the action commit does not pin the downloaded tool's artifact digest"})
+				u := unalias(mapping(step, "uses"))
+				if u == nil {
+					continue
+				}
+				if strings.HasPrefix(u.Value, "docker://") {
+					image(u, "uses: ")
+				}
+				if strings.HasPrefix(u.Value, "./") {
+					out = append(out, Protection{Kind: "local-action", File: name, Line: u.Line, Subject: u.Value, Status: "workspace", Reason: "runs files from the checked-out workspace, which can differ from the workflow commit"})
+				}
+				versions := map[string]string{"actions/setup-node": "node-version", "actions/setup-go": "go-version", "actions/setup-python": "python-version", "actions/setup-java": "java-version", "ruby/setup-ruby": "ruby-version", "actions/setup-dotnet": "dotnet-version"}
+				for action, key := range versions {
+					if strings.HasPrefix(strings.ToLower(u.Value), action+"@") {
+						subject := action
+						if v := unalias(mapping(mapping(step, "with"), key)); v != nil {
+							subject += " " + v.Value
 						}
+						out = append(out, Protection{Kind: "runtime-tool", File: name, Line: u.Line, Subject: subject, Status: "uninspected", Reason: "the action commit does not pin the downloaded tool's artifact digest"})
 					}
 				}
 			}
-			for _, child := range n.Content {
-				walk(child)
+			return nil
+		}
+		if isWorkflow(name) {
+			jobs := unalias(mapping(root, "jobs"))
+			if jobs != nil && jobs.Kind == yaml.MappingNode {
+				for i := 1; i < len(jobs.Content); i += 2 {
+					job := jobs.Content[i]
+					if runner := unalias(mapping(job, "runs-on")); runner != nil {
+						out = append(out, Protection{Kind: "runner", File: name, Line: runner.Line, Subject: "runs-on", Status: "unknown", Reason: "runner labels and groups do not pin the VM or host image contents"})
+					}
+					image(mapping(job, "container"), "")
+					if services := unalias(mapping(job, "services")); services != nil && services.Kind == yaml.MappingNode {
+						for j := 1; j < len(services.Content); j += 2 {
+							image(services.Content[j], "service: ")
+						}
+					}
+					if err := steps(mapping(job, "steps"), true); err != nil {
+						return nil, err
+					}
+				}
+			}
+		} else {
+			runs := mapping(root, "runs")
+			if u := unalias(mapping(runs, "using")); u != nil && u.Value == "docker" {
+				image(mapping(runs, "image"), "Docker action: ")
+			}
+			if err := steps(mapping(runs, "steps"), false); err != nil {
+				return nil, err
 			}
 		}
-		walk(&doc)
+
 	}
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
@@ -220,6 +258,9 @@ func importZizmor(root, name string, r *Report) error {
 				} `json:"driver"`
 			} `json:"tool"`
 			Results []struct {
+				Suppressions []struct {
+					Status string `json:"status"`
+				} `json:"suppressions"`
 				Rule    string `json:"ruleId"`
 				Level   string `json:"level"`
 				Message struct {
@@ -249,6 +290,15 @@ func importZizmor(root, name string, r *Report) error {
 			return fmt.Errorf("SARIF report must come from zizmor")
 		}
 		for _, result := range run.Results {
+			suppressed := false
+			for _, suppression := range result.Suppressions {
+				if suppression.Status == "" || suppression.Status == "accepted" {
+					suppressed = true
+				}
+			}
+			if suppressed {
+				continue
+			}
 			if result.Level == "none" || result.Level == "note" {
 				continue
 			}
