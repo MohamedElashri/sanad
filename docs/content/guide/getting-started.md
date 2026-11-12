@@ -20,7 +20,7 @@ sanad version
 
 ### Release archives
 
-Download the archive for your platform from the [v1.0.2 release](https://github.com/MohamedElashri/sanad/releases/tag/v1.0.2). Extract both executables to the same directory on your `PATH`.
+Download the archive for your platform from the [v1.1.0 release](https://github.com/MohamedElashri/sanad/releases/tag/v1.1.0). Extract both executables to the same directory on your `PATH`.
 
 | Platform | Archive suffix | Executables |
 | --- | --- | --- |

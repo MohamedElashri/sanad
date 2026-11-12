@@ -84,7 +84,7 @@ Check out enough history and pass the pull request's base SHA:
 - uses: actions/checkout@v7.0.1
   with:
     fetch-depth: 0
-- uses: MohamedElashri/sanad@v1.0.2
+- uses: MohamedElashri/sanad@v1.1.0
   with:
     mode: check
     base: ${{ github.event.pull_request.base.sha }}
