@@ -5,129 +5,39 @@
 </div>
 
 Sanad manages GitHub's native [`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
-It generates lockfiles, explains dependency changes, applies update policies, and
-verifies them in CI. GitHub enforces the locked commits when workflows run.
+Pin direct and transitive actions, review updates, and enforce dependency policies
+in CI.
 
-Requires [native lockfile support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
-for your repository. Native lockfiles are generally available on GitHub Free, Team, and Enterprise Cloud (including data residency). GitHub Enterprise Server is not supported.
+[Documentation](https://melashri.net/sanad/) ·
+[Releases](https://github.com/MohamedElashri/sanad/releases) ·
+[Agent skill](skills/sanad/SKILL.md)
 
-## CLI quickstart
-
-Install with Homebrew:
+## Quick start
 
 ```sh
 brew install --cask MohamedElashri/sanad/sanad
 ```
 
-Or download a [v1.1.0 archive](https://github.com/MohamedElashri/sanad/releases/tag/v1.1.0)
-for Linux, macOS, or Windows on amd64/arm64. Keep the included `sanad` and
-`gh-actions-lock` executables together on your `PATH`.
+Linux, macOS, and Windows binaries are also available in
+[release archives](https://github.com/MohamedElashri/sanad/releases/latest).
+Keep the included `sanad` and `gh-actions-lock` executables together on `PATH`.
 
-In your repository, provide a read token and review the initial lockfile:
-
-```sh
-export GH_TOKEN="<read-token>"
-sanad init --confirm-native
-sanad init --confirm-native --write
-sanad check
-```
-
-`--confirm-native` records that you verified GitHub supports enforcement for this
-repository. Review the preview before writing, then commit
-`.github/workflows/actions.lock` and `.sanad.toml`. Authentication also accepts
-`GH_TOKEN` or `GITHUB_TOKEN`, or stored credentials from `gh auth login`. The
-release binaries work without Node.js, Go, or a GitHub CLI installation when a
-token is supplied. See [CLI-only integrations](docs/content/guide/cli-only.md)
-for Makefile and pre-commit usage.
-
-## Action quickstart
-
-Add `.github/workflows/sanad.yml` to check pull requests:
-
-```yaml
-name: Sanad
-on: pull_request
-permissions:
-  contents: read
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: MohamedElashri/sanad@v1.1.0
-        with:
-          mode: check
-          base: ${{ github.event.pull_request.base.sha }}
-```
-
-Run `sanad sync --write` after adding the workflow and commit the updated lockfile.
-Make the Sanad check required in repository settings. The Action installs its
-matching CLI release and verifies its checksum and immutability.
-
-See [CI setup](docs/content/guide/ci.md) for generated workflows and scheduled
-update PRs, or the [Action reference](docs/content/reference/action.md) for inputs and outputs.
-
-## Everyday use
+Your repository must support GitHub's native lockfiles. Authenticate with
+`GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth login`, then run:
 
 ```sh
-sanad sync                  # preview reconciliation after workflow edits
-sanad sync --write           # apply it without advancing existing pins
-sanad plan                  # review available stable version updates
-sanad update --write         # apply eligible updates
-sanad check                  # online frozen verification
-sanad check --offline        # local coverage and graph checks only
+sanad init --confirm-native          # preview the initial lockfile
+sanad init --confirm-native --write  # apply the reviewed changes
+sanad check                         # verify dependencies
 ```
 
-Repository changes require `--write`. Updates stay within the current major
-version by default. Optional constraints and waiting periods cover direct and
-transitive dependencies; see [configuration reference](docs/content/reference/configuration.md).
+Commit the reported files. See [getting started](docs/content/guide/getting-started.md)
+for setup details and [CI integration](docs/content/guide/ci.md) for PR checks.
 
-## Coding agents
+## Contributing
 
-Install the reusable Sanad skill for Codex, Claude Code, Cursor, GitHub Copilot,
-Antigravity, or OpenCode by copying the skill directory into your agent's skill
-location. For example, from a Sanad checkout, install it for your user in Codex:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and repository checks.
 
-```sh
-mkdir -p "$HOME/.agents/skills"
-cp -R skills/sanad "$HOME/.agents/skills/"
-```
+## License
 
-The skill covers onboarding, workflow reconciliation, scoped updates, source
-policies, vendoring, and verification. It requires Sanad 1.1+ on the agent's
-`PATH`. See the [agent guide](docs/content/guide/agents.md) for installation paths
-and example requests, or read [SKILL.md](skills/sanad/SKILL.md).
-
-[Documentation](https://melashri.net/sanad/) ·
-[Security and limitations](docs/content/advanced/security-model.md) ·
-[Release notes](docs/content/release-notes.md) · [MIT license](LICENSE)
-
-## Development
-
-Requires Go 1.26.3+ and Node.js 24+.
-
-```sh
-make check
-npm ci --prefix action
-npm test --prefix action
-```
-
-We use Sanad v1.1.0 to verify our own workflows, approve direct and transitive
-source identities, and guard both published action entry points. Pull-request
-checks attach JSON and Markdown reports with dependency and protection details.
-
-With the release CLI and backend on `PATH`:
-
-```sh
-make sanad-check                 # online verification against origin/main
-make sanad-local                 # local coverage without network access
-make sanad-plan                  # preview eligible updates
-pre-commit install               # optional; requires pre-commit
-```
-
-The local hook checks coverage; online CI enforces source approvals. Review and
-merge approval changes before introducing dependencies from new repositories.
-Dependabot continues to propose updates; scheduled Sanad update PRs need a
-workflow-capable `SANAD_TOKEN` repository secret.
+[MIT](LICENSE).
