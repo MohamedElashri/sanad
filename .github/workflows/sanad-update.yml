@@ -1,0 +1,13 @@
+name: Sanad updates
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  update:
+    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@f7fa1a6dc17e14f7d15354402dd8d24939e80fa1
+    secrets:
+      token: ${{ secrets.SANAD_TOKEN }}

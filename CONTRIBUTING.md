@@ -27,5 +27,7 @@ pre-commit install               # optional; requires pre-commit
 
 The local hook checks coverage; online CI enforces source approvals. Review and
 merge approval changes before introducing dependencies from new repositories.
-Dependabot proposes updates; scheduled Sanad update PRs require a
-workflow-capable `SANAD_TOKEN` repository secret.
+Sanad proposes Actions updates on Mondays at 03:00 UTC, or through a manual run
+of the **Sanad updates** workflow. It uses the workflow-capable `SANAD_TOKEN`
+repository secret and maintains one update PR. Dependabot handles Go and npm
+dependencies.
