@@ -1,0 +1,7 @@
+- id: sanad-check
+  name: Sanad local lockfile coverage
+  entry: sanad check --offline --coverage-only
+  language: system
+  pass_filenames: false
+  files: '(^\.github/(workflows/|sanad/)|(^|/)action\.ya?ml$|^\.sanad\.toml$)'
+  description: Check local coverage using an already installed Sanad and backend.
