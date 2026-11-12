@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: MohamedElashri/sanad@8c3467535793d9b31edbb7e7f49d35ef88e2a2d5 # v1.0.2
+      - uses: MohamedElashri/sanad@v1.1.0
         with:
           mode: check
           base: ${{ github.event.pull_request.base.sha }}
