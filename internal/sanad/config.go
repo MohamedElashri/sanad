@@ -43,7 +43,8 @@ type UpdatePolicy struct {
 }
 
 type Config struct {
-	Version int `toml:"version" json:"version"`
+	Version int         `toml:"version" json:"version"`
+	Trust   TrustPolicy `toml:"trust" json:"trust"`
 	Native  struct {
 		Enabled bool `toml:"enabled" json:"enabled"`
 	} `toml:"native" json:"native"`
@@ -124,6 +125,9 @@ func loadConfig(root, name string) (Config, error) {
 		}
 	}
 	if _, err := duration(raw.Observation.MinimumAge); err != nil {
+		return c, err
+	}
+	if err := validateTrust(&raw.Trust); err != nil {
 		return c, err
 	}
 	return raw, nil

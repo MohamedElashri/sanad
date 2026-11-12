@@ -453,6 +453,10 @@ func planWorkflows(ctx context.Context, work, host string, cfg Config, opts Opti
 			if err != nil {
 				return err
 			}
+			if err := validateTrustedCandidate(after, cfg.Trust); err != nil {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: old.Ref, To: target, Status: "blocked", Reason: err.Error(), Changes: graphDiff(before, after)})
+				continue
+			}
 			ready, until, err := assess(before, after, observations, observed, minimum, opts.Now)
 			if err != nil {
 				return err
