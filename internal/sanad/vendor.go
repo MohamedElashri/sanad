@@ -125,6 +125,7 @@ func unpackArchive(data []byte, nwo string) (tree, error) {
 	folded := map[string]bool{}
 	var total int64
 	root := ""
+	entries := 0
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -132,6 +133,10 @@ func unpackArchive(data []byte, nwo string) (tree, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		entries++
+		if entries > 20000 || len(h.Name) > 4096 {
+			return nil, fmt.Errorf("source archive has too many entries or an oversized path")
 		}
 		if h.Typeflag == tar.TypeXGlobalHeader {
 			continue
@@ -150,7 +155,7 @@ func unpackArchive(data []byte, nwo string) (tree, error) {
 		if h.Typeflag == tar.TypeDir {
 			continue
 		}
-		if !hasPath || h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
+		if !hasPath || h.Typeflag != tar.TypeReg {
 			return nil, fmt.Errorf("source archives with links or special files are unsupported: %s", name)
 		}
 		if h.Size < 0 || h.Size > 64<<20 || total+h.Size > 64<<20 || len(out) >= 10000 {
@@ -178,6 +183,13 @@ func unpackArchive(data []byte, nwo string) (tree, error) {
 			mode = 0o755
 		}
 		out[target] = file{Data: b, Mode: mode}
+	}
+	trailing, err := io.Copy(io.Discard, io.LimitReader(gz, (1<<20)+1))
+	if err != nil {
+		return nil, err
+	}
+	if trailing > 1<<20 {
+		return nil, fmt.Errorf("excess trailing archive data")
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("source archive is empty")
