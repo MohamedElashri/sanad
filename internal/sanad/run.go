@@ -399,7 +399,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 					}
 				}
 				// Only persist observations. The existing workflow may still need sync.
-				return finish(root, opts.Config, input, pending, opts.Write, &report)
+				return finish(ctx, root, opts.Config, input, pending, opts.Write, &report)
 			}
 		} else if cfg.Observation.MinimumAge != "" {
 			state := observations{Version: 1, Seen: map[string]time.Time{}}
@@ -460,12 +460,18 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
-	return finish(root, opts.Config, input, final, opts.Write, &report)
+	return finish(ctx, root, opts.Config, input, final, opts.Write, &report)
 }
 
-func finish(root, config string, before, after tree, write bool, r *Report) (Report, error) {
+func finish(ctx context.Context, root, config string, before, after tree, write bool, r *Report) (Report, error) {
+	if err := ctx.Err(); err != nil {
+		return *r, err
+	}
 	for _, name := range changedFiles(before, after) {
 		r.Files = append(r.Files, FileChange{Path: name, Diff: fileDiff(name, before[name], after[name])})
+	}
+	if err := ctx.Err(); err != nil {
+		return *r, err
 	}
 	if write {
 		if err := applyTree(root, config, before, after); err != nil {
