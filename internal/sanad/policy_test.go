@@ -118,3 +118,19 @@ func TestScopedUpdatesPreserveSubpathCase(t *testing.T) {
 		t.Fatalf("wrong subpath updated: %s", got)
 	}
 }
+
+func TestExplicitDeveloperCoverageCheckSkipsAdoptionOnly(t *testing.T) {
+	root := fixture(t, map[string]lock.Action{"a/root@v1.0.0": action("v1.0.0", "a")}, "7d")
+	opts := options(root, &fakeBackend{t: t})
+	opts.Offline = true
+	opts.CoverageOnly = true
+	r, err := Run(context.Background(), "check", opts)
+	if err != nil || !r.Success || r.Verification != "offline" {
+		t.Fatalf("developer coverage %+v %v", r, err)
+	}
+	opts.Base = "HEAD"
+	_, err = Run(context.Background(), "check", opts)
+	if err == nil {
+		t.Fatal("coverage-only accepted policy comparison")
+	}
+}

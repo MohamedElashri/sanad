@@ -17,6 +17,7 @@ import (
 type Options struct {
 	Root, Repo, Config, Base, ZizmorReport    string
 	Write, Offline, ConfirmNative, Automation bool
+	CoverageOnly                              bool
 	Action, To, Level, Constraint, ActionRef  string
 	Backend                                   Backend
 	Workflows                                 WorkflowSource
@@ -26,6 +27,9 @@ type Options struct {
 
 func Run(ctx context.Context, command string, opts Options) (report Report, err error) {
 	report = NewReport(command)
+	if opts.CoverageOnly && (command != "check" || !opts.Offline || opts.Base != "") {
+		return report, fmt.Errorf("--coverage-only requires check --offline without --base")
+	}
 	defer func() {
 		if err != nil {
 			report.finding("operation-failed", "error", err.Error())
@@ -225,7 +229,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 			return report, e
 		}
 		policyRequired := minimum > 0 || cooldown > 0 || cfg.Trust.RequireApproval || len(cfg.Trust.Repositories) > 0
-		if opts.Offline && (opts.Base != "" || policyRequired) {
+		if opts.Offline && (opts.Base != "" || policyRequired && !opts.CoverageOnly) {
 			report.finding("offline-policy", "error", "offline coverage cannot enforce adoption policy; run an online check with --base")
 			return report, nil
 		}

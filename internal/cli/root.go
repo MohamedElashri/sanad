@@ -83,6 +83,7 @@ func NewRootCommand() *cobra.Command {
 			cmd.Flags().StringVar(&opts.ActionRef, "action-ref", actionRef, "released Sanad action commit for generated workflows")
 		}
 		if name == "check" {
+			cmd.Flags().BoolVar(&opts.CoverageOnly, "coverage-only", false, "explicitly skip adoption policy for an offline developer hook")
 			cmd.Flags().BoolVar(&opts.Offline, "offline", false, "check local coverage without network access")
 			cmd.Flags().StringVar(&opts.Base, "base", "", "trusted base commit for adoption-policy checks")
 		}

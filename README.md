@@ -23,10 +23,10 @@ Or download a [v1.0.2 archive](https://github.com/MohamedElashri/sanad/releases/
 for Linux, macOS, or Windows on amd64/arm64. Keep the included `sanad` and
 `gh-actions-lock` executables together on your `PATH`.
 
-In your repository, authenticate and review the initial lockfile:
+In your repository, provide a read token and review the initial lockfile:
 
 ```sh
-gh auth login
+export GH_TOKEN="<read-token>"
 sanad init --confirm-native
 sanad init --confirm-native --write
 sanad check
@@ -35,7 +35,10 @@ sanad check
 `--confirm-native` records that you verified GitHub supports enforcement for this
 repository. Review the preview before writing, then commit
 `.github/workflows/actions.lock` and `.sanad.toml`. Authentication also accepts
-`GH_TOKEN` or `GITHUB_TOKEN`.
+`GH_TOKEN` or `GITHUB_TOKEN`, or stored credentials from `gh auth login`. The
+release binaries work without Node.js, Go, or a GitHub CLI installation when a
+token is supplied. See [CLI-only integrations](docs/content/guide/cli-only.md)
+for Makefile and pre-commit usage.
 
 ## Action quickstart
 

@@ -11,6 +11,11 @@ permissions:
 
 jobs:
   goreleaser:
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+      attestations: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,6 +56,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Generate release dependency inventories
+        run: |
+          go run ./scripts/release-sbom --dir dist
+          npm sbom --prefix action --sbom-format spdx --omit dev > "dist/sanad_action_${GITHUB_REF_NAME#v}.spdx.json"
+      - name: Attest release artifacts and inventories
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-path: |
+            dist/sanad_*.tar.gz
+            dist/sanad_*.zip
+            dist/sanad_*_checksums.txt
+            dist/*.spdx.json
+      - name: Attach dependency inventories to draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.spdx.json
       - name: Publish and verify immutable release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
