@@ -267,6 +267,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		return report, nil
 	}
 	if command == "vendor" {
+		if e := reconcileWorkflows(ctx, input, host, opts, true, &report); e != nil {
+			return report, e
+		}
+		if report.Blocked() {
+			return report, nil
+		}
 		return runVendor(ctx, root, host, repo, cfg, opts, backend, input, &report)
 	}
 	if opts.ConfirmNative {
