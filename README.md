@@ -12,7 +12,7 @@ in CI.
 [Releases](https://github.com/MohamedElashri/sanad/releases) ·
 [Agent skill](skills/sanad/SKILL.md)
 
-## Quick start
+## CLI quick start
 
 ```sh
 brew install --cask MohamedElashri/sanad/sanad
@@ -32,7 +32,38 @@ sanad check                         # verify dependencies
 ```
 
 Commit the reported files. See [getting started](docs/content/guide/getting-started.md)
-for setup details and [CI integration](docs/content/guide/ci.md) for PR checks.
+for setup details and [updating dependencies](docs/content/guide/updating.md)
+for ongoing maintenance.
+
+## GitHub Action quick start
+
+After initializing the lockfile, add `.github/workflows/sanad.yml`:
+
+```yaml
+name: Sanad
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: MohamedElashri/sanad@v1.1.0
+        with:
+          mode: check
+          base: ${{ github.event.pull_request.base.sha }}
+```
+
+Run `sanad sync --write` and commit the workflow with the updated lockfile.
+Make the check required in repository settings. See
+[CI setup](docs/content/guide/ci.md) for automation and the
+[Action reference](docs/content/reference/action.md) for inputs and outputs.
+
+For advanced use, see [configuration](docs/content/reference/configuration.md)
+and the [security model](docs/content/advanced/security-model.md).
 
 ## Contributing
 
