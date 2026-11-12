@@ -133,3 +133,8 @@ whole write. It does not silently restore incompatible metadata into the native
 graph. Keep exported composites pinned; use a separate internal composite for CI
 when producer normalization conflicts with the published contract. This guard
 covers the declared metadata, not code downloaded by action scripts or Dockerfiles.
+
+Update settings inherit from `[update]`, then the repository entry in `[actions]`,
+then the matching subaction or reusable-workflow entry. An override of level or
+constraint keeps inherited tag-family and catalog settings. An explicit
+`prefer_tags = false` overrides an inherited `true`.

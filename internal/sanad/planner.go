@@ -124,8 +124,12 @@ func validateScope(before, after graph, oldKey, newKey string) error {
 
 func effectivePolicy(cfg Config, opts Options, name, nwo string) UpdatePolicy {
 	p := cfg.Update
-	for _, key := range []string{name, nwo} {
-		if override, ok := cfg.Actions[canonicalActionName(key)]; ok && (override.Level != "" || override.Constraint != "" || override.TagPrefix != "" || override.PreferTags != nil) {
+	keys := []string{canonicalActionName(nwo)}
+	if canonicalActionName(name) != canonicalActionName(nwo) {
+		keys = append(keys, canonicalActionName(name))
+	}
+	for _, key := range keys {
+		if override, ok := cfg.Actions[key]; ok {
 			if override.Level != "" || override.Constraint != "" {
 				p.Level = override.Level
 				p.Constraint = override.Constraint
@@ -136,7 +140,6 @@ func effectivePolicy(cfg Config, opts Options, name, nwo string) UpdatePolicy {
 			if override.PreferTags != nil {
 				p.PreferTags = override.PreferTags
 			}
-			break
 		}
 	}
 	if opts.Level != "" || opts.Constraint != "" {
