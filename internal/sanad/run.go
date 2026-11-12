@@ -74,6 +74,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if err != nil {
 		return report, err
 	}
+	if err := checkPublisher(input, cfg, &report); err != nil {
+		return report, err
+	}
+	if report.Blocked() {
+		return report, nil
+	}
 	refs, err := references(input)
 	if err != nil {
 		return report, err
@@ -328,6 +334,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	final, e := readTree(work, opts.Config)
 	if e != nil {
 		return report, e
+	}
+	if err := checkPublisher(final, cfg, &report); err != nil {
+		return report, err
+	}
+	if report.Blocked() {
+		return report, nil
 	}
 	finalGraph, e := loadGraph(final, host)
 	if e != nil {

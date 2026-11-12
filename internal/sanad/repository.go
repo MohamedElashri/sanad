@@ -202,6 +202,19 @@ func readTree(root, config string) (tree, error) {
 			return nil, err
 		}
 	}
+	cfg, err := loadConfig(root, config)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range cfg.Publisher.Actions {
+		exists, err := load(name)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("publisher action missing: %s", name)
+		}
+	}
 	_, err = collectMetadata(out, load)
 	return out, err
 }

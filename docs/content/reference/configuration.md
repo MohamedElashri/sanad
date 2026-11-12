@@ -113,3 +113,23 @@ The minimum age applies to changed direct and transitive commits. Other cooldown
 Commit `.sanad.toml`, `.github/workflows/actions.lock`, and any reported workflow or local-action edits. Commit `.github/sanad/state.json` when observation policy creates or updates it.
 
 Do not treat temporary caches as observation history. The transaction journal is recovery metadata; an unexpected `.github/sanad/transaction.json` needs investigation and recovery rather than a normal commit.
+
+## Published actions
+
+Declare every action metadata file you distribute, including nested composites:
+
+```toml
+[publisher]
+actions = ["action.yml", "helpers/action.yml"]
+```
+
+Sanad checks these files even when your own workflows never call them. Remote
+`uses:` entries must retain full commit SHAs so callers without native lockfiles
+keep their inline protection. Exported metadata must not contain `$/` references,
+which resolve in the caller's repository. Your own workflows can use native locks.
+
+If the native producer normalizes an exported SHA into a tag, Sanad rejects the
+whole write. It does not silently restore incompatible metadata into the native
+graph. Keep exported composites pinned; use a separate internal composite for CI
+when producer normalization conflicts with the published contract. This guard
+covers the declared metadata, not code downloaded by action scripts or Dockerfiles.
