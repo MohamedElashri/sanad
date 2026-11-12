@@ -113,6 +113,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		return report, err
 	}
 	report.Dependencies = old.list()
+	report.Findings = append(report.Findings, trustFindings(old, cfg.Trust)...)
 	report.Coverage = coverage(input)
 	report.Protection, err = protections(input, host)
 	if err != nil {
@@ -181,6 +182,9 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		}
 		return report, nil
 	}
+	if report.Blocked() {
+		return report, nil
+	}
 	backend := opts.Backend
 	if backend == nil {
 		native, e := EnsureBackend(ctx, !opts.Offline)
@@ -220,7 +224,7 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
-		policyRequired := minimum > 0 || cooldown > 0
+		policyRequired := minimum > 0 || cooldown > 0 || cfg.Trust.RequireApproval || len(cfg.Trust.Repositories) > 0
 		if opts.Offline && (opts.Base != "" || policyRequired) {
 			report.finding("offline-policy", "error", "offline coverage cannot enforce adoption policy; run an online check with --base")
 			return report, nil
@@ -318,6 +322,10 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		if e != nil {
 			return report, e
 		}
+		report.Findings = append(report.Findings, trustFindings(next, cfg.Trust)...)
+		if report.Blocked() {
+			return report, nil
+		}
 		// init accepts a baseline only when no native lockfile exists yet.
 		_, alreadyLocked := input[lock.Path]
 		if command == "sync" || alreadyLocked {
@@ -390,6 +398,10 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	finalGraph, e := loadPolicyGraph(final, host)
 	if e != nil {
 		return report, e
+	}
+	report.Findings = append(report.Findings, trustFindings(finalGraph, cfg.Trust)...)
+	if report.Blocked() {
+		return report, nil
 	}
 	verified, e := backend.Run(ctx, work, host, repo, "--verify")
 	if e != nil {
@@ -470,6 +482,18 @@ func checkBase(ctx context.Context, opts Options, current tree, installed graph,
 	old, err := loadPolicyGraph(base, host)
 	if err != nil {
 		return err
+	}
+	if _, ok := base[opts.Config]; ok {
+		policyRoot, e := snapshot(base)
+		if e != nil {
+			return e
+		}
+		defer os.RemoveAll(policyRoot)
+		trusted, e := loadConfig(policyRoot, opts.Config)
+		if e != nil {
+			return e
+		}
+		r.Findings = append(r.Findings, trustFindings(installed, trusted.Trust)...)
 	}
 	r.Changes = graphDiff(old, installed)
 	if _, exists := base[lock.Path]; !exists {

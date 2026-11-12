@@ -360,6 +360,10 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			if err := validateScope(before, after, key, newKey); err != nil {
 				return err
 			}
+			if err := validateTrustedCandidate(after, cfg.Trust); err != nil {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "blocked", Reason: err.Error(), Changes: graphDiff(before, after)})
+				continue
+			}
 			if err := validateTransitivePolicies(before, after, newKey, cfg, opts); err != nil {
 				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "blocked", Reason: err.Error()})
 				continue

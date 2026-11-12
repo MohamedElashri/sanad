@@ -89,3 +89,33 @@ An old release cannot make a commit with a newer committer timestamp mature. How
 ## Protect the history
 
 Observation history is reviewed Git state, not a trusted timestamp service. Administrators can change it. Protect policy, workflows, lockfiles, and observation records with the same review controls you use for dependency changes.
+
+## Approved sources
+
+You can require reviewed repository identities for every direct action, transitive
+action, and managed reusable workflow:
+
+```toml
+[trust]
+require_approval = true
+
+[trust.repositories."github.com/actions/checkout"]
+owner_id = 44036562
+repo_id = 197814629
+```
+
+Use `sanad explain` to see the recorded host and numeric owner/repository IDs,
+verify them with the source repository, and approve the policy change through
+review. The example IDs identify actions/checkout; verify current ownership before
+adopting them. Entries apply to all action subdirectories and reusable workflows
+in that repository. Names and hosts compare without case; wildcards are not used.
+A listed source remains bound to its IDs even when `require_approval` is false.
+
+Unapproved sources block synchronization and onboarding. During version selection,
+Sanad rejects a candidate introducing an unapproved transitive source and tries the
+next candidate. Existing native organization allowlists still apply at runtime.
+
+Online checks with source trust policy require `--base`. The trusted base's
+approvals apply in addition to current policy, so a dependency PR cannot approve
+its own new repository or replace a source identity. Merge approval changes first,
+then introduce the dependency. Offline checks cannot establish source trust.
