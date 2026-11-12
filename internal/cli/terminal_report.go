@@ -123,6 +123,13 @@ func renderReport(report sanad.Report, width int, profile termenv.Profile) strin
 		}
 		t.renderTable("Dependencies", []string{"Dependency", "Commit", "Host"}, rows, -1)
 	}
+	if len(report.Protection) > 0 {
+		rows := make([][]string, 0, len(report.Protection))
+		for _, p := range report.Protection {
+			rows = append(rows, []string{p.Kind, fmt.Sprintf("%s:%d", p.File, p.Line), p.Status, p.Subject + ": " + p.Reason})
+		}
+		t.renderTable("Protection coverage", []string{"Surface", "Location", "Protection", "Detail"}, rows, -1)
+	}
 	if len(report.Decisions) > 0 {
 		rows := make([][]string, 0, len(report.Decisions))
 		for _, decision := range report.Decisions {

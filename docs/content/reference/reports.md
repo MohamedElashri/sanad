@@ -79,3 +79,30 @@ The [GitHub Action](../action/) writes JSON and Markdown files on the runner and
 Remote reusable workflows appear as dependencies using their workflow path and
 tracked ref. Their executable SHA is stored in the caller's YAML; associated
 versions and numeric identities live in `.github/sanad/workflows.json`.
+
+## Protection surfaces
+
+The `protection` array (also shown in terminal and Markdown output) distinguishes
+native action pins, inline SHA workflow calls, image digests, mutable containers,
+workspace actions, runner environments, runtime tools, and shell commands. Each
+entry includes its source location and a reason. A recorded native pin is not a
+claim that online verification ran or that runtime enforcement is enabled.
+
+Runtime dependencies and runner image contents are marked unknown or uninspected.
+Sanad does not resolve shell scripts, `npx`, Dockerfile base images, or remote
+action implementation downloads. An image digest covers that image, not code it
+fetches while running. Coverage is an inventory of visible metadata, not a complete
+software bill of materials for the executing workflow.
+
+You can include a zizmor audit without adding another executable to Sanad:
+
+```sh
+zizmor --format sarif . > zizmor.sarif
+sanad status --zizmor-report zizmor.sarif
+sanad check --zizmor-report zizmor.sarif
+```
+
+The path must be inside the repository. Sanad imports SARIF 2.1.0 findings from
+zizmor and preserves warning/error severity; errors block writes and checks.
+The report must describe the same revision being reviewed. Sanad does not install
+or execute the linter, or treat a clean imported report as proof of full coverage.
