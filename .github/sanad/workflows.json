@@ -1,10 +1,10 @@
 {
   "version": 1,
   "pins": {
-    "mohamedelashri/sanad/.github/workflows/update-pr.yml@f7fa1a6dc17e14f7d15354402dd8d24939e80fa1": {
+    "mohamedelashri/sanad/.github/workflows/update-pr.yml@31accee9e8700a53b46a780b0deba2d9d1014b55": {
       "name": "mohamedelashri/sanad/.github/workflows/update-pr.yml",
-      "ref": "v1.1.0",
-      "commit": "f7fa1a6dc17e14f7d15354402dd8d24939e80fa1",
+      "ref": "31accee9e8700a53b46a780b0deba2d9d1014b55",
+      "commit": "31accee9e8700a53b46a780b0deba2d9d1014b55",
       "host": "github.com",
       "owner_id": 25898984,
       "repo_id": 1242434851,

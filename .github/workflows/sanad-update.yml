@@ -8,6 +8,7 @@ permissions:
   pull-requests: write
 jobs:
   update:
-    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@f7fa1a6dc17e14f7d15354402dd8d24939e80fa1
+    # Use the reviewed PR lifecycle fix until the next Sanad release.
+    uses: MohamedElashri/sanad/.github/workflows/update-pr.yml@31accee9e8700a53b46a780b0deba2d9d1014b55
     secrets:
       token: ${{ secrets.SANAD_TOKEN }}
