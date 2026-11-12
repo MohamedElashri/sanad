@@ -75,3 +75,7 @@ Handle both the process exit code and the JSON `success` field. Do not assume th
 ## Action reports
 
 The [GitHub Action](../action/) writes JSON and Markdown files on the runner and exposes their paths as outputs. It also produces a job summary and annotations for findings. Preview runs intentionally report no changed files for staging, while retaining the full proposed diffs in JSON.
+
+Remote reusable workflows appear as dependencies using their workflow path and
+tracked ref. Their executable SHA is stored in the caller's YAML; associated
+versions and numeric identities live in `.github/sanad/workflows.json`.

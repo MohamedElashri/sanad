@@ -141,7 +141,7 @@ func safePath(root, name string) (string, error) {
 
 func relevant(name, config string) bool {
 	base := filepath.Base(name)
-	return name == config || name == StatePath || name == ".github/workflows/actions.lock" || name == ".github/dependabot.yml" || name == ".github/dependabot.yaml" || base == "action.yml" || base == "action.yaml" || strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
+	return name == config || name == StatePath || name == WorkflowStatePath || name == ".github/workflows/actions.lock" || name == ".github/dependabot.yml" || name == ".github/dependabot.yaml" || base == "action.yml" || base == "action.yaml" || strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
 }
 
 func readTree(root, config string) (tree, error) {
@@ -181,7 +181,7 @@ func readTree(root, config string) (tree, error) {
 		out[name] = file{Data: b, Mode: info.Mode().Perm()}
 		return true, nil
 	}
-	for _, name := range []string{config, StatePath, ".github/workflows/actions.lock", ".github/dependabot.yml", ".github/dependabot.yaml"} {
+	for _, name := range []string{config, StatePath, WorkflowStatePath, ".github/workflows/actions.lock", ".github/dependabot.yml", ".github/dependabot.yaml"} {
 		if _, err := load(name); err != nil {
 			return nil, err
 		}
