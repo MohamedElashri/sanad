@@ -13,18 +13,19 @@ check to your pull-request workflow:
     base: ${{ github.event.pull_request.base.sha }}
 ```
 
-Run `sanad sync --write` and commit the updated lockfile after adding the workflow.
-You can also pin the Action to the release's full commit. The trusted `base` and
-full checkout history are required when enforcing observation or release-cooldown policy.
+Run `sanad sync --write` and commit the updated lockfile after adding the
+workflow. You can also pin the Action to the release's full commit. The trusted
+`base` and full checkout history are required when enforcing observation or
+release-cooldown policy.
 
-| Input | Default | Purpose |
-| --- | --- | --- |
-| `mode` | `check` | `check`, `status`, `plan`, `sync`, `update`, `setup` |
-| `write` | `false` | Apply changes in `sync` or `update` |
-| `base` | empty | Trusted base revision for adoption-policy checks |
-| `config` | `.sanad.toml` | Repository-relative policy file |
-| `working-directory` | `.` | Repository directory inside the workspace |
-| `token` | `github.token` | Credentials for the repository host |
+| Input               | Default        | Purpose                                              |
+| ------------------- | -------------- | ---------------------------------------------------- |
+| `mode`              | `check`        | `check`, `status`, `plan`, `sync`, `update`, `setup` |
+| `write`             | `false`        | Apply changes in `sync` or `update`                  |
+| `base`              | empty          | Trusted base revision for adoption-policy checks     |
+| `config`            | `.sanad.toml`  | Repository-relative policy file                      |
+| `working-directory` | `.`            | Repository directory inside the workspace            |
+| `token`             | `github.token` | Credentials for the repository host                  |
 
 Outputs: `passed`, `changed`, `changed-files` (JSON), `updates`, `pending`,
 `report-path`, `pr-body-path`, and `sanad-version`. Previews return an empty
@@ -34,13 +35,17 @@ The Action verifies an immutable Sanad release asset and checks the CLI version
 matches its own. The native backend is bundled or checksum-pinned. Tokens are
 masked; tenant tokens are not sent to the public release API.
 
-Generate scheduled PR workflows with `sanad init --automation --write`, including
-observation-only changes. PR checks need read permissions; the scheduled workflow needs contents
-and pull-request writes. Configure `SANAD_TOKEN` with Contents, Workflows, and Pull requests write permissions; the built-in `GITHUB_TOKEN` cannot push workflow edits. The CLI itself does not commit, push, or open PRs.
+Generate scheduled PR workflows with `sanad init --automation --write`,
+including observation-only changes. PR checks need read permissions; the
+scheduled workflow needs contents and pull-request writes. Configure
+`SANAD_TOKEN` with Contents, Workflows, and Pull requests write permissions; the
+built-in `GITHUB_TOKEN` cannot push workflow edits. The CLI itself does not
+commit, push, or open PRs.
 
 Development: `npm ci`, `npm test`, `npm run build`. `npm run test:integration`
-requires `SANAD_ACTION_BINARY` and `SANAD_BACKEND` pointing to built/official tools.
-The build uses esbuild and writes the standalone bundle and bundled dependency
-licenses to `dist/`.
+requires `SANAD_ACTION_BINARY` and `SANAD_BACKEND` pointing to built/official
+tools. The build uses esbuild and writes the standalone bundle and bundled
+dependency licenses to `dist/`.
 
-[Full Action reference](https://melashri.net/sanad/reference/action/) · [CI setup](https://melashri.net/sanad/guide/ci/)
+[Full Action reference](https://melashri.net/sanad/reference/action/) ·
+[CI setup](https://melashri.net/sanad/guide/ci/)

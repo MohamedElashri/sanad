@@ -5,31 +5,32 @@ weight = 50
 template = "page"
 +++
 
-Sanad includes a reusable [agent skill](https://github.com/MohamedElashri/sanad/tree/main/skills/sanad)
-for Codex, Claude Code, Cursor, GitHub Copilot, Antigravity, and OpenCode. It teaches
-agents to manage action and reusable-workflow pins, explain dependency paths,
-review vendor snapshots, and verify the resulting changes. Its supporting
-references cover source approvals, publisher guards, tag families, CI automation,
-local hooks, coverage reports, and troubleshooting.
+Sanad includes a reusable
+[agent skill](https://github.com/MohamedElashri/sanad/tree/main/skills/sanad)
+for Codex, Claude Code, Cursor, GitHub Copilot, Antigravity, and OpenCode. It
+teaches agents to manage action and reusable-workflow pins, explain dependency
+paths, review vendor snapshots, and verify the resulting changes. Its supporting
+references cover source approvals, publisher guards, tag families, CI
+automation, local hooks, coverage reports, and troubleshooting.
 
 ## Install the skill
 
 Copy the entire `skills/sanad` directory, including `references/`, from a Sanad
-source checkout into a skill directory your agent discovers. Paths in the project
-column are relative to the repository where you want to use Sanad.
+source checkout into a skill directory your agent discovers. Paths in the
+project column are relative to the repository where you want to use Sanad.
 
 The skill provides instructions; install [Sanad 1.1+](../getting-started/)
 separately and make it available on the agent's `PATH`.
 
-| Agent | Project directory | Personal directory | Documentation |
-| --- | --- | --- | --- |
-| Codex | `.agents/skills/sanad/` | `~/.agents/skills/sanad/` | [Skills](https://developers.openai.com/codex/skills/) |
-| Claude Code | `.claude/skills/sanad/` | `~/.claude/skills/sanad/` | [Skills](https://code.claude.com/docs/en/skills) |
-| Cursor | `.cursor/skills/sanad/` | `~/.cursor/skills/sanad/` | [Skills](https://cursor.com/help/customization/skills) |
-| GitHub Copilot | `.github/skills/sanad/` | `~/.copilot/skills/sanad/` | [Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills) |
-| Antigravity CLI | `.agents/skills/sanad/` | `~/.gemini/antigravity-cli/skills/sanad/` | [Skills](https://antigravity.google/docs/skills#cli-skill-locations) |
-| Antigravity App / IDE | `.agents/skills/sanad/` | `~/.gemini/config/skills/sanad/` | [Skills](https://antigravity.google/docs/skills) |
-| OpenCode | `.opencode/skills/sanad/` | `~/.config/opencode/skills/sanad/` | [Skills](https://opencode.ai/docs/skills/) |
+| Agent                 | Project directory         | Personal directory                        | Documentation                                                                                                             |
+| --------------------- | ------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Codex                 | `.agents/skills/sanad/`   | `~/.agents/skills/sanad/`                 | [Skills](https://developers.openai.com/codex/skills/)                                                                     |
+| Claude Code           | `.claude/skills/sanad/`   | `~/.claude/skills/sanad/`                 | [Skills](https://code.claude.com/docs/en/skills)                                                                          |
+| Cursor                | `.cursor/skills/sanad/`   | `~/.cursor/skills/sanad/`                 | [Skills](https://cursor.com/help/customization/skills)                                                                    |
+| GitHub Copilot        | `.github/skills/sanad/`   | `~/.copilot/skills/sanad/`                | [Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills) |
+| Antigravity CLI       | `.agents/skills/sanad/`   | `~/.gemini/antigravity-cli/skills/sanad/` | [Skills](https://antigravity.google/docs/skills#cli-skill-locations)                                                      |
+| Antigravity App / IDE | `.agents/skills/sanad/`   | `~/.gemini/config/skills/sanad/`          | [Skills](https://antigravity.google/docs/skills)                                                                          |
+| OpenCode              | `.opencode/skills/sanad/` | `~/.config/opencode/skills/sanad/`        | [Skills](https://opencode.ai/docs/skills/)                                                                                |
 
 For example, from your target repository, install for Codex or Antigravity:
 
@@ -49,24 +50,25 @@ mkdir -p "$HOME/.agents/skills"
 cp -R skills/sanad "$HOME/.agents/skills/"
 ```
 
-The installed file should be `SKILL_DIRECTORY/sanad/SKILL.md`, with `references/`
-beside it. Start a new agent session after installation if the skill does not
-appear.
+The installed file should be `SKILL_DIRECTORY/sanad/SKILL.md`, with
+`references/` beside it. Start a new agent session after installation if the
+skill does not appear.
 
 ## Ask the agent to use Sanad
 
 The skill's description lets agents select it for relevant requests. You can
 also select it explicitly with `$sanad` in Codex or `/sanad` in Claude Code and
-Antigravity CLI.
-Example requests:
+Antigravity CLI. Example requests:
 
 - "Use Sanad to reconcile the lockfile after my workflow edits, then verify it."
-- "Use Sanad to preview patch updates for actions/checkout without writing files."
+- "Use Sanad to preview patch updates for actions/checkout without writing
+  files."
 - "Use Sanad to update actions/checkout within our existing policy."
 - "Explain how actions/upload-artifact enters our dependency graph."
 - "Use Sanad to preview vendoring actions/github-script at our current pin."
 - "Configure source approvals and protect our published composite actions."
-- "Explain why Sanad reports pending dependencies and when they become eligible."
+- "Explain why Sanad reports pending dependencies and when they become
+  eligible."
 
 For first-time adoption, confirm that the repository supports GitHub's native
 lockfile enforcement before asking the agent to initialize it. Existing support
@@ -78,5 +80,6 @@ Agents use `--format json` to read findings, decisions, and proposed file diffs.
 They finish with online verification when available, passing a trusted `--base`
 when first-seen policy is enabled or when evaluating adoption policy for a pull
 request. They identify verification limitations when online checks cannot run;
-offline checks cannot enforce adoption policy. See [reports](../../reference/reports/)
-for the schema and [updating dependencies](../updating/) for the underlying workflow.
+offline checks cannot enforce adoption policy. See
+[reports](../../reference/reports/) for the schema and
+[updating dependencies](../updating/) for the underlying workflow.

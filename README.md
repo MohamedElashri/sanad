@@ -4,9 +4,10 @@
   <p>Make native GitHub Actions lockfiles easy to adopt, review, and update.</p>
 </div>
 
-Sanad manages GitHub's native [`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
-Pin direct and transitive actions, review updates, and enforce dependency policies
-in CI.
+Sanad manages GitHub's native
+[`actions.lock`](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles).
+Pin direct and transitive actions, review updates, and enforce dependency
+policies in CI.
 
 [Documentation](https://melashri.net/sanad/) ·
 [Releases](https://github.com/MohamedElashri/sanad/releases) ·
@@ -31,9 +32,9 @@ sanad init --confirm-native --write  # apply the reviewed changes
 sanad check                         # verify dependencies
 ```
 
-Commit the reported files. See [getting started](docs/content/guide/getting-started.md)
-for setup details and [updating dependencies](docs/content/guide/updating.md)
-for ongoing maintenance.
+Commit the reported files. See
+[getting started](docs/content/guide/getting-started.md) for setup details and
+[updating dependencies](docs/content/guide/updating.md) for ongoing maintenance.
 
 ## GitHub Action quick start
 
@@ -57,8 +58,8 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
 ```
 
-Run `sanad sync --write` and commit the workflow with the updated lockfile.
-Make the check required in repository settings. See
+Run `sanad sync --write` and commit the workflow with the updated lockfile. Make
+the check required in repository settings. See
 [CI setup](docs/content/guide/ci.md) for automation and the
 [Action reference](docs/content/reference/action.md) for inputs and outputs.
 
@@ -67,7 +68,8 @@ and the [security model](docs/content/advanced/security-model.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and repository checks.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and repository
+checks.
 
 ## License
 
