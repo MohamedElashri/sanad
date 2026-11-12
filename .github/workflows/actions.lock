@@ -21,7 +21,8 @@ workflows:
         - 'goreleaser/goreleaser-action@v7.3.0'
     '.github/workflows/sanad-check.yml':
         - 'actions/checkout@v7.0.1'
-        - 'mohamedelashri/sanad@v1.0.2'
+        - 'actions/upload-artifact@v7.0.0'
+        - 'mohamedelashri/sanad@v1.1.0'
     '.github/workflows/update-pr.yml':
         - 'actions/checkout@v7.0.1'
 dependencies:
@@ -67,6 +68,11 @@ dependencies:
         commit: 'sha1-bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
         owner_id: 44036562
         repo_id: 192625955
+    'actions/upload-artifact@v7.0.0':
+        ref: 'v7.0.0'
+        commit: 'sha1-bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
+        owner_id: 44036562
+        repo_id: 192625955
     'actions/upload-pages-artifact@v5.0.0':
         ref: 'v5.0.0'
         commit: 'sha1-fc324d3547104276b827a68afc52ff2a11cc49c9'
@@ -79,8 +85,8 @@ dependencies:
         commit: 'sha1-a4f02ab5355a589de60d917a659ce617ed19b3de'
         owner_id: 24697112
         repo_id: 209873006
-    'mohamedelashri/sanad@v1.0.2':
-        ref: 'v1.0.2'
-        commit: 'sha1-8c3467535793d9b31edbb7e7f49d35ef88e2a2d5'
+    'mohamedelashri/sanad@v1.1.0':
+        ref: 'v1.1.0'
+        commit: 'sha1-f7fa1a6dc17e14f7d15354402dd8d24939e80fa1'
         owner_id: 25898984
         repo_id: 1242434851
