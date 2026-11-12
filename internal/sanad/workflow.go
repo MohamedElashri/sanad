@@ -236,6 +236,10 @@ func collectMetadata(files tree, load func(string) (bool, error)) (map[string]bo
 }
 
 func rewriteRefs(files tree, refs []reference, target string) error {
+	return rewriteUses(files, refs, func(r reference) string { return r.Name + "@" + target })
+}
+
+func rewriteUses(files tree, refs []reference, value func(reference) string) error {
 	// Reverse source order makes multiple edits on one line stable.
 	for i := len(refs) - 1; i >= 0; i-- {
 		r := refs[i]
@@ -262,7 +266,7 @@ func rewriteRefs(files tree, refs []reference, target string) error {
 		if !strings.HasPrefix(tail, old) {
 			return fmt.Errorf("%s:%d: cannot preserve uses formatting", r.File, r.Line)
 		}
-		f.Data = []byte(string(chars[:index]) + r.Name + "@" + target + strings.TrimPrefix(tail, old))
+		f.Data = []byte(string(chars[:index]) + value(r) + strings.TrimPrefix(tail, old))
 		files[r.File] = f
 	}
 	return nil

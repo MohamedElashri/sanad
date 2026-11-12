@@ -126,3 +126,41 @@ not remotely verify every callee dependency or recursively inspect nested workfl
 calls. GitHub applies the callee repository's native lockfile; your caller's
 lockfile cannot supply that protection. API failures block the operation instead
 of being treated as absent coverage.
+
+## Vendor complete action source
+
+Vendoring copies the entire upstream repository snapshot, including implementation
+files, bundled JavaScript, and license files. It redirects action calls from that
+repository to the committed same-repository snapshot:
+
+```sh
+sanad vendor --action actions/github-script
+sanad vendor --action actions/github-script --write
+sanad vendor --action actions/github-script --to v8.0.1
+sanad vendor --action actions/github-script --to v8.0.1 --write
+```
+
+The first copy uses the existing native execution pin. `--to` explicitly resolves
+a new upstream ref with the pinned producer. The repository-level operation covers
+all subactions in the selected repository and refuses ambiguous installed versions
+unless you select a target. Review the full copied code in the proposed diff.
+Vendored sources use this explicit update command rather than automatic `update`.
+
+Source snapshots live under `.github/sanad/vendor/owner/repo/`. The separate
+`.github/sanad/vendor.json` records source commits, identities, the producer's
+upstream lock graph, file digests, and executable modes. Commit every reported file.
+Online verification checks the upstream frozen pins and compares copied files
+against the archive of that exact commit. Local checks reject modified, missing,
+or unexpected files; edit upstream and re-vendor rather than customizing a managed
+snapshot in place. Source trust and adoption waiting periods also apply to updates.
+
+Archive extraction rejects traversal, links, special files, submodules, and
+case-colliding or nonportable paths. The snapshot must fit the 64 MiB/10,000-file
+limit and the overall 64 MiB managed-input limit. If native processing would rewrite
+copied metadata, Sanad refuses the whole change so the snapshot remains exact.
+Choose an action compatible with this constraint rather than silently altering it.
+
+A source snapshot does not vendor runtime downloads, container images, or remote
+actions called by a composite; native locks and the protection report still matter.
+Vendoring also does not establish compatibility with `act`: test that runner's
+execution behavior separately before relying on native lockfile enforcement.

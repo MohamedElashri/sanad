@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -141,7 +142,7 @@ func safePath(root, name string) (string, error) {
 
 func relevant(name, config string) bool {
 	base := filepath.Base(name)
-	return name == config || name == StatePath || name == WorkflowStatePath || name == ".github/workflows/actions.lock" || name == ".github/dependabot.yml" || name == ".github/dependabot.yaml" || base == "action.yml" || base == "action.yaml" || strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
+	return name == config || name == StatePath || name == WorkflowStatePath || name == VendorStatePath || strings.HasPrefix(name, VendorRoot) || name == ".github/workflows/actions.lock" || name == ".github/dependabot.yml" || name == ".github/dependabot.yaml" || base == "action.yml" || base == "action.yaml" || strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
 }
 
 func readTree(root, config string) (tree, error) {
@@ -181,7 +182,7 @@ func readTree(root, config string) (tree, error) {
 		out[name] = file{Data: b, Mode: info.Mode().Perm()}
 		return true, nil
 	}
-	for _, name := range []string{config, StatePath, WorkflowStatePath, ".github/workflows/actions.lock", ".github/dependabot.yml", ".github/dependabot.yaml"} {
+	for _, name := range []string{config, StatePath, WorkflowStatePath, VendorStatePath, ".github/workflows/actions.lock", ".github/dependabot.yml", ".github/dependabot.yaml"} {
 		if _, err := load(name); err != nil {
 			return nil, err
 		}
@@ -213,6 +214,47 @@ func readTree(root, config string) (tree, error) {
 		}
 		if !exists {
 			return nil, fmt.Errorf("publisher action missing: %s", name)
+		}
+	}
+	vendors, err := loadVendors(out)
+	if err != nil {
+		return nil, err
+	}
+	for nwo, entry := range vendors.Repositories {
+		for name, record := range entry.Files {
+			exists, err := load(name)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				return nil, fmt.Errorf("vendored file missing: %s", name)
+			}
+			if runtime.GOOS == "windows" {
+				f := out[name]
+				f.Mode = fs.FileMode(record.Mode)
+				out[name] = f
+			}
+		}
+		path, err := safePath(root, strings.TrimSuffix(VendorRoot+nwo, "/"))
+		if err != nil {
+			return nil, err
+		}
+		err = filepath.WalkDir(path, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				return nil
+			}
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			_, err = load(filepath.ToSlash(relative))
+			return err
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	_, err = collectMetadata(out, load)
@@ -366,6 +408,24 @@ func applyTree(root, config string, before, after tree) error {
 			return err
 		}
 		return fmt.Errorf("repository changed during planning; rerun the command")
+	}
+	// Newly managed vendor paths may not have been part of the old snapshot.
+	// Never overwrite an untracked file that appeared at one of those paths.
+	for _, name := range paths {
+		if _, tracked := before[name]; !tracked {
+			path, e := safePath(root, name)
+			if e != nil {
+				_ = os.Remove(record.Name())
+				return e
+			}
+			if _, e = os.Lstat(path); e == nil {
+				_ = os.Remove(record.Name())
+				return fmt.Errorf("new managed path already exists: %s", name)
+			} else if !os.IsNotExist(e) {
+				_ = os.Remove(record.Name())
+				return e
+			}
+		}
 	}
 	j := journal{Before: before, After: after, Paths: paths}
 	data, err := json.Marshal(j)

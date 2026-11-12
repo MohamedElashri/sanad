@@ -236,6 +236,17 @@ func explain(files tree, g graph, cfg Config, opts Options, r *Report) error {
 			}
 		}
 	}
+	vendors, err := loadVendors(files)
+	if err != nil {
+		return err
+	}
+	for nwo, entry := range vendors.Repositories {
+		for _, workflow := range entry.Source.Workflows {
+			if err := visit(entry.Source.Key, []string{workflow, VendorRoot + nwo}); err != nil {
+				return err
+			}
+		}
+	}
 	for _, d := range g.list() {
 		if !explanationMatches(opts.Action, d) {
 			continue

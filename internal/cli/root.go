@@ -62,7 +62,7 @@ func NewRootCommand() *cobra.Command {
 	if date != "" && strings.HasPrefix(version, "1.") && !strings.Contains(version, "-") {
 		actionRef = commit
 	}
-	for _, name := range []string{"status", "doctor", "explain", "init", "sync", "plan", "update", "check", "recover"} {
+	for _, name := range []string{"status", "doctor", "explain", "init", "sync", "plan", "update", "vendor", "check", "recover"} {
 		cmd := &cobra.Command{Use: name, Short: descriptions[name], Args: cobra.NoArgs, RunE: run(name)}
 		if name == "explain" {
 			cmd.Use = "explain [owner/repo[/path][@ref]]"
@@ -74,7 +74,7 @@ func NewRootCommand() *cobra.Command {
 				return run("explain")(cmd, args)
 			}
 		}
-		if name == "init" || name == "sync" || name == "update" || name == "recover" {
+		if name == "init" || name == "sync" || name == "update" || name == "recover" || name == "vendor" {
 			cmd.Flags().BoolVar(&opts.Write, "write", false, "apply the proposed local changes")
 		}
 		if name == "init" {
@@ -86,6 +86,10 @@ func NewRootCommand() *cobra.Command {
 			cmd.Flags().BoolVar(&opts.CoverageOnly, "coverage-only", false, "explicitly skip adoption policy for an offline developer hook")
 			cmd.Flags().BoolVar(&opts.Offline, "offline", false, "check local coverage without network access")
 			cmd.Flags().StringVar(&opts.Base, "base", "", "trusted base commit for adoption-policy checks")
+		}
+		if name == "vendor" {
+			cmd.Flags().StringVar(&opts.Action, "action", "", "repository to vendor: owner/repo")
+			cmd.Flags().StringVar(&opts.To, "to", "", "explicit upstream version for a reviewed vendor update")
 		}
 		if name == "plan" || name == "update" {
 			cmd.Flags().StringVar(&opts.Action, "action", "", "select owner/repo[/path]")
@@ -147,4 +151,4 @@ func NewRootCommand() *cobra.Command {
 	return root
 }
 
-var descriptions = map[string]string{"explain": "Explain dependency paths, source identities, and observations", "status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}
+var descriptions = map[string]string{"vendor": "Copy complete action source at a verified commit", "explain": "Explain dependency paths, source identities, and observations", "status": "Show native lockfile readiness and dependencies", "doctor": "Diagnose tools, authentication, and state", "init": "Preview native onboarding and accept an initial baseline", "sync": "Reconcile workflow edits while preserving existing pins", "plan": "Explain eligible dependency updates", "update": "Apply eligible dependency updates", "check": "Verify frozen native pins and adoption policy", "recover": "Restore an interrupted write transaction"}

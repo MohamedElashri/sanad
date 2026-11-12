@@ -20,6 +20,7 @@ type Options struct {
 	CoverageOnly                              bool
 	Action, To, Level, Constraint, ActionRef  string
 	Backend                                   Backend
+	Archives                                  ArchiveSource
 	Workflows                                 WorkflowSource
 	Releases                                  ReleaseSource
 	Now                                       time.Time
@@ -78,6 +79,13 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	input, err := readTree(root, opts.Config)
 	if err != nil {
 		return report, err
+	}
+	vendors, e := loadVendors(input)
+	if e != nil {
+		return report, e
+	}
+	if e := vendorChecks(input, vendors); e != nil {
+		return report, e
 	}
 	if err := checkPublisher(input, cfg, &report); err != nil {
 		return report, err
@@ -197,6 +205,12 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		}
 		backend = native
 	}
+	if e := verifyVendors(ctx, input, host, repo, opts, backend, &report); e != nil {
+		return report, e
+	}
+	if report.Blocked() {
+		return report, nil
+	}
 	work, err := snapshot(input)
 	if err != nil {
 		return report, err
@@ -243,12 +257,15 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 		}
 		return report, nil
 	}
-	if command != "init" && command != "sync" && command != "plan" && command != "update" {
+	if command != "init" && command != "sync" && command != "plan" && command != "update" && command != "vendor" {
 		return report, fmt.Errorf("unsupported command %s", command)
 	}
 	if opts.Write && !cfg.Native.Enabled {
 		report.finding("native-support-required", "error", "verify native lockfile support for this repository, then run init --confirm-native --write")
 		return report, nil
+	}
+	if command == "vendor" {
+		return runVendor(ctx, root, host, repo, cfg, opts, backend, input, &report)
 	}
 	if opts.ConfirmNative {
 		var b strings.Builder
@@ -459,7 +476,7 @@ func baseFiles(ctx context.Context, root, base, config string) (tree, error) {
 	}
 	hash := strings.TrimSpace(string(b))
 	out := tree{}
-	for _, name := range []string{lock.Path, StatePath, WorkflowStatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
+	for _, name := range []string{lock.Path, StatePath, WorkflowStatePath, VendorStatePath, config, ".github/dependabot.yml", ".github/dependabot.yaml"} {
 		cmd = exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "--name-only", hash, "--", name)
 		b, err = cmd.Output()
 		if err != nil {
