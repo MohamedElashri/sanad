@@ -2,6 +2,12 @@
 
 All notable changes to Sanad are documented here.
 
+## Unreleased
+
+### Fixes
+
+- Create fresh update PRs after earlier ones close.
+
 ## 1.1.0 - 2026-11-12
 
 ### Features
