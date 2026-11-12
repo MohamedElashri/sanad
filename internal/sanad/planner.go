@@ -16,7 +16,11 @@ func targets(releases []Release, current string, p UpdatePolicy, explicit string
 	if explicit != "" {
 		return []string{explicit}
 	}
-	from, err := semver.NewVersion(current)
+	currentVersion, full := policyVersion(current, p)
+	if !full {
+		return nil
+	}
+	from, err := semver.NewVersion(currentVersion)
 	if err != nil {
 		return nil
 	}
@@ -31,11 +35,11 @@ func targets(releases []Release, current string, p UpdatePolicy, explicit string
 	list := []candidate{}
 	seen := map[string]bool{}
 	for _, r := range releases {
-		parsed, full := lock.ParseSemVer(r.Ref)
-		if !full || !parsed.IsFull() || !parsed.IsStable() {
+		version, full := policyVersion(r.Ref, p)
+		if !full {
 			continue
 		}
-		v, err := semver.NewVersion(r.Ref)
+		v, err := semver.NewVersion(version)
 		if err != nil || r.Draft || r.Prerelease || v.Prerelease() != "" || !v.GreaterThan(from) || seen[r.Ref] {
 			continue
 		}
@@ -119,15 +123,40 @@ func validateScope(before, after graph, oldKey, newKey string) error {
 }
 
 func effectivePolicy(cfg Config, opts Options, name, nwo string) UpdatePolicy {
-	if opts.Level != "" || opts.Constraint != "" {
-		return UpdatePolicy{Level: opts.Level, Constraint: opts.Constraint}
-	}
+	p := cfg.Update
 	for _, key := range []string{name, nwo} {
-		if p, ok := cfg.Actions[canonicalActionName(key)]; ok && (p.Level != "" || p.Constraint != "") {
-			return p
+		if override, ok := cfg.Actions[canonicalActionName(key)]; ok && (override.Level != "" || override.Constraint != "" || override.TagPrefix != "" || override.PreferTags != nil) {
+			if override.Level != "" || override.Constraint != "" {
+				p.Level = override.Level
+				p.Constraint = override.Constraint
+			}
+			if override.TagPrefix != "" {
+				p.TagPrefix = override.TagPrefix
+			}
+			if override.PreferTags != nil {
+				p.PreferTags = override.PreferTags
+			}
+			break
 		}
 	}
-	return cfg.Update
+	if opts.Level != "" || opts.Constraint != "" {
+		p.Level = opts.Level
+		p.Constraint = opts.Constraint
+	}
+	return p
+}
+func lockParsePrefix(prefix string) bool {
+	return lock.ParseActionRef("owner/repo@"+prefix+"1.2.3") != nil
+}
+func policyVersion(ref string, p UpdatePolicy) (string, bool) {
+	if p.TagPrefix != "" {
+		if !strings.HasPrefix(ref, p.TagPrefix) {
+			return "", false
+		}
+		ref = strings.TrimPrefix(ref, p.TagPrefix)
+	}
+	v, ok := lock.ParseSemVer(ref)
+	return ref, ok && v.IsFull() && v.IsStable()
 }
 
 func matchesAction(selected string, ref reference) bool {
@@ -141,7 +170,15 @@ func validateTransitivePolicies(before, after graph, selected string, cfg Config
 		}
 		nwo, ref, _ := strings.Cut(c.Key, "@")
 		policy := effectivePolicy(cfg, opts, nwo, nwo)
-		version, err := semver.NewVersion(ref)
+		versionRef := ref
+		if policy.TagPrefix != "" {
+			var ok bool
+			versionRef, ok = policyVersion(ref, policy)
+			if !ok {
+				return fmt.Errorf("%s is outside tag family %s", c.Key, policy.TagPrefix)
+			}
+		}
+		version, err := semver.NewVersion(versionRef)
 		if policy.Constraint != "" {
 			constraint, _ := semver.NewConstraint(policy.Constraint)
 			if err != nil || !constraint.Check(version) {
@@ -158,7 +195,15 @@ func validateTransitivePolicies(before, after graph, selected string, cfg Config
 			if oldNWO != nwo || old.Host != c.After.Host {
 				continue
 			}
-			v, err := semver.NewVersion(oldRef)
+			oldVersion := oldRef
+			if policy.TagPrefix != "" {
+				var ok bool
+				oldVersion, ok = policyVersion(oldRef, policy)
+				if !ok {
+					continue
+				}
+			}
+			v, err := semver.NewVersion(oldVersion)
 			if err != nil {
 				continue
 			}
@@ -275,12 +320,12 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 		effective := effectivePolicy(cfg, opts, ref.Name, ref.NWO)
 		var releases []Release
 		if opts.To == "" {
-			parsed, versionRef := lock.ParseSemVer(ref.Ref)
-			if !versionRef || !parsed.IsFull() || !parsed.IsStable() {
+			_, versionRef := policyVersion(ref.Ref, effective)
+			if !versionRef {
 				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, Status: "frozen", Reason: "only full stable versions update automatically; choose an explicit version with --to"})
 				continue
 			}
-			releases, err = source.List(ctx, initial[key].Host, ref.NWO)
+			releases, err = listCandidates(ctx, source, initial[key].Host, ref.NWO, effective)
 			if err != nil {
 				return err
 			}
@@ -293,6 +338,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			}
 			filtered := []string{}
 			for _, target := range candidates {
+
 				if allowed[target] {
 					filtered = append(filtered, target)
 				}
@@ -304,6 +350,10 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			continue
 		}
 		for _, target := range candidates {
+			if age > 0 && tagOnlyCandidate(releases, target) {
+				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "blocked", Reason: "tag-only candidate has no release publication timestamp for cooldown policy"})
+				continue
+			}
 			if target == ref.Ref {
 				r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, To: target, Status: "unchanged", Reason: "already tracking this ref; mutable-ref refresh is not supported by the scoped native producer"})
 				continue
