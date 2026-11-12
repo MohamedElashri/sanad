@@ -293,6 +293,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 	}
 	groups := map[string][]reference{}
 	keys := []string{}
+	frozen := map[string]reference{}
 	for _, ref := range refs {
 		if ref.Workflow {
 			continue
@@ -304,13 +305,26 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 		if !matchesAction(opts.Action, ref) {
 			continue
 		}
+		if strings.HasPrefix(ref.File, VendorRoot) {
+			frozen[key] = ref
+			continue
+		}
 		if _, ok := groups[key]; !ok {
 			keys = append(keys, key)
 		}
 		groups[key] = append(groups[key], ref)
 	}
-	if opts.Action != "" && len(keys) == 0 && !hasWorkflowSelection(refs, opts.Action) {
+	if opts.Action != "" && len(keys) == 0 && len(frozen) == 0 && !hasWorkflowSelection(refs, opts.Action) {
 		return fmt.Errorf("no locked action matches %s", opts.Action)
+	}
+	frozenKeys := []string{}
+	for key := range frozen {
+		frozenKeys = append(frozenKeys, key)
+	}
+	sort.Strings(frozenKeys)
+	for _, key := range frozenKeys {
+		ref := frozen[key]
+		r.Decisions = append(r.Decisions, Decision{Action: ref.Name, From: ref.Ref, Status: "frozen", Reason: "vendored source is immutable; update the owning snapshot with sanad vendor"})
 	}
 	sort.Strings(keys)
 	observed := map[string]time.Time{}
@@ -374,7 +388,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			}
 			selected := []reference{}
 			for _, candidate := range currentRefs {
-				if strings.EqualFold(candidate.NWO, ref.NWO) && candidate.Ref == ref.Ref && matchesAction(opts.Action, candidate) {
+				if !strings.HasPrefix(candidate.File, VendorRoot) && !candidate.Workflow && strings.EqualFold(candidate.NWO, ref.NWO) && candidate.Ref == ref.Ref && matchesAction(opts.Action, candidate) {
 					selected = append(selected, candidate)
 				}
 			}

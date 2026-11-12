@@ -412,6 +412,9 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if e != nil {
 		return report, e
 	}
+	if err := vendorChecks(final, vendors); err != nil {
+		return report, fmt.Errorf("operation would modify an immutable vendor snapshot: %w", err)
+	}
 	if err := checkPublisher(final, cfg, &report); err != nil {
 		return report, err
 	}
