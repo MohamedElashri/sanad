@@ -91,6 +91,20 @@ func loadPolicyGraph(files tree, host string) (graph, error) {
 	if err != nil {
 		return nil, err
 	}
+	vendors, err := loadVendors(files)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range vendors.Repositories {
+		d := entry.Source
+		if host == "github.com" && d.Host != host || host != "github.com" && d.Host != "github.com" && d.Host != host {
+			return nil, fmt.Errorf("vendor source is bound to a different host")
+		}
+		if old, ok := g[d.Key]; ok && (old.Commit != d.Commit || old.OwnerID != d.OwnerID || old.RepoID != d.RepoID || old.Host != d.Host) {
+			return nil, fmt.Errorf("vendor source conflicts with native pin %s", d.Key)
+		}
+		g[d.Key] = d
+	}
 	for _, p := range state.Pins {
 		if host == "github.com" && p.Host != host || host != "github.com" && p.Host != "github.com" && p.Host != host {
 			return nil, fmt.Errorf("reusable workflow is bound to a different host")
