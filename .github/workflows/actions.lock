@@ -23,6 +23,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.0'
         - 'mohamedelashri/sanad@v1.1.0'
+    '.github/workflows/sanad-update.yml': []
     '.github/workflows/update-pr.yml':
         - 'actions/checkout@v7.0.1'
 dependencies:
