@@ -193,3 +193,9 @@ Commit/tag author dates do not establish publication age for this fallback.
 First-seen observations remain available when you want waiting periods for projects
 without release records. Explicit `--to` selections retain the ordinary adoption
 checks and are separate from automatic catalog selection.
+
+Callee coverage inspection checks each visible direct action against the callee
+workflow's own pin set, including inline-SHA consistency. An empty workflow entry
+cannot hide missing pins. Local action implementations that were not downloaded
+leave coverage unestablished; the result is not an online trust audit of every
+transitive dependency or nested reusable workflow.

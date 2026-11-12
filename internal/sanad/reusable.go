@@ -184,7 +184,7 @@ func reconcileWorkflows(ctx context.Context, files tree, host string, opts Optio
 		}
 		next.Pins[workflowKey(ref.Name, pin.Commit)] = pin
 		if !pin.CalleeLocked {
-			r.Findings = append(r.Findings, Finding{Code: "callee-lock-missing", Severity: "warning", File: ref.File, Message: ref.Name + ": the called workflow has no structural lockfile coverage at its pinned commit; its dependencies are outside the caller's lockfile"})
+			r.Findings = append(r.Findings, Finding{Code: "callee-lock-missing", Severity: "warning", File: ref.File, Message: ref.Name + ": complete action coverage was not established in the called workflow at its pinned commit; its dependencies are outside the caller's lockfile"})
 		}
 	}
 	if verify {
@@ -357,7 +357,7 @@ func (a *githubAPI) Workflow(ctx context.Context, host, name, ref, sha string) (
 		return pin, err
 	}
 	if exists {
-		_, e := loadGraph(tree{lock.Path: {Data: data}}, host)
+		calleeGraph, e := loadGraph(tree{lock.Path: {Data: data}}, host)
 		if e != nil {
 			return pin, e
 		}
@@ -365,7 +365,10 @@ func (a *githubAPI) Workflow(ctx context.Context, host, name, ref, sha string) (
 		if e != nil {
 			return pin, e
 		}
-		_, pin.CalleeLocked = parsed.Workflows[parts[2]]
+		pin.CalleeLocked, e = calleeCovered(&doc, parts[2], parsed, calleeGraph)
+		if e != nil {
+			return pin, e
+		}
 	}
 	return pin, nil
 }
@@ -519,7 +522,7 @@ func planWorkflows(ctx context.Context, work, host string, cfg Config, opts Opti
 				continue
 			}
 			if !pin.CalleeLocked {
-				r.Findings = append(r.Findings, Finding{Code: "callee-lock-missing", Severity: "warning", File: ref.File, Message: ref.Name + ": callee action dependencies have no structural lockfile coverage at the selected commit"})
+				r.Findings = append(r.Findings, Finding{Code: "callee-lock-missing", Severity: "warning", File: ref.File, Message: ref.Name + ": complete callee action coverage was not established at the selected commit"})
 			}
 			if err := installTree(work, current, edited); err != nil {
 				return err
@@ -538,4 +541,42 @@ func planWorkflows(ctx context.Context, work, host string, cfg Config, opts Opti
 		return putFile(work, StatePath, staged[StatePath])
 	}
 	return nil
+}
+
+// A workflow entry alone is insufficient: every visible remote action must be
+// in that workflow's pin set. Local implementations cannot be inspected from
+// the workflow file alone, so leave their coverage unknown rather than green.
+func calleeCovered(doc *yaml.Node, path string, parsed lock.File, g graph) (bool, error) {
+	keys, ok := parsed.Workflows[path]
+	if !ok {
+		return false, nil
+	}
+	pins := map[string]bool{}
+	for _, key := range keys {
+		pins[key] = true
+	}
+	sites, err := metadataUses(doc, true)
+	if err != nil {
+		return false, err
+	}
+	for _, site := range sites {
+		if site.reusable {
+			continue
+		}
+		value := site.node.Value
+		if strings.HasPrefix(value, "$/") || strings.HasPrefix(value, "./") {
+			return false, nil
+		}
+		if action := lock.ParseActionRef(value); action != nil {
+			key := strings.ToLower(action.NWO()) + "@" + action.Ref
+			dep, ok := g[key]
+			if !ok || !pins[key] {
+				return false, nil
+			}
+			if fullSHA.MatchString(action.Ref) && !strings.EqualFold(dep.Commit, "sha1-"+action.Ref) {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
 }
