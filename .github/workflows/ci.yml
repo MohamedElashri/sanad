@@ -69,6 +69,8 @@ jobs:
       - name: Build action bundle for Dependabot
         if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
         shell: bash
+        env:
+          DEPENDABOT_HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
           npm run build --prefix action
@@ -77,6 +79,6 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "build(action): update dist bundle for dependabot [dependabot skip]"
-            git push origin "HEAD:${{ github.head_ref }}"
+            git push origin "HEAD:$DEPENDABOT_HEAD_REF"
           fi
       - run: npm run check-dist --prefix action
