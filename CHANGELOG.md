@@ -4,47 +4,32 @@ All notable changes to Sanad are documented here.
 
 ## 1.1.0 - 2026-11-12
 
-### Added
+### Features
 
-- Pin and update remote reusable workflows with readable version tracking, numeric source identities, and callee lockfile inspection at the pinned commit.
-- Add `sanad explain` with workflow and composite call paths, stored observations, source identities, and commit compare links.
-- Report protection surfaces for actions, reusable workflows, containers, runner environments, runtime tools, and shell commands. Import optional zizmor SARIF findings.
-- Protect inline commit pins in declared published action metadata with `[publisher]` policy.
-- Require reviewed repository identities across direct and transitive dependencies with `[trust]` policy and trusted-base approvals.
-- Vendor complete verified action repository snapshots, retaining source files, licenses, executable modes, and provenance. Apply explicit, reviewed snapshot updates.
-- Support explicit tag families and optional tag catalogs, preserving repository policy in subaction overrides and intersecting policies for shared refs.
-- Add CLI-only Makefile and pre-commit integrations, explicit offline coverage-only mode, and separate public GitHub credentials for tenant runs.
-- Generate SPDX inventories for all release archives and the Action's production dependencies, with build-provenance attestations in the release workflow.
+- Pin and update reusable workflows.
+- Explain dependency paths and source identities.
+- Report coverage gaps and import zizmor findings.
+- Protect published action pins and approve trusted sources.
+- Vendor verified action source snapshots.
+- Support tag families and tag-based updates.
+- Add CLI hooks, SBOMs, and build provenance.
 
-### Security
+### Fixes
 
-- Upgrade the checksum-pinned native backend to `gh-actions-lock v0.4.1`, including upstream source-reachability, incomplete-graph, and unanswered-pin verification fixes.
-- Restrict recovery to managed paths and serialize writes and recovery with an operating-system lock held through validation and updates.
-- Enforce release cooldowns during verification and assess the locked commit's age as well as release publication. Require a trusted base for waiting-period and source-approval checks.
-- Verify cached Action release archives against immutable release metadata and extract fresh executables before execution.
-- Bind repository identity across action and reusable-workflow call types, and reject incomplete callee coverage claims.
+- Upgrade the native backend to v0.4.1.
+- Harden recovery, transaction locks, and cached binaries.
+- Enforce cooldowns and transitive update policies.
+- Fix YAML aliases, parallel groups, and subaction policies.
+- Preserve repository identities and immutable vendor snapshots.
+- Correct callee coverage and retain observation history.
+- Stop canceled operations before repository writes.
 
-### Fixed
+### Upgrade
 
-- Enforce transitive version constraints and update levels, including compatible baselines when multiple versions are installed.
-- Preserve case-sensitive subaction selection while canonicalizing repository names; apply every selected sibling policy independently of call order.
-- Restrict automatic targets to full stable versions and reject unknown publication age for tag-only automatic candidates when release cooldowns apply.
-- Follow reachable local action metadata, support YAML aliases and flat parallel step groups, and keep ordinary input data out of execution scanning.
-- Traverse both dependency graphs when checking update scope and require native pins at every visible composite callsite.
-- Encode observation identities without delimiter ambiguity and migrate existing history without resetting maturity.
-- Recognize legacy directives only in active YAML comments.
-- Keep vendored snapshots immutable during ordinary updates, verify reusable workflows during vendoring, and reject canceled operations before repository writes.
-- Require dedicated workflow-write credentials for generated update automation.
-
-### Upgrade notes
-
-- Upgrade the CLI and Action together. Commands, configuration version 1, and report version 1 remain supported; new report fields are additive.
-- Run `sanad sync` to review remote reusable-workflow onboarding, then `sanad sync --write`. Commit `.github/sanad/workflows.json` with the SHA-pinned calls. Existing waiting periods can require an observation-only change before adoption.
-- Provide a trusted `--base` for online checks when first-seen, release-cooldown, or source-approval policy is enabled. Developer hooks can explicitly use `check --offline --coverage-only`; this does not enforce adoption policy.
-- Generated update workflows require `SANAD_TOKEN` with Contents, Workflows, and Pull requests write permissions, or an equivalent GitHub App token. The built-in `GITHUB_TOKEN` is rejected for updates.
-- Observation state version 1 remains readable; subsequent state changes write version 2 without resetting established dates.
-- Stricter upstream verification may reject previously accepted pins. Review and reconcile the source refs rather than hand-editing execution pins to silence findings.
-- Release cooldowns do not prove when a tag moved, and commit dates can be backdated. Use first-seen observations when that distinction matters.
+- Upgrade the CLI and Action together; 1.x interfaces remain supported.
+- Run `sanad sync --write` to onboard reusable workflows.
+- Use a trusted `--base` for adoption checks.
+- Scheduled updates require a workflow-capable `SANAD_TOKEN`.
 
 ## 1.0.2 - 2026-11-07
 

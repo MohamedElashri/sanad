@@ -47,12 +47,25 @@ jobs:
       - name: Determine release version
         id: release-version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Prepare release notes
+        run: |
+          python3 - <<'PYNOTES'
+          import os
+          from pathlib import Path
+          version = Path("VERSION").read_text().strip()
+          changelog = Path("CHANGELOG.md").read_text()
+          section = changelog.split(f"## {version} - ", 1)[1]
+          notes = section.split("\n", 1)[1].split("\n## ", 1)[0].strip()
+          if not notes:
+              raise SystemExit("Release notes are empty")
+          Path(os.environ["RUNNER_TEMP"], "sanad-release-notes.md").write_text(notes + "\n")
+          PYNOTES
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7.3.0
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes "${{ runner.temp }}/sanad-release-notes.md"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
