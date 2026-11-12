@@ -38,6 +38,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.Repo, "repo", "", "repository identity: [HOST/]OWNER/REPO")
 	root.PersistentFlags().StringVar(&opts.Config, "config", sanad.ConfigPath, "versioned policy file")
 	root.PersistentFlags().StringVar(&format, "format", "table", "table, json, or markdown")
+	root.PersistentFlags().StringVar(&opts.ZizmorReport, "zizmor-report", "", "import a repository-relative zizmor SARIF report")
 	run := func(name string) func(*cobra.Command, []string) error {
 		return func(cmd *cobra.Command, args []string) error {
 			if format != "table" && format != "json" && format != "markdown" {

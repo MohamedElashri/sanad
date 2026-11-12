@@ -15,7 +15,7 @@ import (
 )
 
 type Options struct {
-	Root, Repo, Config, Base                  string
+	Root, Repo, Config, Base, ZizmorReport    string
 	Write, Offline, ConfirmNative, Automation bool
 	Action, To, Level, Constraint, ActionRef  string
 	Backend                                   Backend
@@ -81,6 +81,11 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	if report.Blocked() {
 		return report, nil
 	}
+	if opts.ZizmorReport != "" {
+		if err := importZizmor(root, opts.ZizmorReport, &report); err != nil {
+			return report, err
+		}
+	}
 	refs, err := references(input)
 	if err != nil {
 		return report, err
@@ -109,6 +114,10 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	}
 	report.Dependencies = old.list()
 	report.Coverage = coverage(input)
+	report.Protection, err = protections(input, host)
+	if err != nil {
+		return report, err
+	}
 	for _, ref := range refs {
 		if ref.Workflow {
 			report.Findings = append(report.Findings, Finding{Code: "external-workflow", Severity: "warning", File: ref.File, Message: ref.Name + ": dependencies inside the called workflow use its defining repository's lockfile"})
@@ -394,6 +403,10 @@ func Run(ctx context.Context, command string, opts Options) (report Report, err 
 	}
 	report.Dependencies = finalGraph.list()
 	report.Coverage = coverage(final)
+	report.Protection, err = protections(final, host)
+	if err != nil {
+		return report, err
+	}
 	report.Changes = graphDiff(old, finalGraph)
 	if err := ctx.Err(); err != nil {
 		return report, err

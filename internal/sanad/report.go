@@ -54,6 +54,7 @@ type Report struct {
 	LockfileVersion string       `json:"lockfile_version"`
 	Verification    string       `json:"verification"`
 	NativeSupport   string       `json:"native_support"`
+	Protection      []Protection `json:"protection"`
 	Coverage        Coverage     `json:"coverage"`
 	Findings        []Finding    `json:"findings"`
 	Dependencies    []Dependency `json:"dependencies"`
@@ -70,7 +71,7 @@ type Coverage struct {
 }
 
 func NewReport(command string) Report {
-	return Report{Version: 1, Command: command, BackendVersion: BackendVersion, ParserVersion: "v0.0.6", LockfileVersion: "v0.0.3", Verification: "none", NativeSupport: "unknown", Coverage: Coverage{Uncovered: []string{}}, Findings: []Finding{}, Dependencies: []Dependency{}, Changes: []Change{}, Decisions: []Decision{}, Files: []FileChange{}}
+	return Report{Version: 1, Command: command, BackendVersion: BackendVersion, ParserVersion: "v0.0.6", LockfileVersion: "v0.0.3", Verification: "none", NativeSupport: "unknown", Protection: []Protection{}, Coverage: Coverage{Uncovered: []string{}}, Findings: []Finding{}, Dependencies: []Dependency{}, Changes: []Change{}, Decisions: []Decision{}, Files: []FileChange{}}
 }
 
 func (r *Report) finding(code, severity, message string) {
@@ -97,6 +98,12 @@ func (r Report) Markdown() string {
 		b.WriteString("\n| Dependency | Commit | Host |\n| --- | --- | --- |\n")
 		for _, d := range r.Dependencies {
 			fmt.Fprintf(&b, "| %s | %s | %s |\n", escape(d.Key), escape(d.Commit), escape(d.Host))
+		}
+	}
+	if len(r.Protection) > 0 {
+		b.WriteString("\n| Surface | Location | Protection | Detail |\n| --- | --- | --- | --- |\n")
+		for _, p := range r.Protection {
+			fmt.Fprintf(&b, "| %s | %s:%d | %s | %s |\n", escape(p.Kind), escape(p.File), p.Line, escape(p.Status), escape(p.Subject+": "+p.Reason))
 		}
 	}
 	for _, f := range r.Findings {
