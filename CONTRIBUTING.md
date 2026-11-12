@@ -31,3 +31,7 @@ Sanad proposes Actions updates on Mondays at 03:00 UTC, or through a manual run
 of the **Sanad updates** workflow. It uses the workflow-capable `SANAD_TOKEN`
 repository secret and maintains one update PR. Dependabot handles Go and npm
 dependencies.
+
+The updater currently pins a reviewed workflow fix by commit. After the next
+Sanad release, explicitly update this reusable-workflow pin to the release tag
+to resume its automatic version updates.
