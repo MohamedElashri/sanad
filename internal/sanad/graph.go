@@ -123,6 +123,7 @@ func graphDiff(before, after graph) []Change {
 		if bok {
 			c.After = &b
 		}
+		reviewChange(&c, before)
 		out = append(out, c)
 	}
 	return out

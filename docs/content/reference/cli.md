@@ -116,3 +116,22 @@ sanad completion bash > sanad.bash
 ```
 
 See [Reports](../reports/) for machine-readable output, and [Configuration](../configuration/) for policy values.
+
+## Explain a dependency
+
+```sh
+sanad explain
+sanad explain actions/checkout
+sanad explain 'actions/checkout@v7.0.1' --format json
+```
+
+`explain` reads local metadata without installing a backend or querying GitHub.
+It shows workflow and local-composite paths to direct and transitive dependencies,
+source commits and numeric identities, and stored observations with their waiting
+periods. Pending observations are candidates, not adopted execution pins. Run
+`plan` for current release selection, complete candidate graphs, and all policy
+checks. A dependency with no current call path is shown with an empty path list.
+
+Update reports include commit compare URLs when the prior repository version is
+unambiguous, and identify new sources and source-identity changes. These links
+help review code; they do not establish that the changes are safe.
