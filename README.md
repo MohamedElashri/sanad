@@ -9,7 +9,7 @@ It generates lockfiles, explains dependency changes, applies update policies, an
 verifies them in CI. GitHub enforces the locked commits when workflows run.
 
 Requires [native lockfile support](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)
-for your repository. Native lockfiles are in GitHub's public preview.
+for your repository. Native lockfiles are generally available on GitHub Free, Team, and Enterprise Cloud (including data residency). GitHub Enterprise Server is not supported.
 
 ## CLI quickstart
 

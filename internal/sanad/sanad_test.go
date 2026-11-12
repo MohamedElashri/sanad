@@ -119,9 +119,6 @@ func (b *fakeBackend) Run(ctx context.Context, root, host, repo string, args ...
 	if b.fail {
 		return r, errors.New("producer failed after staging")
 	}
-	// Match the official producer's pre-fix diagnosis on exit 0.
-	invalid := false
-	r.Valid = &invalid
 	return r, nil
 }
 
@@ -471,7 +468,7 @@ func TestCrossHostCredentialsAndScopeAreProtected(t *testing.T) {
 func TestNativeBackendContract(t *testing.T) {
 	path := os.Getenv("SANAD_TEST_BACKEND")
 	if path == "" {
-		t.Skip("set SANAD_TEST_BACKEND to the official v0.2.0 binary for the producer contract test")
+		t.Skip("set SANAD_TEST_BACKEND to the official v0.4.1 binary for the producer contract test")
 	}
 	if err := verifyBackend(path); err != nil {
 		t.Fatal(err)
@@ -493,6 +490,16 @@ func TestNativeBackendContract(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, lock.Path)); !os.IsNotExist(err) {
 		t.Fatal("native preview wrote original lock")
+	}
+	// Fix-mode JSON describes the resulting files, including local migration.
+	work, err := snapshot(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(work)
+	native, err := backend.Run(context.Background(), work, "github.com", "example/test", "--migrate-local-actions", "--no-narrow")
+	if err != nil || native.Valid == nil || !*native.Valid || native.ExitCode != 0 {
+		t.Fatalf("post-fix native contract: %+v %v", native, err)
 	}
 	opts.Write = true
 	r, err = Run(context.Background(), "init", opts)

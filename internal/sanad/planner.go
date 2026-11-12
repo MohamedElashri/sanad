@@ -332,7 +332,7 @@ func planUpdates(ctx context.Context, work, host, repo string, cfg Config, opts 
 			if err != nil {
 				return err
 			}
-			native, runErr := backend.Run(ctx, dir, host, repo, "--no-narrow", "--no-migrate-local-actions")
+			native, runErr := backend.Run(ctx, dir, host, repo, "--no-narrow")
 			if runErr != nil {
 				_ = os.RemoveAll(dir)
 				return runErr

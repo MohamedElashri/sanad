@@ -70,6 +70,6 @@ An unexpected journal needs investigation. Use the [recovery procedure](../troub
 
 ## Pinned native components
 
-Sanad 1.0 uses `gh-actions-lock v0.2.0` and `actions-lockfile/go v0.0.6`. Backend binaries are pinned by SHA-256. Changing either component requires the producer contract tests.
+Sanad 1.0 uses `gh-actions-lock v0.4.1` and `actions-lockfile/go v0.0.6`. Backend binaries are pinned by SHA-256. Changing either component requires the producer contract tests.
 
 The implementation has two packages: `internal/sanad` for the core behavior and `internal/cli` for commands and presentation. Dependency resolution stays in the official producer.
