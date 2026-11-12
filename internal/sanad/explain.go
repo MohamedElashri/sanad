@@ -73,49 +73,42 @@ func metadataEdges(files tree, name string) ([]string, error) {
 		return nil, err
 	}
 	targets := map[string]bool{}
-	seen := map[*yaml.Node]bool{}
-	var walk func(*yaml.Node)
-	walk = func(n *yaml.Node) {
-		n = unalias(n)
-		if n == nil || seen[n] {
-			return
+	sites, err := metadataUses(&doc, isWorkflow(name))
+	if err != nil {
+		return nil, err
+	}
+	for _, site := range sites {
+		path := ""
+		if strings.HasPrefix(site.node.Value, "$/") {
+			path = strings.TrimPrefix(site.node.Value, "$/")
 		}
-		seen[n] = true
-		if n.Kind == yaml.MappingNode {
-			if u := unalias(mapping(n, "uses")); u != nil {
-				path := ""
-				if strings.HasPrefix(u.Value, "$/") {
-					path = strings.TrimPrefix(u.Value, "$/")
-				}
-				if strings.HasPrefix(u.Value, "./") {
-					path = strings.TrimPrefix(u.Value, "./")
-				}
-				if path != "" && !strings.Contains(path, "..") && !strings.Contains(path, "@") {
-					if _, ok := files[path]; ok {
-						targets[path] = true
-					} else {
-						path = strings.TrimSuffix(path, "/")
-						if path == "." {
-							path = ""
-						}
-						if path != "" {
-							path += "/"
-						}
-						for _, suffix := range []string{"action.yml", "action.yaml"} {
-							if _, ok := files[path+suffix]; ok {
-								targets[path+suffix] = true
-								break
-							}
-						}
-					}
-				}
+		if strings.HasPrefix(site.node.Value, "./") {
+			path = strings.TrimPrefix(site.node.Value, "./")
+		}
+		if path == "" || strings.Contains(path, "..") || strings.Contains(path, "@") {
+			continue
+		}
+		if site.reusable {
+			if _, ok := files[path]; ok {
+				targets[path] = true
+			}
+			continue
+		}
+		path = strings.TrimSuffix(path, "/")
+		if path == "." {
+			path = ""
+		}
+		if path != "" {
+			path += "/"
+		}
+		for _, suffix := range []string{"action.yml", "action.yaml"} {
+			if _, ok := files[path+suffix]; ok {
+				targets[path+suffix] = true
+				break
 			}
 		}
-		for _, c := range n.Content {
-			walk(c)
-		}
 	}
-	walk(&doc)
+
 	out := []string{}
 	for t := range targets {
 		out = append(out, t)

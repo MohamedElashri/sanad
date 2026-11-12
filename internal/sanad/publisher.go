@@ -24,24 +24,15 @@ func checkPublisher(files tree, cfg Config, r *Report) error {
 		if err := yaml.Unmarshal(f.Data, &doc); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
-		visited := map[*yaml.Node]bool{}
-		var walk func(*yaml.Node)
-		walk = func(n *yaml.Node) {
-			n = unalias(n)
-			if n == nil || visited[n] {
-				return
-			}
-			visited[n] = true
-			if n.Kind == yaml.MappingNode {
-				if u := unalias(mapping(n, "uses")); u != nil && strings.HasPrefix(u.Value, "$/") {
-					r.Findings = append(r.Findings, Finding{Code: "publisher-self-reference", Severity: "error", File: name, Message: "exported actions cannot use $/ references resolved in a caller's repository"})
-				}
-			}
-			for _, c := range n.Content {
-				walk(c)
+		sites, err := metadataUses(&doc, false)
+		if err != nil {
+			return err
+		}
+		for _, site := range sites {
+			if strings.HasPrefix(site.node.Value, "$/") {
+				r.Findings = append(r.Findings, Finding{Code: "publisher-self-reference", Severity: "error", File: name, Message: "exported actions cannot use $/ references resolved in a caller's repository"})
 			}
 		}
-		walk(&doc)
 	}
 	refs, err := referencesIn(files, active)
 	if err != nil {

@@ -41,6 +41,86 @@ func unalias(n *yaml.Node) *yaml.Node {
 	return n
 }
 
+func isWorkflow(name string) bool {
+	return strings.HasPrefix(name, ".github/workflows/") && !strings.Contains(strings.TrimPrefix(name, ".github/workflows/"), "/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
+}
+
+type useSite struct {
+	node     *yaml.Node
+	reusable bool
+}
+
+func stepNodes(n *yaml.Node, parallel bool) ([]*yaml.Node, error) {
+	n = unalias(n)
+	if n == nil {
+		return nil, nil
+	}
+	if n.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("steps must be a sequence")
+	}
+	out := []*yaml.Node{}
+	for _, step := range n.Content {
+		step = unalias(step)
+		if step == nil || step.Kind != yaml.MappingNode {
+			continue
+		}
+		out = append(out, step)
+		if parallel {
+			inner, err := stepNodes(mapping(step, "parallel"), false)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, inner...)
+		}
+	}
+	return out, nil
+}
+
+// Match the producer's syntax: job steps can have one flat parallel group;
+// composite action steps cannot. Input/env keys named uses are ordinary data.
+func metadataUses(doc *yaml.Node, workflow bool) ([]useSite, error) {
+	if len(doc.Content) == 0 {
+		return nil, nil
+	}
+	root := doc.Content[0]
+	out := []useSite{}
+	addSteps := func(n *yaml.Node, parallel bool) error {
+		steps, err := stepNodes(n, parallel)
+		if err != nil {
+			return err
+		}
+		for _, step := range steps {
+			if u := unalias(mapping(step, "uses")); u != nil {
+				out = append(out, useSite{u, false})
+			}
+		}
+		return nil
+	}
+	if workflow {
+		jobs := unalias(mapping(root, "jobs"))
+		if jobs == nil {
+			return out, nil
+		}
+		if jobs.Kind != yaml.MappingNode {
+			return nil, fmt.Errorf("jobs must be a mapping")
+		}
+		for i := 1; i < len(jobs.Content); i += 2 {
+			job := jobs.Content[i]
+			if u := unalias(mapping(job, "uses")); u != nil {
+				out = append(out, useSite{u, true})
+			}
+			if err := addSteps(mapping(job, "steps"), true); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		if err := addSteps(mapping(mapping(root, "runs"), "steps"), false); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 func references(files tree) ([]reference, error) {
 	active, err := activeMetadata(files)
 	if err != nil {
@@ -56,7 +136,7 @@ func referencesIn(files tree, active map[string]bool) ([]reference, error) {
 		if !active[name] {
 			continue
 		}
-		workflow := strings.HasPrefix(name, ".github/workflows/") && (strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml"))
+		workflow := isWorkflow(name)
 		if !workflow && name != "action.yml" && name != "action.yaml" && !strings.HasSuffix(name, "/action.yml") && !strings.HasSuffix(name, "/action.yaml") {
 			continue
 		}
@@ -67,7 +147,6 @@ func referencesIn(files tree, active map[string]bool) ([]reference, error) {
 		if len(doc.Content) == 0 {
 			continue
 		}
-		root := doc.Content[0]
 		add := func(n *yaml.Node, reusable bool) error {
 			n = unalias(n)
 			if n == nil {
@@ -94,36 +173,12 @@ func referencesIn(files tree, active map[string]bool) ([]reference, error) {
 			}
 			return nil
 		}
-		steps := func(n *yaml.Node) error {
-			n = unalias(n)
-			if n == nil {
-				return nil
-			}
-			if n.Kind != yaml.SequenceNode {
-				return fmt.Errorf("%s: steps must be a sequence", name)
-			}
-			for _, step := range n.Content {
-				if err := add(mapping(step, "uses"), false); err != nil {
-					return err
-				}
-			}
-			return nil
+		sites, err := metadataUses(&doc, workflow)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		if workflow {
-			jobs := unalias(mapping(root, "jobs"))
-			if jobs != nil {
-				for i := 1; i < len(jobs.Content); i += 2 {
-					job := jobs.Content[i]
-					if err := add(mapping(job, "uses"), true); err != nil {
-						return nil, err
-					}
-					if err := steps(mapping(job, "steps")); err != nil {
-						return nil, err
-					}
-				}
-			}
-		} else {
-			if err := steps(mapping(mapping(root, "runs"), "steps")); err != nil {
+		for _, site := range sites {
+			if err := add(site.node, site.reusable); err != nil {
 				return nil, err
 			}
 		}
@@ -179,55 +234,40 @@ func collectMetadata(files tree, load func(string) (bool, error)) (map[string]bo
 		if err := yaml.Unmarshal(f.Data, &doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		var walk func(*yaml.Node)
-		visited := map[*yaml.Node]bool{}
-		walk = func(n *yaml.Node) {
-			n = unalias(n)
-			if n == nil || visited[n] {
-				return
+		sites, err := metadataUses(&doc, isWorkflow(name))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		for _, site := range sites {
+			value := site.node.Value
+			path := ""
+			if strings.HasPrefix(value, "$/") {
+				path = strings.TrimPrefix(value, "$/")
+			} else if strings.HasPrefix(value, "./") {
+				path = strings.TrimPrefix(value, "./")
+			} else {
+				continue
 			}
-			visited[n] = true
-			if n.Kind == yaml.MappingNode {
-				for i := 0; i+1 < len(n.Content); i += 2 {
-					valueNode := unalias(n.Content[i+1])
-					if n.Content[i].Value != "uses" || valueNode == nil || valueNode.Kind != yaml.ScalarNode {
-						continue
-					}
-					value := valueNode.Value
-					var path string
-					if strings.HasPrefix(value, "$/") {
-						path = strings.TrimPrefix(value, "$/")
-					} else if strings.HasPrefix(value, "./") {
-						path = strings.TrimPrefix(value, "./")
-					} else {
-						continue
-					}
-					if strings.Contains(path, "@") || strings.Contains(path, "..") || strings.HasPrefix(path, "/") {
-						continue
-					}
-					if strings.HasPrefix(path, ".github/workflows/") {
-						enqueue(path)
-						continue
-					}
-					path = strings.TrimSuffix(path, "/")
-					if path == "." {
-						path = ""
-					}
-					if path != "" {
-						path += "/"
-					}
-					for _, suffix := range []string{"action.yml", "action.yaml"} {
-						if enqueue(path + suffix) {
-							break
-						}
-					}
+			if strings.Contains(path, "@") || strings.Contains(path, "..") || strings.HasPrefix(path, "/") {
+				continue
+			}
+			if site.reusable {
+				enqueue(path)
+				continue
+			}
+			path = strings.TrimSuffix(path, "/")
+			if path == "." {
+				path = ""
+			}
+			if path != "" {
+				path += "/"
+			}
+			for _, suffix := range []string{"action.yml", "action.yaml"} {
+				if enqueue(path + suffix) {
+					break
 				}
 			}
-			for _, child := range n.Content {
-				walk(child)
-			}
 		}
-		walk(&doc)
 		if loadErr != nil {
 			return nil, loadErr
 		}

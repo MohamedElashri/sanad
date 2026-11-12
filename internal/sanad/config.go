@@ -114,6 +114,9 @@ func loadConfig(root, name string) (Config, error) {
 	}
 	raw.Actions = policies
 	for _, name := range raw.Publisher.Actions {
+		if isWorkflow(name) {
+			return c, fmt.Errorf("publisher action cannot also be a workflow: %s", name)
+		}
 		if _, err := safePath(root, name); err != nil {
 			return c, err
 		}

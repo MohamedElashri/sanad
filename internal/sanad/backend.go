@@ -191,7 +191,13 @@ func backendEnv(root, host, repo string) []string {
 		env = append(env, pair)
 	}
 	// User-global upstream cooldowns must not change repository policy.
-	return append(env, "GH_HOST="+host, "GH_REPO="+host+"/"+repo, "GH_ACTIONS_LOCK_REPO_ROOT="+root, "GH_ACTIONS_LOCK_CONFIG="+os.DevNull, "NO_COLOR=1")
+	env = append(env, "GH_HOST="+host, "GH_REPO="+host+"/"+repo, "GH_ACTIONS_LOCK_REPO_ROOT="+root, "GH_ACTIONS_LOCK_CONFIG="+os.DevNull, "NO_COLOR=1")
+	if validTenant(host) {
+		if token := os.Getenv("SANAD_GITHUB_COM_TOKEN"); token != "" {
+			env = append(env, "GH_ACTIONS_LOCK_GITHUB_COM_TOKEN="+token)
+		}
+	}
+	return env
 }
 
 func (b NativeBackend) Run(ctx context.Context, root, host, repo string, args ...string) (NativeResult, error) {

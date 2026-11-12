@@ -105,13 +105,7 @@ func loadPolicyGraph(files tree, host string) (graph, error) {
 		}
 		g[d.Key] = d
 	}
-	for _, p := range state.Pins {
-		if host == "github.com" && p.Host != host || host != "github.com" && p.Host != "github.com" && p.Host != host {
-			return nil, fmt.Errorf("reusable workflow is bound to a different host")
-		}
-		d := workflowDependency(p)
-		g[d.Key] = d
-	}
+
 	for _, ref := range refs {
 		if !ref.Workflow {
 			continue
@@ -122,6 +116,9 @@ func loadPolicyGraph(files tree, host string) (graph, error) {
 			}
 			d := workflowDependency(p)
 			if existing, ok := g[d.Key]; ok {
+				if existing.Commit != d.Commit || existing.Host != d.Host || existing.OwnerID != d.OwnerID || existing.RepoID != d.RepoID {
+					return nil, fmt.Errorf("reusable workflow version has conflicting execution pins: %s", d.Key)
+				}
 				d = existing
 			}
 			d.Workflows = append(d.Workflows, ref.File)
@@ -191,6 +188,11 @@ func reconcileWorkflows(ctx context.Context, files tree, host string, opts Optio
 		}
 	}
 	if verify {
+		for key := range state.Pins {
+			if _, ok := next.Pins[key]; !ok {
+				r.finding("workflow-orphan-pin", "error", "unused reusable workflow pin "+key+"; run sanad sync to remove it")
+			}
+		}
 		return nil
 	}
 	// Re-read positions after every edit (flow YAML may have multiple uses per line).

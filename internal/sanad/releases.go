@@ -48,6 +48,8 @@ func (a *githubAPI) token(ctx context.Context, host string) string {
 		if token == "" {
 			token = os.Getenv("GITHUB_TOKEN")
 		}
+	} else if host == "github.com" {
+		token = os.Getenv("SANAD_GITHUB_COM_TOKEN")
 	}
 	if token == "" {
 		cmd := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", host)
