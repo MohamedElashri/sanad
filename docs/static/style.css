@@ -261,10 +261,6 @@ input {
 .article-shell {
   min-width: 0;
   width: 100%;
-  max-width: 800px;
-}
-.home-article {
-  max-width: 960px;
 }
 .article-header {
   border-bottom: 1px solid var(--border);
@@ -297,10 +293,9 @@ h1 {
   color: var(--muted);
   font-size: 18px;
   line-height: 1.7;
-  max-width: 64ch;
 }
 .prose {
-  max-width: 78ch;
+  width: 100%;
   font-size: 16px;
   line-height: 1.85;
   overflow-wrap: break-word;
@@ -813,9 +808,6 @@ h1 {
   }
   .side-nav a {
     padding: 9px 10px;
-  }
-  .article-shell {
-    max-width: none;
   }
   #content,
   .prose h2,
