@@ -41,7 +41,7 @@ jobs:
           node -e 'require("./action/node_modules/@actions/core")'
           npm test --prefix action
       - name: Set up Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version: "1.26.x"
       - name: Determine release version
